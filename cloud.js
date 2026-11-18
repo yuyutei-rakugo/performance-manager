@@ -1,6 +1,6 @@
 // Configuration is enabled only after the Firebase project and access rules are ready.
 const listeners = new Set();
-const state = {ready:false, configured:false, user:null, role:null, message:'共通保存は設定準備中です。現在はこの端末に保存します。'};
+const state = {ready:false, configured:false, user:null, role:null,stageName:null, message:'共通保存は設定準備中です。現在はこの端末に保存します。'};
 let api, auth, db, userWatch, roleWatch;
 const watchers = new Set();
 const emit=()=>{listeners.forEach(fn=>fn({...state}));window.dispatchEvent(new CustomEvent('cloud-state',{detail:{...state}}));};
@@ -14,6 +14,16 @@ export const cloud={
   if(!db||!state.role)throw Error('会員ログインが必要です。');
   const stop=api.onSnapshot(api.doc(db,'shared',name),snap=>fn(snap.exists()?snap.data():null),e=>onError(errorMessage(e)));
   watchers.add(stop);return()=>{watchers.delete(stop);stop()};
+ },
+ watchAttendance(id,fn,onError){
+  if(!db||!state.role)throw Error('会員ログインが必要です。');
+  const stop=api.onSnapshot(api.collection(db,'rehearsalAttendance',id,'responses'),snap=>fn(snap.docs.map(d=>d.data())),e=>onError(errorMessage(e)));
+  watchers.add(stop);return()=>{watchers.delete(stop);stop()};
+ },
+ async respondAttendance(id,status){
+  if(!state.role||!state.stageName)throw Error('会員の高座名登録が必要です。');
+  if(!['出席','欠席','未定','未回答'].includes(status))throw Error('出欠を選択してください。');
+  try{await api.setDoc(api.doc(db,'rehearsalAttendance',id,'responses',auth.currentUser.uid),{stageName:state.stageName,status,updatedAt:api.serverTimestamp()})}catch(e){throw Error(errorMessage(e))}
  },
  async save(name,payload,revision){
   if(!['admin','editor'].includes(state.role))throw Error('編集を許可された会員のみ保存できます。');
@@ -33,11 +43,11 @@ export async function startCloud(){
   const [app,authApi,store]=await Promise.all([import(base+'firebase-app.js'),import(base+'firebase-auth.js'),import(base+'firebase-firestore.js')]);
   api={...authApi,...store};const firebase=app.initializeApp(config.firebase);auth=api.getAuth(firebase);db=api.getFirestore(firebase);
   userWatch=api.onAuthStateChanged(auth,user=>{
-   roleWatch?.();watchers.forEach(stop=>stop());watchers.clear();state.user=user?{uid:user.uid,email:user.email}:null;state.role=null;state.ready=!user;
+   roleWatch?.();watchers.forEach(stop=>stop());watchers.clear();state.user=user?{uid:user.uid,email:user.email}:null;state.role=null;state.stageName=null;state.ready=!user;
    state.message=user?'会員権限を確認しています。':'共通保存：ログインしてください。';emit();
    if(user)roleWatch=api.onSnapshot(api.doc(db,'members',user.uid),snap=>{
     const role=snap.exists()&&snap.data().active===true?snap.data().role:null;
-    state.role=['admin','editor','viewer'].includes(role)?role:null;state.ready=true;
+    state.role=['admin','editor','viewer'].includes(role)?role:null;state.stageName=state.role&&typeof snap.data().stageName==='string'?snap.data().stageName:null;state.ready=true;
     state.message=state.role?`共通保存：${user.email}（${{admin:'管理者',editor:'編集可',viewer:'閲覧のみ'}[state.role]}）`:`このアカウントは未承認です。管理者に会員IDを伝えてください：${user.uid}`;
     emit();
    },()=>{state.ready=true;state.role=null;state.message='会員権限を確認できませんでした。';emit()});
