@@ -17,6 +17,12 @@ const editable=()=>!cloud.state.configured||(['admin','editor'].includes(cloud.s
 function assigneePicker(item,i){return `<fieldset class="assignee-picker"><legend>担当者（任意・複数選択可）</legend>${[...new Set([...memberNames,...(item.assignees||[])])].map(n=>`<label><input type="checkbox" data-owner="${i}" value="${esc(n)}" ${(item.assignees||[]).includes(n)?'checked':''}>${esc(n)}</label>`).join('')}</fieldset>`}
 const progress = event => event.checklist.filter(item => item.done).length;
 
+function copiedTasks() {
+  const edited=events.filter(event=>typeof event.checklistUpdatedAt==='string');
+  const latest=[...(edited.length?edited:events)].sort((a,b)=>(b.checklistUpdatedAt||b.date+'T'+b.time).localeCompare(a.checklistUpdatedAt||a.date+'T'+a.time))[0];
+  return latest?latest.checklist.map(item=>({label:item.label,done:false,assignees:[],dueDate:''})):newTasks();
+}
+
 function samples() {
   const sample = (offset, title, time, venue, done) => {
     const date = new Date();
@@ -36,7 +42,7 @@ function validEvent(event) {
   if (!event.id.trim() || !event.title.trim() || !event.venue.trim()) return false;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(event.date) || localDate(new Date(event.date + 'T00:00:00')) !== event.date || !/^([01]\d|2[0-3]):[0-5]\d$/.test(event.time)) return false;
   return Array.isArray(event.performers) && event.performers.every(person => person && ['name','stageName','piece'].every(field => isText(person[field])) && person.stageName.trim() && person.piece.trim() && Number.isSafeInteger(person.minutes) && person.minutes > 0)
-    && Array.isArray(event.checklist) && event.checklist.length === 15 && event.checklist.every(item => item && isText(item.label) && item.label.trim() && typeof item.done === 'boolean' && (item.dueDate===undefined||item.dueDate===''||(isText(item.dueDate)&&/^\d{4}-\d{2}-\d{2}$/.test(item.dueDate)&&localDate(new Date(item.dueDate+'T00:00:00'))===item.dueDate)) && (item.assignees === undefined || (Array.isArray(item.assignees)&&item.assignees.every(isText))));
+    && Array.isArray(event.checklist) && event.checklist.length > 0 && event.checklist.length <= 200 && event.checklist.every(item => item && isText(item.label) && item.label.trim() && typeof item.done === 'boolean' && (item.dueDate===undefined||item.dueDate===''||(isText(item.dueDate)&&/^\d{4}-\d{2}-\d{2}$/.test(item.dueDate)&&localDate(new Date(item.dueDate+'T00:00:00'))===item.dueDate)) && (item.assignees === undefined || (Array.isArray(item.assignees)&&item.assignees.every(isText))));
 }
 
 let events = [];
@@ -95,15 +101,15 @@ function sortedEvents(list) {
 }
 function progressMarkup(event) {
   const done = progress(event);
-  return `<div class="progress"><div class="progress-label"><span>準備進捗</span><span>${done} / 15</span></div><progress aria-label="準備進捗" value="${done}" max="15"></progress></div>`;
+  return `<div class="progress"><div class="progress-label"><span>準備進捗</span><span>${done} / ${event.checklist.length}</span></div><progress aria-label="準備進捗" value="${done}" max="${event.checklist.length}"></progress></div>`;
 }
 function card(event) {
   const [year, mon, day] = event.date.split('-');
-  return `<article class="event-card"><div class="date-badge" aria-hidden="true"><small>${Number(mon)}月</small><strong>${Number(day)}</strong></div><div><h3>${esc(event.title)}</h3><div class="meta"><span>${year}/${mon}/${day} ${event.time}</span><span>＠ ${esc(event.venue)}</span></div></div>${progressMarkup(event)}<div class="event-actions"><button class="secondary" data-event="${esc(event.id)}" aria-label="${esc(event.title)}の詳細">詳細 ›</button><button class="secondary" data-edit-event="${esc(event.id)}" aria-label="${esc(event.title)}を編集" ${editable()?'':'disabled'}>編集</button><button class="danger" data-delete-event="${esc(event.id)}" aria-label="${esc(event.title)}を削除" ${editable()?'':'disabled'}>削除</button></div></article>`;
+  return `<article class="event-card"><div class="date-badge" aria-hidden="true"><small>${Number(mon)}月</small><strong>${Number(day)}</strong></div><div><h3>${esc(event.title)}</h3><div class="meta"><span>${year}/${mon}/${day} ${event.time}</span><span>＠ ${esc(event.venue)}</span></div></div>${progressMarkup(event)}<div class="event-actions"><button class="secondary" data-event="${esc(event.id)}" aria-label="${esc(event.title)}の詳細">詳細 ›</button><button class="secondary" data-edit-event="${esc(event.id)}" aria-label="${esc(event.title)}を編集" ${editable()?'':'disabled'}>編集</button></div></article>`;
 }
 function render() {
   const scheduled = events.filter(upcoming);
-  const stats = [['▦','予定の公演',scheduled.length],['◷','準備未完了',scheduled.filter(event => progress(event) < 15).length],['✓','準備完了',scheduled.filter(event => progress(event) === 15).length]];
+  const stats = [['▦','予定の公演',scheduled.length],['◷','準備未完了',scheduled.filter(event => progress(event) < event.checklist.length).length],['✓','準備完了',scheduled.filter(event => progress(event) === event.checklist.length).length]];
   $('stats').innerHTML = stats.map(([icon,label,count]) => `<div class="stat"><span class="stat-icon" aria-hidden="true">${icon}</span><div><small>${label}</small><strong>${count}</strong><span class="unit">件</span></div></div>`).join('');
   $('list-tab').setAttribute('aria-pressed', tab === 'list');
   $('calendar-tab').setAttribute('aria-pressed', tab === 'calendar');
@@ -135,12 +141,11 @@ function renderDetails(id) {
   if (!event) return;
   const program = event.performers.map(person => `<li><strong>${esc(person.stageName)}</strong>${person.name ? '（' + esc(person.name) + '）' : ''}　${esc(person.piece)}　${person.minutes}分</li>`).join('');
   eventDialog.innerHTML = `<div class="dialog-body"><div class="dialog-head"><h2 id="event-heading">${esc(event.title)}</h2><button type="button" data-close="event-dialog" aria-label="閉じる">×</button></div>
-    <p>${dateLabel(event.date)} ${event.time}<br>会場　${esc(event.venue)}</p><div class="form-actions"><button class="primary" data-edit ${editable()?'':'disabled'}>編集する</button><button class="danger" data-delete ${editable()?'':'disabled'}>削除する</button></div>
+    <p>${dateLabel(event.date)} ${event.time}<br>会場　${esc(event.venue)}</p><div class="form-actions"><button class="primary" data-edit ${editable()?'':'disabled'}>編集する</button></div>
     <section class="block"><h3>出演順・演目</h3>${program ? '<ol class="details-list">' + program + '</ol>' : '<p class="muted">出演者は未登録です。</p>'}</section>
     <section class="block"><h3>準備チェックリスト</h3>${progressMarkup(event)}${event.checklist.map((item,i) => `<div class="check-row"><label><input type="checkbox" data-check="${i}" ${editable()?'':'disabled'} ${item.done ? 'checked' : ''}>${esc(item.label)}</label><small>担当：${esc((item.assignees||[]).join('・')||'未設定')} ／ 完了予定：${esc(item.dueDate||'未設定')}</small></div>`).join('')}</section>
     <section class="block"><h3>メモ</h3><p class="memo">${esc(event.memo) || 'メモはありません。'}</p></section></div>`;
   eventDialog.querySelector('[data-edit]').onclick = () => renderForm(events.find(item => item.id === id));
-  eventDialog.querySelector('[data-delete]').onclick = () => deleteEvent(id);
   eventDialog.onchange = async change => {
     if (!change.target.matches('[data-check]')) return;
     const current = events.find(item => item.id === id);
@@ -173,15 +178,35 @@ function performerRow(person) {
 function renderForm(existing) {
   if(!editable()){notify('編集できる会員でログインしてください。');return}
   const formRevision=cloudRevision;
-  const event = existing || {title:'',date:tab === 'calendar' ? selected : today(),time:'14:00',venue:'',memo:'',performers:[],checklist:newTasks()};
+  const event = existing || {title:'',date:tab === 'calendar' ? selected : today(),time:'14:00',venue:'',memo:'',performers:[],checklist:copiedTasks()};
   eventDialog.onchange = null;
   eventDialog.innerHTML = `<div class="dialog-body"><div class="dialog-head"><h2 id="event-heading">${existing ? '公演を編集' : '公演を登録'}</h2><button type="button" data-close="event-dialog" aria-label="閉じる">×</button></div>
     <form id="event-form"><div class="fields"><label class="wide">公演名<input name="title" value="${esc(event.title)}" required></label><label>開催日<input name="date" type="date" value="${event.date}" required></label><label>開演時刻<input name="time" type="time" value="${event.time}" required></label><label class="wide">会場<input name="venue" value="${esc(event.venue)}" required></label></div>
     <section class="block"><h3>出演順・演目</h3><div id="performers"></div><button type="button" class="secondary" id="add-performer">＋ 出演者を追加</button></section>
-    <section class="block"><h3>準備チェックリスト</h3>${event.checklist.map((item,i) => `<div class="check-row"><span aria-hidden="true">${i + 1}</span><input aria-label="準備項目 ${i + 1}" name="label" value="${esc(item.label)}" required>${assigneePicker(item,i)}<label>完了予定日（任意）<input type="date" data-due="${i}" value="${esc(item.dueDate||'')}"></label></div>`).join('')}</section>
+    <section class="block"><h3>準備チェックリスト</h3>${!existing?'<p class="muted">最新のリストの項目をコピーしました。完了・担当者・完了予定日はリセットしています。</p>':''}<div id="task-rows"></div><button type="button" class="secondary" id="add-task">＋ 末尾に項目を追加</button></section>
     <section class="block"><label>公演メモ<textarea name="memo" rows="4"></textarea></label></section><p class="muted" id="form-feedback" role="alert" hidden></p>
-    <div class="form-actions"><button class="primary" type="submit">保存する</button><button class="secondary" type="button" id="cancel-edit">キャンセル</button></div></form></div>`;
+    <div class="form-actions"><button class="primary" type="submit">保存する</button><button class="secondary" type="button" id="cancel-edit">キャンセル</button></div>${existing?'<details class="delete-zone"><summary>この公演を削除する</summary><p>削除すると、この公演の出演者・準備リスト・メモも削除されます。</p><label><input type="checkbox" id="confirm-delete">この公演を削除することを確認しました</label><button type="button" class="danger" id="delete-event" disabled>公演を削除する</button></details>':''}</form></div>`;
   $('event-form').elements.memo.value = event.memo;
+  const taskRows=$('task-rows');
+  function addTask(item,before=null) {
+    const row=document.createElement('div');row.className='check-row task-edit-row';row.dataset.done=String(item.done);
+    row.innerHTML=`<label>準備項目<input name="label" value="${esc(item.label)}" required></label>${assigneePicker(item,0)}<label>完了予定日（任意）<input type="date" data-due value="${esc(item.dueDate||'')}"></label><div class="task-row-actions"><button type="button" class="secondary" data-insert-before>＋ 前に挿入</button><button type="button" class="secondary" data-insert-after>＋ 後に挿入</button><button type="button" class="secondary" data-remove-task>項目を外す</button></div>`;
+    taskRows.insertBefore(row,before);return row;
+  }
+  event.checklist.forEach(item=>addTask(item));
+  const blankTask=()=>({label:'',done:false,assignees:[],dueDate:''});
+  $('add-task').onclick=()=>{if(taskRows.children.length>=200){notify('準備項目は200件までです。');return}addTask(blankTask()).querySelector('[name="label"]').focus()};
+  taskRows.onclick=click=>{
+    const button=click.target.closest('button');if(!button)return;const row=button.closest('.task-edit-row');
+    if(button.hasAttribute('data-remove-task')){if(taskRows.children.length===1){notify('準備項目を1件以上残してください。');return}if(confirm('この準備項目をリストから外しますか？'))row.remove();return}
+    if(taskRows.children.length>=200){notify('準備項目は200件までです。');return}
+    addTask(blankTask(),button.hasAttribute('data-insert-before')?row:row.nextElementSibling).querySelector('[name="label"]').focus();
+  };
+  if(existing){
+    $('confirm-delete').onchange=e=>{$('delete-event').disabled=!e.target.checked};
+    $('delete-event').onclick=()=>{if($('confirm-delete').checked)deleteEvent(existing.id)};
+  }
+
   const list = $('performers');
   function renumber() {
     [...list.children].forEach((row,i) => {
@@ -217,9 +242,10 @@ function renderForm(existing) {
     const text = field => form.get(field).trim();
     const next = {
       id:existing?.id || (globalThis.crypto.randomUUID?.() ?? 'event-' + Date.now() + '-' + Math.random().toString(36).slice(2)),
+      checklistUpdatedAt:new Date().toISOString(),
       title:text('title'),date:text('date'),time:text('time'),venue:text('venue'),memo:form.get('memo'),
       performers:[...list.children].map(row => Object.fromEntries([...row.querySelectorAll('input')].map(input => [input.name,input.type === 'number' ? input.valueAsNumber : input.value.trim()]))),
-      checklist:form.getAll('label').map((label,i) => ({label:label.trim(),done:event.checklist[i].done,dueDate:eventDialog.querySelector(`[data-due="${i}"]`).value,assignees:[...eventDialog.querySelectorAll(`[data-owner="${i}"]:checked`)].map(el=>el.value)}))
+      checklist:[...taskRows.children].map(row=>({label:row.querySelector('[name="label"]').value.trim(),done:row.dataset.done==='true',dueDate:row.querySelector('[data-due]').value,assignees:[...row.querySelectorAll('[data-owner]:checked')].map(el=>el.value)}))
     };
     const feedback = $('form-feedback');
     if (!validEvent(next)) {
