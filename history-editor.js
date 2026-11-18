@@ -1,7 +1,7 @@
 import {cloud} from './cloud.js';
 export function historyEditor(getData,refresh){
- const section=document.createElement('section');section.className='account-panel';section.innerHTML='<button id="history-add" type="button" disabled>＋ 稽古・公演記録を追加</button><p id="history-edit-status">共通保存の設定後、許可された会員が記録を追加・修正できます。</p>';
- document.querySelector('nav').before(section);
+ const section=document.createElement('section');section.className='record-edit-panel';section.innerHTML='<button id="history-add" class="primary" type="button" disabled>＋ 稽古・公演記録を追加</button><p id="history-edit-status">共通保存の設定後、許可された会員が記録を追加・修正できます。</p>';
+ (document.getElementById('history-tools')||document.querySelector('main')).append(section);
  const dialog=document.createElement('dialog');dialog.className='record-dialog';document.body.append(dialog);
  const original=structuredClone(getData().records);
  let revision=0,loaded=false,stop,identity='',busy=false;
