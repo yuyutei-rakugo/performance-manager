@@ -18,3 +18,14 @@ dialog{border:1px solid var(--line);border-radius:14px;width:min(680px,calc(100%
 .rehearsal-card{background:var(--white);border:1px solid var(--line);border-radius:12px;padding:20px;margin:16px 0}.attendance-list label{display:flex;align-items:center;justify-content:space-between;gap:16px;border-bottom:1px solid var(--line);padding:12px 0}.attendance-list select,#rehearsal-form select{font:inherit;padding:12px;border:1px solid var(--line);border-radius:6px}.rehearsal-card h2{font-size:1.2rem}#restore{max-width:100%}#rehearsal-form textarea{width:100%;box-sizing:border-box}#rehearsal-dialog{width:min(680px,94vw);max-height:90vh;border:1px solid var(--line);border-radius:12px}#rehearsal-dialog::backdrop{background:#202c4677}
 
 .tabs a{display:inline-flex;align-items:center;min-height:44px;color:var(--muted);text-decoration:none;border-bottom:3px solid transparent;padding:9px 15px;font-weight:700}.tabs a[aria-current=page]{color:var(--red);border-bottom-color:var(--red)}
+
+/* Shared schedule navigation and prominent date/place information. */
+.tabs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;border:0;background:#eae5dc;padding:6px;border-radius:12px;margin:20px 0}
+.tabs button,.tabs a{display:flex;justify-content:center;align-items:center;min-height:56px;padding:12px 8px;border:2px solid transparent;border-radius:9px;background:var(--white);color:var(--navy);font-size:1.1rem;font-weight:800;text-align:center;text-decoration:none}
+.tabs button[aria-pressed=true],.tabs a[aria-current=page]{background:var(--navy);color:white;border-color:var(--navy);box-shadow:0 2px 5px #202c4626}
+.tabs button:hover,.tabs a:hover{border-color:var(--navy)}
+.event-card .meta{display:grid;gap:6px;margin-top:10px;color:var(--navy);font-size:1.05rem;line-height:1.5;font-weight:700}
+.event-card .meta span:first-child{font-size:1.15rem;font-weight:800;color:#8b342b}
+.event-card .meta span:nth-child(2){overflow-wrap:anywhere}
+.event-card .date-badge{min-height:78px}.event-card .date-badge small{font-size:.9rem}.event-card .date-badge strong{font-size:1.9rem}
+@media(max-width:650px){.tabs button,.tabs a{min-height:54px;font-size:1.05rem}.event-card .meta{font-size:.98rem;gap:6px}.event-card .meta span:first-child{font-size:1.08rem}.event-card .date-badge{min-height:70px}.event-card .date-badge strong{font-size:1.8rem}.event-card h3{font-size:1.08rem}}
