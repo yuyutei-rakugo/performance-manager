@@ -7,10 +7,20 @@ service cloud.firestore {
    allow get: if request.auth != null && request.auth.uid == uid;
    allow list, write: if false;
   }
+  match /rehearsalAttendance/{rehearsalId}/responses/{uid} {
+   allow read: if member();
+   allow create, update: if member() && request.auth.uid == uid
+    && request.resource.data.keys().hasAll(['stageName','status','updatedAt'])
+    && request.resource.data.keys().hasOnly(['stageName','status','updatedAt'])
+    && request.resource.data.stageName == get(/databases/$(database)/documents/members/$(request.auth.uid)).data.stageName
+    && request.resource.data.status in ['出席','欠席','未定','未回答']
+    && request.resource.data.updatedAt == request.time;
+   allow delete: if false;
+  }
   match /shared/{name} {
-   allow read: if member() && name in ['events','history'];
-   allow create: if editor() && name in ['events','history'] && request.resource.data.revision == 1 && valid();
-   allow update: if editor() && name in ['events','history'] && request.resource.data.revision == resource.data.revision + 1 && valid();
+   allow read: if member() && name in ['events','history','rehearsals'];
+   allow create: if editor() && name in ['events','history','rehearsals'] && request.resource.data.revision == 1 && valid();
+   allow update: if editor() && name in ['events','history','rehearsals'] && request.resource.data.revision == resource.data.revision + 1 && valid();
    allow delete: if false;
    function valid() {
     return request.resource.data.keys().hasOnly(['items','revision','updatedBy','updatedAt'])
