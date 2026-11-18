@@ -2,7 +2,11 @@
 
 現在は cloud-config.json の enabled=false。既存の端末内公演データと、公開済み過去記録を維持する。
 
-Firebase接続後に実施すること：
+2026-11-18 設定済み：専用プロジェクト yuyutei-rakugo（Spark、請求先なし）、Webアプリ登録、Google認証有効、GitHub Pagesドメイン許可、Firestore Standard 東京、本番ルール適用。未ログインの shared/history 読み取り拒否をコンソールのルールプレイグラウンドで確認。
+
+connect.html は enabled=false のまま本人のFirebase Authentication UIDを取得するための独立したログイン画面。既存の端末内データは変更しない。管理者登録・認可テスト・移行・自動同期の有効化は未完了。
+
+残作業を含む設定手順：
 
 1. 新規専用プロジェクトをSparkで作成。請求先は関連付けず、有料プランには変更しない。
 2. Firestore Standardの無料データベースを作成。Googleログインを有効にする。
