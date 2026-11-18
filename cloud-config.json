@@ -1,1 +1,11 @@
-{"enabled":false,"firebase":null}
+{
+  "enabled": false,
+  "firebase": {
+    "apiKey": "AIzaSyB9jWH7cCC65Wp2c3Dxs3on8AYDH_HEGAI",
+    "authDomain": "yuyutei-rakugo.firebaseapp.com",
+    "projectId": "yuyutei-rakugo",
+    "storageBucket": "yuyutei-rakugo.firebasestorage.app",
+    "messagingSenderId": "841552171661",
+    "appId": "1:841552171661:web:55ddeb12bbbdac2cb448c4"
+  }
+}
