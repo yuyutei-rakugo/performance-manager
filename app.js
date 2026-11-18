@@ -1,3 +1,4 @@
+import {cloud,startCloud,mountAccount} from './cloud.js';
 'use strict';
 
 const key = 'yuitei.events.v1';
@@ -9,7 +10,11 @@ const clone = value => JSON.parse(JSON.stringify(value));
 const localDate = date => [date.getFullYear(), date.getMonth() + 1, date.getDate()].map((part, i) => String(part).padStart(i ? 2 : 4, '0')).join('-');
 const today = () => localDate(new Date());
 const dateLabel = value => new Intl.DateTimeFormat('ja-JP', {year:'numeric',month:'long',day:'numeric',weekday:'short'}).format(new Date(value + 'T00:00:00'));
-const newTasks = () => tasks.map(label => ({label, done:false}));
+const newTasks = () => tasks.map(label => ({label, done:false,assignees:[],dueDate:''}));
+let memberNames=['勇水','小薔薇','懐古','華詩','世喜音','やすゑ','一悟','日光'],cloudRevision=0,cloudLoaded=false,stopCloud,cloudIdentity='',saving=false;
+fetch('./history-data.json').then(r=>r.json()).then(d=>{memberNames=d.names.filter(n=>n!=='藤本')}).catch(()=>{});
+const editable=()=>!cloud.state.configured||(['admin','editor'].includes(cloud.state.role)&&cloudLoaded);
+function assigneePicker(item,i){return `<fieldset class="assignee-picker"><legend>担当者（任意・複数選択可）</legend>${[...new Set([...memberNames,...(item.assignees||[])])].map(n=>`<label><input type="checkbox" data-owner="${i}" value="${esc(n)}" ${(item.assignees||[]).includes(n)?'checked':''}>${esc(n)}</label>`).join('')}</fieldset>`}
 const progress = event => event.checklist.filter(item => item.done).length;
 
 function samples() {
@@ -31,7 +36,7 @@ function validEvent(event) {
   if (!event.id.trim() || !event.title.trim() || !event.venue.trim()) return false;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(event.date) || localDate(new Date(event.date + 'T00:00:00')) !== event.date || !/^([01]\d|2[0-3]):[0-5]\d$/.test(event.time)) return false;
   return Array.isArray(event.performers) && event.performers.every(person => person && ['name','stageName','piece'].every(field => isText(person[field])) && person.stageName.trim() && person.piece.trim() && Number.isSafeInteger(person.minutes) && person.minutes > 0)
-    && Array.isArray(event.checklist) && event.checklist.length === 15 && event.checklist.every(item => item && isText(item.label) && item.label.trim() && typeof item.done === 'boolean');
+    && Array.isArray(event.checklist) && event.checklist.length === 15 && event.checklist.every(item => item && isText(item.label) && item.label.trim() && typeof item.done === 'boolean' && (item.dueDate===undefined||item.dueDate===''||(isText(item.dueDate)&&/^\d{4}-\d{2}-\d{2}$/.test(item.dueDate)&&localDate(new Date(item.dueDate+'T00:00:00'))===item.dueDate)) && (item.assignees === undefined || (Array.isArray(item.assignees)&&item.assignees.every(isText))));
 }
 
 let events = [];
@@ -61,7 +66,12 @@ try {
   notify('保存済みデータを読み込めませんでした。');
 }
 
-function save(next) {
+async function save(next, expectedRevision=cloudRevision) {
+  if(saving)return false;
+  if(cloud.state.configured){
+    if(!editable()){notify('会員ログインと編集権限、共通データの読み込みが必要です。');return false}
+    saving=true;try{await cloud.save('events',{items:next},expectedRevision);events=next;render();return true}catch(e){notify(e.message);return false}finally{saving=false}
+  }
   if (!storageReadable) {
     notify('保存済みデータを読み込めないため、変更を保存できません。');
     return false;
@@ -125,23 +135,23 @@ function renderDetails(id) {
   if (!event) return;
   const program = event.performers.map(person => `<li><strong>${esc(person.stageName)}</strong>${person.name ? '（' + esc(person.name) + '）' : ''}　${esc(person.piece)}　${person.minutes}分</li>`).join('');
   eventDialog.innerHTML = `<div class="dialog-body"><div class="dialog-head"><h2 id="event-heading">${esc(event.title)}</h2><button type="button" data-close="event-dialog" aria-label="閉じる">×</button></div>
-    <p>${dateLabel(event.date)} ${event.time}<br>会場　${esc(event.venue)}</p><div class="form-actions"><button class="primary" data-edit>編集する</button><button class="danger" data-delete>削除する</button></div>
+    <p>${dateLabel(event.date)} ${event.time}<br>会場　${esc(event.venue)}</p><div class="form-actions"><button class="primary" data-edit ${editable()?'':'disabled'}>編集する</button><button class="danger" data-delete ${editable()?'':'disabled'}>削除する</button></div>
     <section class="block"><h3>出演順・演目</h3>${program ? '<ol class="details-list">' + program + '</ol>' : '<p class="muted">出演者は未登録です。</p>'}</section>
-    <section class="block"><h3>準備チェックリスト</h3>${progressMarkup(event)}${event.checklist.map((item,i) => `<div class="check-row"><label><input type="checkbox" data-check="${i}" ${item.done ? 'checked' : ''}>${esc(item.label)}</label></div>`).join('')}</section>
+    <section class="block"><h3>準備チェックリスト</h3>${progressMarkup(event)}${event.checklist.map((item,i) => `<div class="check-row"><label><input type="checkbox" data-check="${i}" ${editable()?'':'disabled'} ${item.done ? 'checked' : ''}>${esc(item.label)}</label><small>担当：${esc((item.assignees||[]).join('・')||'未設定')} ／ 完了予定：${esc(item.dueDate||'未設定')}</small></div>`).join('')}</section>
     <section class="block"><h3>メモ</h3><p class="memo">${esc(event.memo) || 'メモはありません。'}</p></section></div>`;
   eventDialog.querySelector('[data-edit]').onclick = () => renderForm(events.find(item => item.id === id));
-  eventDialog.querySelector('[data-delete]').onclick = () => {
-    if (confirm('「' + event.title + '」を削除しますか？') && save(events.filter(item => item.id !== id))) {
+  eventDialog.querySelector('[data-delete]').onclick = async () => {
+    if (confirm('「' + event.title + '」を削除しますか？') && await save(events.filter(item => item.id !== id))) {
       eventDialog.close();
       notify('公演を削除しました。');
     }
   };
-  eventDialog.onchange = change => {
+  eventDialog.onchange = async change => {
     if (!change.target.matches('[data-check]')) return;
     const current = events.find(item => item.id === id);
     const next = clone(current);
     next.checklist[Number(change.target.dataset.check)].done = change.target.checked;
-    if (save(events.map(item => item.id === id ? next : item))) {
+    if (await save(events.map(item => item.id === id ? next : item))) {
       eventDialog.querySelector('.progress').outerHTML = progressMarkup(next);
     } else change.target.checked = !change.target.checked;
   };
@@ -156,12 +166,14 @@ function performerRow(person) {
   return row;
 }
 function renderForm(existing) {
+  if(!editable()){notify('編集できる会員でログインしてください。');return}
+  const formRevision=cloudRevision;
   const event = existing || {title:'',date:tab === 'calendar' ? selected : today(),time:'14:00',venue:'',memo:'',performers:[],checklist:newTasks()};
   eventDialog.onchange = null;
   eventDialog.innerHTML = `<div class="dialog-body"><div class="dialog-head"><h2 id="event-heading">${existing ? '公演を編集' : '公演を登録'}</h2><button type="button" data-close="event-dialog" aria-label="閉じる">×</button></div>
     <form id="event-form"><div class="fields"><label class="wide">公演名<input name="title" value="${esc(event.title)}" required></label><label>開催日<input name="date" type="date" value="${event.date}" required></label><label>開演時刻<input name="time" type="time" value="${event.time}" required></label><label class="wide">会場<input name="venue" value="${esc(event.venue)}" required></label></div>
     <section class="block"><h3>出演順・演目</h3><div id="performers"></div><button type="button" class="secondary" id="add-performer">＋ 出演者を追加</button></section>
-    <section class="block"><h3>準備チェックリスト</h3>${event.checklist.map((item,i) => `<div class="check-row"><span aria-hidden="true">${i + 1}</span><input aria-label="準備項目 ${i + 1}" name="label" value="${esc(item.label)}" required></div>`).join('')}</section>
+    <section class="block"><h3>準備チェックリスト</h3>${event.checklist.map((item,i) => `<div class="check-row"><span aria-hidden="true">${i + 1}</span><input aria-label="準備項目 ${i + 1}" name="label" value="${esc(item.label)}" required>${assigneePicker(item,i)}<label>完了予定日（任意）<input type="date" data-due="${i}" value="${esc(item.dueDate||'')}"></label></div>`).join('')}</section>
     <section class="block"><label>公演メモ<textarea name="memo" rows="4"></textarea></label></section><p class="muted" id="form-feedback" role="alert" hidden></p>
     <div class="form-actions"><button class="primary" type="submit">保存する</button><button class="secondary" type="button" id="cancel-edit">キャンセル</button></div></form></div>`;
   $('event-form').elements.memo.value = event.memo;
@@ -194,7 +206,7 @@ function renderForm(existing) {
     row.querySelector('input').focus();
   };
   $('cancel-edit').onclick = () => existing ? renderDetails(existing.id) : eventDialog.close();
-  $('event-form').onsubmit = submit => {
+  $('event-form').onsubmit = async submit => {
     submit.preventDefault();
     const form = new FormData(submit.currentTarget);
     const text = field => form.get(field).trim();
@@ -202,7 +214,7 @@ function renderForm(existing) {
       id:existing?.id || (globalThis.crypto.randomUUID?.() ?? 'event-' + Date.now() + '-' + Math.random().toString(36).slice(2)),
       title:text('title'),date:text('date'),time:text('time'),venue:text('venue'),memo:form.get('memo'),
       performers:[...list.children].map(row => Object.fromEntries([...row.querySelectorAll('input')].map(input => [input.name,input.type === 'number' ? input.valueAsNumber : input.value.trim()]))),
-      checklist:form.getAll('label').map((label,i) => ({label:label.trim(),done:event.checklist[i].done}))
+      checklist:form.getAll('label').map((label,i) => ({label:label.trim(),done:event.checklist[i].done,dueDate:eventDialog.querySelector(`[data-due="${i}"]`).value,assignees:[...eventDialog.querySelectorAll(`[data-owner="${i}"]:checked`)].map(el=>el.value)}))
     };
     const feedback = $('form-feedback');
     if (!validEvent(next)) {
@@ -211,7 +223,7 @@ function renderForm(existing) {
       return;
     }
     const updated = existing ? events.map(item => item.id === next.id ? next : item) : [...events,next];
-    if (!save(updated)) {
+    if (!await save(updated,formRevision)) {
       feedback.textContent = '公演を保存できませんでした。';
       feedback.hidden = false;
       return;
@@ -279,9 +291,17 @@ $('import-submit').onclick = async () => {
   }
   const merged = new Map(events.map(event => [event.id,event]));
   incoming.forEach(event => merged.set(event.id,event));
-  if (save([...merged.values()])) {
+  if (await save([...merged.values()])) {
     feedback.textContent = incoming.length + '件の公演を取り込みました。';
     input.value = '';
   } else feedback.textContent = '取り込んだデータを保存できませんでした。';
 };
 render();
+
+mountAccount();
+cloud.onState(state=>{
+ const identity=state.configured?`${state.user?.uid||''}:${state.role||''}`:'local';
+ if(identity===cloudIdentity)return;cloudIdentity=identity;stopCloud?.();cloudLoaded=false;
+ if(state.configured){events=[];eventDialog.close();render();if(state.role){stopCloud=cloud.watch('events',doc=>{if(doc&&(!Array.isArray(doc.items)||!doc.items.every(validEvent))){notify('共通データの形式を確認してください。');return}events=doc?.items||[];cloudRevision=doc?.revision||0;cloudLoaded=true;render()},notify)}}
+});
+startCloud();

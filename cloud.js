@@ -1,0 +1,54 @@
+// Configuration is enabled only after the Firebase project and access rules are ready.
+const listeners = new Set();
+const state = {ready:false, configured:false, user:null, role:null, message:'共通保存は設定準備中です。現在はこの端末に保存します。'};
+let api, auth, db, userWatch, roleWatch;
+const watchers = new Set();
+const emit=()=>{listeners.forEach(fn=>fn({...state}));window.dispatchEvent(new CustomEvent('cloud-state',{detail:{...state}}));};
+const errorMessage=e=>e?.code==='permission-denied'?'閲覧・編集の権限がありません。管理者に確認してください。':e?.message==='conflict'?'ほかの端末で更新されています。最新の内容を確認し、もう一度編集してください。':'通信または保存に失敗しました。接続を確認して再度お試しください。';
+export const cloud={
+ get state(){return {...state}},
+ onState(fn){listeners.add(fn);fn({...state});return()=>listeners.delete(fn)},
+ async login(){if(!auth)throw Error('共通保存の設定が必要です。');await api.signInWithPopup(auth,new api.GoogleAuthProvider())},
+ async logout(){if(auth)await api.signOut(auth)},
+ watch(name,fn,onError){
+  if(!db||!state.role)throw Error('会員ログインが必要です。');
+  const stop=api.onSnapshot(api.doc(db,'shared',name),snap=>fn(snap.exists()?snap.data():null),e=>onError(errorMessage(e)));
+  watchers.add(stop);return()=>{watchers.delete(stop);stop()};
+ },
+ async save(name,payload,revision){
+  if(!['admin','editor'].includes(state.role))throw Error('編集を許可された会員のみ保存できます。');
+  try{return await api.runTransaction(db,async tx=>{
+   const ref=api.doc(db,'shared',name),snap=await tx.get(ref),actual=snap.exists()?snap.data().revision:0;
+   if(actual!==revision)throw Error('conflict');
+   const next={...payload,revision:actual+1,updatedBy:auth.currentUser.uid,updatedAt:api.serverTimestamp()};tx.set(ref,next);return actual+1;
+  })}catch(e){throw Error(errorMessage(e))}
+ }
+};
+export async function startCloud(){
+ try{
+  const config=await fetch('./cloud-config.json',{cache:'no-store'}).then(r=>{if(!r.ok)throw Error();return r.json()});
+  if(!config.enabled){state.ready=true;emit();return}
+  state.configured=true;state.message='ログイン状態を確認しています。';emit();
+  const base='https://www.gstatic.com/firebasejs/12.6.0/';
+  const [app,authApi,store]=await Promise.all([import(base+'firebase-app.js'),import(base+'firebase-auth.js'),import(base+'firebase-firestore.js')]);
+  api={...authApi,...store};const firebase=app.initializeApp(config.firebase);auth=api.getAuth(firebase);db=api.getFirestore(firebase);
+  userWatch=api.onAuthStateChanged(auth,user=>{
+   roleWatch?.();watchers.forEach(stop=>stop());watchers.clear();state.user=user?{uid:user.uid,email:user.email}:null;state.role=null;state.ready=!user;
+   state.message=user?'会員権限を確認しています。':'共通保存：ログインしてください。';emit();
+   if(user)roleWatch=api.onSnapshot(api.doc(db,'members',user.uid),snap=>{
+    const role=snap.exists()&&snap.data().active===true?snap.data().role:null;
+    state.role=['admin','editor','viewer'].includes(role)?role:null;state.ready=true;
+    state.message=state.role?`共通保存：${user.email}（${{admin:'管理者',editor:'編集可',viewer:'閲覧のみ'}[state.role]}）`:`このアカウントは未承認です。管理者に会員IDを伝えてください：${user.uid}`;
+    emit();
+   },()=>{state.ready=true;state.role=null;state.message='会員権限を確認できませんでした。';emit()});
+  });
+ }catch{state.configured=true;state.ready=true;state.message='共通保存に接続できません。接続を確認して再読み込みしてください。';emit()}
+}
+export function mountAccount(){
+ const panel=document.createElement('section');panel.className='account-panel';panel.innerHTML='<p id="cloud-status" role="status"></p><button type="button" id="cloud-login" hidden>Googleで会員ログイン</button> <button type="button" id="cloud-logout" hidden>ログアウト</button>';
+ (document.querySelector('main')||document.body).prepend(panel);
+ const status=panel.querySelector('p'),login=panel.querySelector('#cloud-login'),logout=panel.querySelector('#cloud-logout');
+ cloud.onState(s=>{status.textContent=s.message;login.hidden=!s.configured||!!s.user;logout.hidden=!s.user});
+ login.onclick=async()=>{try{await cloud.login()}catch{status.textContent='ログインできませんでした。Chromeで開き、ポップアップを許可して再度お試しください。'}};
+ logout.onclick=async()=>{try{await cloud.logout()}catch{status.textContent='ログアウトできませんでした。'}};
+}

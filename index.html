@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#202c46">
 <title>公演管理 | 結友亭落語研究会</title>
 <link rel="stylesheet" href="style.css">
-<script src="app.js" defer></script>
+<script type="module" src="app.js"></script>
 </head>
 <body>
 <header class="top"><div class="wrap top-inner"><a class="brand" href="./"><span class="crest" aria-hidden="true">結</span><span>結友亭落語研究会<small>公演管理</small></span></a><button id="data-open" class="data-button">⇅ <span>データ管理</span></button></div></header>
@@ -24,7 +24,7 @@
 <dialog id="event-dialog" aria-labelledby="event-heading"></dialog>
 <dialog id="data-dialog" aria-labelledby="data-heading">
   <div class="dialog-body"><div class="dialog-head"><h2 id="data-heading">データ管理</h2><button type="button" data-close="data-dialog" aria-label="閉じる">×</button></div>
-  <p>公演データは、このブラウザに保存されます。JSONファイルでバックアップや別の端末への移行ができます。</p>
+  <p>共通保存が有効な場合は会員で共有します。設定準備中は、このブラウザに保存されます。JSONファイルでバックアップや別の端末への移行ができます。</p>
   <button class="primary" id="export-file">JSONを書き出す</button>
   <hr><label for="import-file">JSONファイルを取り込む</label><p class="muted">取り込んだ公演を追加します。同じIDの公演は取り込んだ内容に更新します。</p>
   <input type="file" id="import-file" accept=".json,application/json"><button class="secondary" id="import-submit">取り込む</button><p id="import-feedback" role="status"></p></div>
