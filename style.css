@@ -10,3 +10,5 @@ dialog{border:1px solid var(--line);border-radius:14px;width:min(680px,calc(100%
 .fields{grid-template-columns:repeat(2,minmax(0,1fr))}.fields input{min-width:0}.icon-button:disabled{opacity:.4;cursor:default}
 
 .account-panel{padding:16px;margin:16px 0;background:#fff;border:1px solid #ccd2dc;border-radius:8px}.assignee-picker{grid-column:1/-1;border:1px solid #ccd2dc;padding:10px}.assignee-picker label{display:inline-flex;gap:5px;margin:6px}.assignee-picker input{width:auto}.check-row{flex-wrap:wrap}.check-row small{display:block;width:100%}
+
+.event-actions{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end}.event-actions button{white-space:nowrap}@media(max-width:650px){.event-actions{grid-column:2 / -1;grid-row:3}.event-card .event-actions .secondary{padding-inline:12px}.event-card>.progress{grid-column:2 / -1}}

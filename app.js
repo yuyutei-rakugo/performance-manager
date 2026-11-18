@@ -99,7 +99,7 @@ function progressMarkup(event) {
 }
 function card(event) {
   const [year, mon, day] = event.date.split('-');
-  return `<article class="event-card"><div class="date-badge" aria-hidden="true"><small>${Number(mon)}月</small><strong>${Number(day)}</strong></div><div><h3>${esc(event.title)}</h3><div class="meta"><span>${year}/${mon}/${day} ${event.time}</span><span>＠ ${esc(event.venue)}</span></div></div>${progressMarkup(event)}<button class="secondary" data-event="${esc(event.id)}" aria-label="${esc(event.title)}の詳細">詳細 ›</button></article>`;
+  return `<article class="event-card"><div class="date-badge" aria-hidden="true"><small>${Number(mon)}月</small><strong>${Number(day)}</strong></div><div><h3>${esc(event.title)}</h3><div class="meta"><span>${year}/${mon}/${day} ${event.time}</span><span>＠ ${esc(event.venue)}</span></div></div>${progressMarkup(event)}<div class="event-actions"><button class="secondary" data-event="${esc(event.id)}" aria-label="${esc(event.title)}の詳細">詳細 ›</button><button class="secondary" data-edit-event="${esc(event.id)}" aria-label="${esc(event.title)}を編集" ${editable()?'':'disabled'}>編集</button><button class="danger" data-delete-event="${esc(event.id)}" aria-label="${esc(event.title)}を削除" ${editable()?'':'disabled'}>削除</button></div></article>`;
 }
 function render() {
   const scheduled = events.filter(upcoming);
@@ -140,12 +140,7 @@ function renderDetails(id) {
     <section class="block"><h3>準備チェックリスト</h3>${progressMarkup(event)}${event.checklist.map((item,i) => `<div class="check-row"><label><input type="checkbox" data-check="${i}" ${editable()?'':'disabled'} ${item.done ? 'checked' : ''}>${esc(item.label)}</label><small>担当：${esc((item.assignees||[]).join('・')||'未設定')} ／ 完了予定：${esc(item.dueDate||'未設定')}</small></div>`).join('')}</section>
     <section class="block"><h3>メモ</h3><p class="memo">${esc(event.memo) || 'メモはありません。'}</p></section></div>`;
   eventDialog.querySelector('[data-edit]').onclick = () => renderForm(events.find(item => item.id === id));
-  eventDialog.querySelector('[data-delete]').onclick = async () => {
-    if (confirm('「' + event.title + '」を削除しますか？') && await save(events.filter(item => item.id !== id))) {
-      eventDialog.close();
-      notify('公演を削除しました。');
-    }
-  };
+  eventDialog.querySelector('[data-delete]').onclick = () => deleteEvent(id);
   eventDialog.onchange = async change => {
     if (!change.target.matches('[data-check]')) return;
     const current = events.find(item => item.id === id);
@@ -156,6 +151,16 @@ function renderDetails(id) {
     } else change.target.checked = !change.target.checked;
   };
   showEvent();
+}
+
+async function deleteEvent(id) {
+  if (!editable()) { notify('編集できる会員でログインしてください。'); return; }
+  const event = events.find(item => item.id === id);
+  if (!event) return;
+  if (confirm('「' + event.title + '」を削除しますか？') && await save(events.filter(item => item.id !== id))) {
+    if (eventDialog.open) eventDialog.close();
+    notify('公演を削除しました。');
+  }
 }
 
 function performerRow(person) {
@@ -238,9 +243,11 @@ function renderForm(existing) {
   showEvent();
 }
 
-$('schedule').onclick = click => {
+$('schedule').onclick = async click => {
   const button = click.target.closest('button');
   if (!button) return;
+  if (button.dataset.editEvent !== undefined) { renderForm(events.find(item => item.id === button.dataset.editEvent)); return; }
+  if (button.dataset.deleteEvent !== undefined) { await deleteEvent(button.dataset.deleteEvent); return; }
   if (button.dataset.event !== undefined) renderDetails(button.dataset.event);
   if (button.dataset.day) {
     selected = button.dataset.day;
