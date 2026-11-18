@@ -15,13 +15,13 @@ async function boot(stored,cloudState={configured:false}){
  return {w,dom,cloud,emit(s){cloud.state=s;stateListener(s)},snapshot(d){watch(d)},attendance(rows){watchAttendance(rows)},confirm(v){confirm=v},fail(v){saveError=v},responses:respond,blob:()=>blobData};
 }
 function $(t,s){return t.w.document.querySelector(s)}
-async function create(t,title='稽古A',date='2026-12-02',kind='師匠稽古'){
- $(t,'#add').click();for(const [key,v] of Object.entries({title,date,time:'14:00',venue:'和室',kind,notes:''}))$(t,`[name="${key}"]`).value=v;
+async function create(t,title='通常稽古',date='2026-12-02'){
+ $(t,'#add').click();assert.deepEqual([...$(t,'[name=title]').options].map(o=>o.value),['通常稽古','師匠稽古','自主稽古','その他稽古']);assert(!$(t,'[name=kind]'));for(const [key,v] of Object.entries({title,date,time:'14:00',venue:'和室',notes:''}))$(t,`[name="${key}"]`).value=v;
  await $(t,'#rehearsal-form').onsubmit({preventDefault(){},target:$(t,'#rehearsal-form')});
 }
 async function response(t,name,status){const select=$(t,`[data-person="${name}"]`);select.value=status;await $(t,'#attendance').onchange({target:select})}
 (async()=>{
- const t=await boot();await create(t);assert.equal($(t,'#rehearsals h3').textContent,'稽古A');assert(!$(t,'#rehearsal-dialog').open);await create(t,'稽古B','2026-12-01','自主稽古');assert.equal($(t,'#rehearsals h3').textContent,'稽古B');
+ const t=await boot();await create(t);assert.equal($(t,'#rehearsals h3').textContent,'通常稽古');assert(!$(t,'#rehearsal-dialog').open);await create(t,'自主稽古','2026-12-01','自主稽古');assert.equal($(t,'#rehearsals h3').textContent,'自主稽古');
  $(t,'[data-detail]').click();assert.equal(t.w.document.querySelectorAll('[data-person]').length,3);assert(!$(t,'[data-person="藤本"]'));assert.match($(t,'#attendance h3').textContent,/出席 0人 ／ 未回答 3人/);
  for(const status of ['出席','欠席','未定','未回答']){await response(t,'勇水',status);assert.equal($(t,'[data-person="勇水"]').value,status)}
  await response(t,'勇水','出席');await response(t,'日光','出席');assert.match($(t,'#attendance h3').textContent,/出席 2人 ／ 未回答 1人/);assert.match($(t,'#attendance').textContent,/参加者：勇水・日光/);
