@@ -1,0 +1,287 @@
+'use strict';
+
+const key = 'yuitei.events.v1';
+const tasks = ['会場を予約する', '開催日時を確定する', '出演者に連絡する', '演目を確認する', '出演順を決める', '持ち時間を確認する', 'チラシを作る', '公演を告知する', '予約を確認する', '番組表を作る', '高座と座布団を準備する', '音響を確認する', '受付担当を決める', '当日の進行を共有する', '搬入・撤収の手順を確認する'];
+const $ = id => document.getElementById(id);
+const eventDialog = $('event-dialog');
+const esc = value => String(value).replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+const clone = value => JSON.parse(JSON.stringify(value));
+const localDate = date => [date.getFullYear(), date.getMonth() + 1, date.getDate()].map((part, i) => String(part).padStart(i ? 2 : 4, '0')).join('-');
+const today = () => localDate(new Date());
+const dateLabel = value => new Intl.DateTimeFormat('ja-JP', {year:'numeric',month:'long',day:'numeric',weekday:'short'}).format(new Date(value + 'T00:00:00'));
+const newTasks = () => tasks.map(label => ({label, done:false}));
+const progress = event => event.checklist.filter(item => item.done).length;
+
+function samples() {
+  const sample = (offset, title, time, venue, done) => {
+    const date = new Date();
+    date.setDate(date.getDate() + offset);
+    return {id:'sample-' + offset,title,date:localDate(date),time,venue,memo:'試作用のサンプル公演です。',performers:[{name:'',stageName:'結友亭 こはる',piece:'寿限無',minutes:15}],checklist:newTasks().map((item,i) => ({...item,done:i < done}))};
+  };
+  return [
+    sample(4,'結友亭 定例寄席','14:00','結友会館 和室',9),
+    sample(18,'まちかど落語会','13:30','中央公民館 ホール',4),
+    sample(42,'結友亭 お楽しみ寄席','15:00','市民文化センター',0)
+  ];
+}
+
+const isText = value => typeof value === 'string';
+function validEvent(event) {
+  if (!event || !['id','title','date','time','venue','memo'].every(field => isText(event[field]))) return false;
+  if (!event.id.trim() || !event.title.trim() || !event.venue.trim()) return false;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(event.date) || localDate(new Date(event.date + 'T00:00:00')) !== event.date || !/^([01]\d|2[0-3]):[0-5]\d$/.test(event.time)) return false;
+  return Array.isArray(event.performers) && event.performers.every(person => person && ['name','stageName','piece'].every(field => isText(person[field])) && person.stageName.trim() && person.piece.trim() && Number.isSafeInteger(person.minutes) && person.minutes > 0)
+    && Array.isArray(event.checklist) && event.checklist.length === 15 && event.checklist.every(item => item && isText(item.label) && item.label.trim() && typeof item.done === 'boolean');
+}
+
+let events = [];
+let tab = 'list';
+let selected = today();
+let month = selected.slice(0,7);
+let noticeTimer;
+let storageReadable = true;
+
+function notify(message) {
+  const notice = $('notice');
+  notice.textContent = message;
+  notice.hidden = false;
+  clearTimeout(noticeTimer);
+  noticeTimer = setTimeout(() => { notice.hidden = true; }, 4500);
+}
+try {
+  const stored = localStorage.getItem(key);
+  if (stored === null) events = samples();
+  else {
+    const saved = JSON.parse(stored);
+    if (!Array.isArray(saved) || !saved.every(validEvent)) throw new Error('Invalid storage');
+    events = saved;
+  }
+} catch {
+  storageReadable = false;
+  notify('保存済みデータを読み込めませんでした。');
+}
+
+function save(next) {
+  if (!storageReadable) {
+    notify('保存済みデータを読み込めないため、変更を保存できません。');
+    return false;
+  }
+  try {
+    localStorage.setItem(key, JSON.stringify(next));
+  } catch {
+    notify('変更を保存できませんでした。ブラウザの設定や空き容量をご確認ください。');
+    return false;
+  }
+  events = next;
+  render();
+  return true;
+}
+
+function upcoming(event) {
+  return new Date(event.date + 'T' + event.time) >= new Date();
+}
+function sortedEvents(list) {
+  return [...list].sort((a,b) => (a.date + a.time).localeCompare(b.date + b.time));
+}
+function progressMarkup(event) {
+  const done = progress(event);
+  return `<div class="progress"><div class="progress-label"><span>準備進捗</span><span>${done} / 15</span></div><progress aria-label="準備進捗" value="${done}" max="15"></progress></div>`;
+}
+function card(event) {
+  const [year, mon, day] = event.date.split('-');
+  return `<article class="event-card"><div class="date-badge" aria-hidden="true"><small>${Number(mon)}月</small><strong>${Number(day)}</strong></div><div><h3>${esc(event.title)}</h3><div class="meta"><span>${year}/${mon}/${day} ${event.time}</span><span>＠ ${esc(event.venue)}</span></div></div>${progressMarkup(event)}<button class="secondary" data-event="${esc(event.id)}" aria-label="${esc(event.title)}の詳細">詳細 ›</button></article>`;
+}
+function render() {
+  const scheduled = events.filter(upcoming);
+  const stats = [['▦','予定の公演',scheduled.length],['◷','準備未完了',scheduled.filter(event => progress(event) < 15).length],['✓','準備完了',scheduled.filter(event => progress(event) === 15).length]];
+  $('stats').innerHTML = stats.map(([icon,label,count]) => `<div class="stat"><span class="stat-icon" aria-hidden="true">${icon}</span><div><small>${label}</small><strong>${count}</strong><span class="unit">件</span></div></div>`).join('');
+  $('list-tab').setAttribute('aria-pressed', tab === 'list');
+  $('calendar-tab').setAttribute('aria-pressed', tab === 'calendar');
+  $('schedule').innerHTML = tab === 'list'
+    ? sortedEvents(events).map(card).join('') || '<p class="empty">公演がありません。「公演を登録」から追加できます。</p>'
+    : calendar();
+}
+function calendar() {
+  const [year, mon] = month.split('-').map(Number);
+  const first = new Date(year, mon - 1, 1).getDay();
+  const days = new Date(year, mon, 0).getDate();
+  const counts = new Map();
+  events.forEach(({date}) => counts.set(date, (counts.get(date) || 0) + 1));
+  const labels = [...'日月火水木金土'].map(day => `<span class="weekday">${day}</span>`).join('');
+  const cells = Array.from({length:days}, (_,i) => {
+    const date = month + '-' + String(i + 1).padStart(2,'0');
+    const count = counts.get(date);
+    return `<button class="day" data-day="${date}" aria-label="${dateLabel(date)}${count ? ' 公演' + count + '件' : ''}" aria-pressed="${date === selected}" ${date === today() ? 'aria-current="date"' : ''}>${i + 1}${count ? '<span>' + count + '件</span>' : ''}</button>`;
+  }).join('');
+  const cards = sortedEvents(events.filter(event => event.date === selected)).map(card).join('');
+  return `<div class="calendar"><div class="calendar-head"><button data-month="-1" aria-label="前の月">‹</button><h3>${year}年${mon}月</h3><button data-month="1" aria-label="次の月">›</button></div><div class="calendar-grid">${labels}${'<span></span>'.repeat(first)}${cells}</div></div><div class="calendar-results"><h3>${dateLabel(selected)}</h3>${cards || '<p class="empty">この日の公演はありません。</p>'}</div>`;
+}
+function showEvent() {
+  if (!eventDialog.open) eventDialog.showModal();
+  eventDialog.scrollTop = 0;
+}
+function renderDetails(id) {
+  const event = events.find(item => item.id === id);
+  if (!event) return;
+  const program = event.performers.map(person => `<li><strong>${esc(person.stageName)}</strong>${person.name ? '（' + esc(person.name) + '）' : ''}　${esc(person.piece)}　${person.minutes}分</li>`).join('');
+  eventDialog.innerHTML = `<div class="dialog-body"><div class="dialog-head"><h2 id="event-heading">${esc(event.title)}</h2><button type="button" data-close="event-dialog" aria-label="閉じる">×</button></div>
+    <p>${dateLabel(event.date)} ${event.time}<br>会場　${esc(event.venue)}</p><div class="form-actions"><button class="primary" data-edit>編集する</button><button class="danger" data-delete>削除する</button></div>
+    <section class="block"><h3>出演順・演目</h3>${program ? '<ol class="details-list">' + program + '</ol>' : '<p class="muted">出演者は未登録です。</p>'}</section>
+    <section class="block"><h3>準備チェックリスト</h3>${progressMarkup(event)}${event.checklist.map((item,i) => `<div class="check-row"><label><input type="checkbox" data-check="${i}" ${item.done ? 'checked' : ''}>${esc(item.label)}</label></div>`).join('')}</section>
+    <section class="block"><h3>メモ</h3><p class="memo">${esc(event.memo) || 'メモはありません。'}</p></section></div>`;
+  eventDialog.querySelector('[data-edit]').onclick = () => renderForm(events.find(item => item.id === id));
+  eventDialog.querySelector('[data-delete]').onclick = () => {
+    if (confirm('「' + event.title + '」を削除しますか？') && save(events.filter(item => item.id !== id))) {
+      eventDialog.close();
+      notify('公演を削除しました。');
+    }
+  };
+  eventDialog.onchange = change => {
+    if (!change.target.matches('[data-check]')) return;
+    const current = events.find(item => item.id === id);
+    const next = clone(current);
+    next.checklist[Number(change.target.dataset.check)].done = change.target.checked;
+    if (save(events.map(item => item.id === id ? next : item))) {
+      eventDialog.querySelector('.progress').outerHTML = progressMarkup(next);
+    } else change.target.checked = !change.target.checked;
+  };
+  showEvent();
+}
+
+function performerRow(person) {
+  const row = document.createElement('div');
+  row.className = 'performer';
+  row.innerHTML = `<div class="performer-head"><strong></strong><button type="button" class="icon-button" data-move="-1" aria-label="出演順を上げる">↑</button><button type="button" class="icon-button" data-move="1" aria-label="出演順を下げる">↓</button><button type="button" class="danger" data-remove>削除</button></div>
+    <div class="fields"><label>高座名<input name="stageName" value="${esc(person.stageName)}" required></label><label>氏名（任意）<input name="name" value="${esc(person.name)}"></label><label>演目<input name="piece" value="${esc(person.piece)}" required></label><label>持ち時間（分）<input name="minutes" type="number" min="1" step="1" value="${person.minutes}" required></label></div>`;
+  return row;
+}
+function renderForm(existing) {
+  const event = existing || {title:'',date:tab === 'calendar' ? selected : today(),time:'14:00',venue:'',memo:'',performers:[],checklist:newTasks()};
+  eventDialog.onchange = null;
+  eventDialog.innerHTML = `<div class="dialog-body"><div class="dialog-head"><h2 id="event-heading">${existing ? '公演を編集' : '公演を登録'}</h2><button type="button" data-close="event-dialog" aria-label="閉じる">×</button></div>
+    <form id="event-form"><div class="fields"><label class="wide">公演名<input name="title" value="${esc(event.title)}" required></label><label>開催日<input name="date" type="date" value="${event.date}" required></label><label>開演時刻<input name="time" type="time" value="${event.time}" required></label><label class="wide">会場<input name="venue" value="${esc(event.venue)}" required></label></div>
+    <section class="block"><h3>出演順・演目</h3><div id="performers"></div><button type="button" class="secondary" id="add-performer">＋ 出演者を追加</button></section>
+    <section class="block"><h3>準備チェックリスト</h3>${event.checklist.map((item,i) => `<div class="check-row"><span aria-hidden="true">${i + 1}</span><input aria-label="準備項目 ${i + 1}" name="label" value="${esc(item.label)}" required></div>`).join('')}</section>
+    <section class="block"><label>公演メモ<textarea name="memo" rows="4"></textarea></label></section><p class="muted" id="form-feedback" role="alert" hidden></p>
+    <div class="form-actions"><button class="primary" type="submit">保存する</button><button class="secondary" type="button" id="cancel-edit">キャンセル</button></div></form></div>`;
+  $('event-form').elements.memo.value = event.memo;
+  const list = $('performers');
+  function renumber() {
+    [...list.children].forEach((row,i) => {
+      row.querySelector('strong').textContent = '出演順 ' + (i + 1);
+      row.querySelector('[data-move="-1"]').disabled = i === 0;
+      row.querySelector('[data-move="1"]').disabled = i === list.children.length - 1;
+    });
+  }
+  event.performers.forEach(person => list.append(performerRow(person)));
+  renumber();
+  list.onclick = click => {
+    const button = click.target.closest('button');
+    if (!button) return;
+    const row = button.closest('.performer');
+    if (button.hasAttribute('data-remove')) row.remove();
+    else if (button.dataset.move === '-1' && row.previousElementSibling) list.insertBefore(row,row.previousElementSibling);
+    else if (row.nextElementSibling) list.insertBefore(row.nextElementSibling,row);
+    renumber();
+    if (!button.disabled && button.isConnected) button.focus();
+    else if (row.isConnected) row.querySelector('input').focus();
+    else $('add-performer').focus();
+  };
+  $('add-performer').onclick = () => {
+    const row = performerRow({name:'',stageName:'',piece:'',minutes:15});
+    list.append(row);
+    renumber();
+    row.querySelector('input').focus();
+  };
+  $('cancel-edit').onclick = () => existing ? renderDetails(existing.id) : eventDialog.close();
+  $('event-form').onsubmit = submit => {
+    submit.preventDefault();
+    const form = new FormData(submit.currentTarget);
+    const text = field => form.get(field).trim();
+    const next = {
+      id:existing?.id || (globalThis.crypto.randomUUID?.() ?? 'event-' + Date.now() + '-' + Math.random().toString(36).slice(2)),
+      title:text('title'),date:text('date'),time:text('time'),venue:text('venue'),memo:form.get('memo'),
+      performers:[...list.children].map(row => Object.fromEntries([...row.querySelectorAll('input')].map(input => [input.name,input.type === 'number' ? input.valueAsNumber : input.value.trim()]))),
+      checklist:form.getAll('label').map((label,i) => ({label:label.trim(),done:event.checklist[i].done}))
+    };
+    const feedback = $('form-feedback');
+    if (!validEvent(next)) {
+      feedback.textContent = '必須項目と日時・持ち時間を確認してください。';
+      feedback.hidden = false;
+      return;
+    }
+    const updated = existing ? events.map(item => item.id === next.id ? next : item) : [...events,next];
+    if (!save(updated)) {
+      feedback.textContent = '公演を保存できませんでした。';
+      feedback.hidden = false;
+      return;
+    }
+    if (tab === 'calendar') {
+      selected = next.date;
+      month = next.date.slice(0,7);
+      render();
+    }
+    renderDetails(next.id);
+  };
+  showEvent();
+}
+
+$('schedule').onclick = click => {
+  const button = click.target.closest('button');
+  if (!button) return;
+  if (button.dataset.event !== undefined) renderDetails(button.dataset.event);
+  if (button.dataset.day) {
+    selected = button.dataset.day;
+    render();
+    $('schedule').querySelector('[aria-pressed="true"]').focus();
+  }
+  if (button.dataset.month) {
+    const [year, mon] = month.split('-').map(Number);
+    const next = new Date(year,mon - 1 + Number(button.dataset.month),1);
+    month = localDate(next).slice(0,7);
+    selected = month === today().slice(0,7) ? today() : localDate(next);
+    render();
+    $('schedule').querySelector(`[data-month="${button.dataset.month}"]`).focus();
+  }
+};
+$('list-tab').onclick = () => {tab = 'list'; render();};
+$('calendar-tab').onclick = () => {tab = 'calendar'; render();};
+$('new-event').onclick = () => renderForm();
+$('data-open').onclick = () => $('data-dialog').showModal();
+document.addEventListener('click', click => {
+  const button = click.target.closest('[data-close]');
+  if (button) $(button.dataset.close).close();
+});
+$('export-file').onclick = () => {
+  const url = URL.createObjectURL(new Blob([JSON.stringify({version:1,events},null,2)],{type:'application/json'}));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'yuitei-' + today() + '.json';
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url),1000);
+};
+$('import-submit').onclick = async () => {
+  const input = $('import-file');
+  const feedback = $('import-feedback');
+  const file = input.files[0];
+  if (!file) {
+    feedback.textContent = 'JSONファイルを選んでください。';
+    return;
+  }
+  let incoming;
+  try {
+    const data = JSON.parse(await file.text());
+    if (data?.version !== 1 || !Array.isArray(data.events) || !data.events.every(validEvent) || new Set(data.events.map(event => event.id)).size !== data.events.length) throw new Error('Invalid import');
+    incoming = data.events;
+  } catch {
+    feedback.textContent = '取り込めませんでした。JSONの形式と必須項目を確認してください。';
+    return;
+  }
+  const merged = new Map(events.map(event => [event.id,event]));
+  incoming.forEach(event => merged.set(event.id,event));
+  if (save([...merged.values()])) {
+    feedback.textContent = incoming.length + '件の公演を取り込みました。';
+    input.value = '';
+  } else feedback.textContent = '取り込んだデータを保存できませんでした。';
+};
+render();
