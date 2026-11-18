@@ -21,7 +21,7 @@ async function create(t,title='稽古A',date='2026-12-02',kind='師匠稽古'){
 }
 async function response(t,name,status){const select=$(t,`[data-person="${name}"]`);select.value=status;await $(t,'#attendance').onchange({target:select})}
 (async()=>{
- const t=await boot();await create(t);assert.equal($(t,'#rehearsals h2').textContent,'稽古A');assert(!$(t,'dialog').open);await create(t,'稽古B','2026-12-01','自主稽古');assert.equal($(t,'#rehearsals h2').textContent,'稽古B');
+ const t=await boot();await create(t);assert.equal($(t,'#rehearsals h3').textContent,'稽古A');assert(!$(t,'#rehearsal-dialog').open);await create(t,'稽古B','2026-12-01','自主稽古');assert.equal($(t,'#rehearsals h3').textContent,'稽古B');
  $(t,'[data-detail]').click();assert.equal(t.w.document.querySelectorAll('[data-person]').length,3);assert(!$(t,'[data-person="藤本"]'));assert.match($(t,'#attendance h3').textContent,/出席 0人 ／ 未回答 3人/);
  for(const status of ['出席','欠席','未定','未回答']){await response(t,'勇水',status);assert.equal($(t,'[data-person="勇水"]').value,status)}
  await response(t,'勇水','出席');await response(t,'日光','出席');assert.match($(t,'#attendance h3').textContent,/出席 2人 ／ 未回答 1人/);assert.match($(t,'#attendance').textContent,/参加者：勇水・日光/);
@@ -33,6 +33,6 @@ async function response(t,name,status){const select=$(t,`[data-person="${name}"]
  const fresh=await boot();Object.defineProperty($(fresh,'#restore'),'files',{configurable:true,value:[{text:async()=>contents}]});await $(fresh,'#restore').onchange({target:$(fresh,'#restore')});assert.equal(JSON.parse(fresh.w.localStorage.getItem('yuitei.rehearsals.v1')).items.length,1);
  const malformed=await boot('{bad');await create(malformed);assert.equal(malformed.w.localStorage.getItem('yuitei.rehearsals.v1'),'{bad');
  const viewer=await boot(undefined,{configured:true,role:'viewer',stageName:'勇水'});viewer.snapshot({items:data.items,revision:1});assert($(viewer,'#add').disabled);$(viewer,'[data-detail]').click();viewer.attendance([]);assert(!$(viewer,'[data-person="勇水"]').disabled);assert($(viewer,'[data-person="日光"]').disabled);await response(viewer,'勇水','出席');assert.equal(viewer.responses.length,1);
- const admin=await boot(undefined,{configured:true,role:'admin',stageName:'勇水'});admin.snapshot({items:data.items,revision:1});admin.fail(true);$(admin,'[data-edit]').click();$(admin,'[name="venue"]').value='競合';await $(admin,'#rehearsal-form').onsubmit({preventDefault(){},target:$(admin,'#rehearsal-form')});assert($(admin,'dialog').open);assert(!$(admin,'#rehearsals').textContent.includes('競合'));
+ const admin=await boot(undefined,{configured:true,role:'admin',stageName:'勇水'});admin.snapshot({items:data.items,revision:1});admin.fail(true);$(admin,'[data-edit]').click();$(admin,'[name="venue"]').value='競合';await $(admin,'#rehearsal-form').onsubmit({preventDefault(){},target:$(admin,'#rehearsal-form')});assert($(admin,'#rehearsal-dialog').open);assert(!$(admin,'#rehearsals').textContent.includes('競合'));
  console.log('PASS: create both types; chronological order; four attendance states; counts and participants; reload; edit; guarded deletion/cancel; JSON export/import; corrupt storage preservation; viewer UI restrictions/self RSVP; cloud save failure preservation.');
 })().catch(e=>{console.error(e.stack);process.exitCode=1});
