@@ -1,8 +1,9 @@
 const fs=require('fs'),vm=require('vm'),assert=require('node:assert/strict');
-let calls=[],requests=[],timers=[],focus,failSave=false;
+let calls=[],requests=[],timers=[],focus,now=Date.now();
+class Clock extends Date { static now(){return now} }
 const persistent=new Map();
 const state={stageName:'勇水'},storage=new Map([['yuitei.session','test-session']]);
-const sandbox={AbortController,setTimeout,clearTimeout,Date,JSON,Map,Set,Error,Object,String,Promise,structuredClone,queueMicrotask,localStorage:{getItem:k=>persistent.get(k),setItem:(k,v)=>persistent.set(k,v),removeItem:k=>persistent.delete(k)},sessionStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},document:{visibilityState:'visible'},window:{addEventListener:(event,fn)=>{if(event==='focus')focus=fn}},setInterval:fn=>{timers.push(fn);return timers.length},clearInterval(){},fetch:(url,options)=>{const body=JSON.parse(options.body);calls.push(body);return new Promise(resolve=>requests.push({body,resolve:result=>resolve({ok:true,json:async()=>result})}))}};
+const sandbox={AbortController,setTimeout,clearTimeout,Date:Clock,JSON,Map,Set,Error,Object,String,Promise,structuredClone,queueMicrotask,localStorage:{getItem:k=>persistent.get(k),setItem:(k,v)=>persistent.set(k,v),removeItem:k=>persistent.delete(k)},sessionStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},document:{visibilityState:'visible'},window:{addEventListener:(event,fn)=>{if(event==='focus')focus=fn}},setInterval:fn=>{timers.push(fn);return timers.length},clearInterval(){},fetch:(url,options)=>{const body=JSON.parse(options.body);calls.push(body);return new Promise(resolve=>requests.push({body,resolve:result=>resolve({ok:true,json:async()=>result})}))}};
 vm.createContext(sandbox);vm.runInContext(fs.readFileSync('pin-cloud.js','utf8').replace('export function','function')+'\nthis.client=createPinClient("https://example.test",this.state,()=>{});',Object.assign(sandbox,{state}));
 const client=sandbox.client,tick=()=>new Promise(r=>setImmediate(r));
 function respond(action,data){const i=requests.findIndex(r=>r.body.action===action);assert(i>=0,'missing '+action);requests.splice(i,1)[0].resolve({ok:true,...data})}
@@ -18,11 +19,26 @@ function respond(action,data){const i=requests.findIndex(r=>r.body.action===acti
  let oldDelivered=0;timers[0]();client.watch('rehearsals',()=>oldDelivered++);await tick();const logout=client.logout();respond('logout',{});await logout;const count=oldDelivered;respond('read',{doc:{items:[{id:'old-user'}],revision:3}});await tick();assert.equal(oldDelivered,count,'pending response cannot escape logout');assert.equal(storage.has('yuitei.session'),false);
  assert.equal(persistent.has('yuitei.session'),false);
  const login=client.login('勇水','2468');respond('login',{token:'kept',member:{id:'owner',name:'勇水',role:'admin'}});await login;assert.equal(persistent.get('yuitei.session'),'kept');assert(!JSON.stringify([...persistent,...storage]).includes('2468'));
- vm.runInContext('this.restored=createPinClient("https://example.test",this.state,()=>{});',sandbox);const restored=sandbox.restored.start();assert.equal(requests.at(-1).body.token,'kept');assert.equal(requests.at(-1).body.remember,true);respond('session',{member:{id:'owner',name:'勇水',role:'admin'}});await restored;
- const end=sandbox.restored.logout();respond('logout',{});await end;
- const temporary=client.login('勇水','2468',false);respond('login',{token:'temporary',member:{id:'owner',name:'勇水',role:'admin'}});await temporary;assert.equal(persistent.has('yuitei.session'),false);assert.equal(storage.get('yuitei.session'),'temporary');
- vm.runInContext('this.temporaryClient=createPinClient("https://example.test",this.state,()=>{});',sandbox);assert.equal(persistent.has('yuitei.session'),false,'unchecked option is not upgraded on navigation');const tempStart=sandbox.temporaryClient.start();assert.equal(requests.at(-1).body.remember,false);respond('session',{member:{id:'owner',name:'勇水',role:'admin'}});await tempStart;
- const expired=sandbox.temporaryClient.start();respond('session',{ok:false,error:'ログインの期限が切れました。'});await expired;assert.equal(storage.has('yuitei.session'),false);
+ const restart=n=>vm.runInContext('this.'+n+'=createPinClient("https://example.test",this.state,()=>{});this.'+n,sandbox);
+ const restored=restart('restored'),beforeNavigation=calls.length;
+ await restored.start();assert.equal(calls.length,beforeNavigation,'recent navigation skips session request');
+ assert.equal(state.role,'admin');
+ const stop=restored.watch('events',()=>{});assert.equal(calls.at(-1).action,'read');assert.equal(calls.at(-1).token,'kept');respond('read',{doc:null});await tick();stop();
+ now+=5*60*1000;
+ const renewed=restart('renewed'),renew=renewed.start();
+ assert.equal(requests.at(-1).body.token,'kept');assert.equal(requests.at(-1).body.remember,true);
+ respond('session',{member:{id:'owner',name:'勇水',role:'admin'}});await renew;
+ const end=renewed.logout();respond('logout',{});await end;
+ assert.equal(storage.has('yuitei.session.identity'),false);
+ const temporary=client.login('勇水','2468',false);respond('login',{token:'temporary',member:{id:'member',name:'勇水',role:'viewer'}});await temporary;
+ assert.equal(persistent.has('yuitei.session'),false);assert.equal(storage.get('yuitei.session'),'temporary');
+ const temporaryClient=restart('temporaryClient');
+ await temporaryClient.start();assert.equal(state.role,'viewer');assert.equal(persistent.has('yuitei.session'),false,'unchecked option is not upgraded on navigation');
+ const denied=temporaryClient.save('events',{items:[]},1);assert.equal(calls.at(-1).token,'temporary');respond('save',{ok:false,error:'編集権限が必要です。'});await assert.rejects(denied,/編集権限/);assert.equal(state.role,'viewer');
+ let delivered=0;
+ temporaryClient.watch('events',()=>delivered++);
+ respond('read',{ok:false,error:'ログインの期限が切れました。'});await tick();
+ assert.equal(state.role,null);assert.equal(delivered,0);assert.equal(storage.has('yuitei.session'),false);assert.equal(storage.has('yuitei.session.identity'),false);
  console.log('PASS remembered login survives client restart, opt-out stays temporary, PIN never stored, expiry and logout clear tokens');
  console.log('PASS shared read coalescing, one timer per resource, recent in-memory reuse, roster coalescing, attendance-only refresh, confirmed writes, failure preservation and session isolation');
 })().catch(error=>{console.error(error);process.exitCode=1});

@@ -1,5 +1,7 @@
 export function createPinClient(endpoint,state,emit){
  const sessionKey='yuitei.session';
+ const identityKey=sessionKey+'.identity';
+ const identityMaxAge=5*60*1000;
  const readStorage=store=>{try{return store.getItem(sessionKey)||''}catch{return ''}};
  const removeStorage=store=>{try{store.removeItem(sessionKey)}catch{}};
  let token=readStorage(localStorage)||readStorage(sessionStorage),remember=!!readStorage(localStorage),epoch=0,rosterCache=null,rosterRequest=null;
@@ -10,14 +12,49 @@ export function createPinClient(endpoint,state,emit){
 
  const streams=new Map(),pending=new Map();
  async function call(action,body={}){
+  const version=epoch;
   const read=['session','read','attendanceRead','roster','members'].includes(action),key=JSON.stringify([epoch,action,body]);
   if(read&&pending.has(key))return pending.get(key);
-  const request=(async()=>{const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),30000);try{const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action,token,...body}),redirect:'follow',signal:controller.signal});if(!response.ok)throw Error('共通保存に接続できません。');const result=await response.json();if(!result.ok){const error=Error(result.error||'操作できませんでした。');error.sessionInvalid=/会員ログインが必要|ログインの期限/.test(error.message);throw error}return result}catch(error){if(error.name==='AbortError')throw Error('接続に時間がかかっています。接続を確認して再度お試しください。');throw error}finally{clearTimeout(timeout)}})();
+  const request=(async()=>{
+   const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),30000);
+   try{
+    const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action,token,...body}),redirect:'follow',signal:controller.signal});
+    if(!response.ok)throw Error('共通保存に接続できません。');
+    const result=await response.json();
+    if(version!==epoch)throw Error('ログイン状態が変わりました。');
+    if(!result.ok){
+     const error=Error(result.error||'操作できませんでした。');
+     error.sessionInvalid=action!=='login'&&/会員ログインが必要|ログインの期限/.test(error.message);
+     if(token&&error.sessionInvalid)signOut();
+     throw error;
+    }
+    return result;
+   }catch(error){
+    if(error.name==='AbortError')throw Error('接続に時間がかかっています。接続を確認して再度お試しください。');
+    throw error;
+   }finally{clearTimeout(timeout)}
+  })();
   if(read)pending.set(key,request);
   try{return await request}finally{if(read&&pending.get(key)===request)pending.delete(key)}
  }
- function clear(){epoch++;rosterCache=null;rosterRequest=null;for(const entry of streams.values()){clearInterval(entry.timer);entry.closed=true}streams.clear();pending.clear()}
+ // The snapshot only starts the UI. Every data request still sends the token to Apps Script.
+ function cachedMember(){
+  try{
+   const saved=JSON.parse(sessionStorage.getItem(identityKey));
+   const age=Date.now()-saved.checkedAt;
+   return saved.token===token&&age>=0&&age<identityMaxAge?saved.member:null;
+  }catch{return null}
+ }
+ function rememberMember(member){
+  try{sessionStorage.setItem(identityKey,JSON.stringify({token,member,checkedAt:Date.now()}))}catch{}
+ }
+ function clear(){try{sessionStorage.removeItem(identityKey)}catch{}epoch++;rosterCache=null;rosterRequest=null;for(const entry of streams.values()){clearInterval(entry.timer);entry.closed=true}streams.clear();pending.clear()}
  function identity(member){state.user=member?{uid:member.id,email:member.name}:null;state.stageName=member?.name||null;state.role=member?.role||null;state.owner=!!member?.owner;state.ready=true;state.message=member?'共通保存：'+member.name+'（'+({admin:'管理者',editor:'編集可',viewer:'会員'}[member.role])+'）':'登録名と4桁の暗証番号でログインしてください。';emit()}
+ function signOut(){
+  if(readStorage(localStorage)===token)removeStorage(localStorage);
+  if(readStorage(sessionStorage)===token)removeStorage(sessionStorage);
+  token='';clear();identity(null);
+ }
  const streamKey=(action,args)=>JSON.stringify([action,args]);
  function deliver(entry,error){for(const subscriber of [...entry.subscribers]){try{if(error)subscriber.onError?.(error);else subscriber.fn(structuredClone(entry.value))}catch{}}}
  async function load(entry){
@@ -35,12 +72,21 @@ export function createPinClient(endpoint,state,emit){
  function refresh(predicate=()=>true){for(const entry of streams.values())if(predicate(entry)){entry.version++;entry.updatedAt=0;if(entry.subscribers.size)load(entry)}}
  function confirmed(action,args,value){const entry=streams.get(streamKey(action,args));if(!entry)return;entry.version++;entry.value=value;entry.hasValue=true;entry.updatedAt=Date.now();deliver(entry)}
  const refreshAttendance=id=>refresh(entry=>entry.action==='attendanceRead'&&entry.args.id===id);
- window.addEventListener('storage',event=>{if(event.key===sessionKey&&event.newValue!==token){token='';clear();identity(null)}});
+ window.addEventListener('storage',event=>{if(event.storageArea===localStorage&&(event.key===sessionKey||event.key===null)&&readStorage(localStorage)!==token&&remember){token='';clear();identity(null)}});
  window.addEventListener('focus',()=>{for(const entry of streams.values())if(entry.subscribers.size&&Date.now()-entry.updatedAt>15000)load(entry)});
  return {
-  async start(){state.provider='apps-script';if(token)try{identity((await call('session',{remember})).member);return}catch(error){if(!error.sessionInvalid)throw error;token='';forget();clear()}identity(null)},
-  async login(name,pin,keep=true){const result=await call('login',{name,pin,remember:keep});clear();token=result.token;remember=keep;persist();identity(result.member)},
-  async logout(){try{await call('logout')}finally{token='';forget();clear();identity(null)}},
+  async start(){
+   state.provider='apps-script';
+   if(!token){identity(null);return}
+   const member=cachedMember();
+   if(member){identity(member);return}
+   try{
+    const {member}=await call('session',{remember});
+    rememberMember(member);identity(member);
+   }catch(error){if(!error.sessionInvalid)throw error}
+  },
+  async login(name,pin,keep=true){const result=await call('login',{name,pin,remember:keep});clear();token=result.token;remember=keep;persist();rememberMember(result.member);identity(result.member)},
+  async logout(){const version=epoch;try{await call('logout')}finally{if(version===epoch)signOut()}},
   watch(name,fn,onError){return watch('read',{name},fn,onError)},watchAttendance(id,fn,onError){return watch('attendanceRead',{id},fn,onError)},
   async save(name,payload,revision){const result=await call('save',{name,items:payload.items,revision});confirmed('read',{name},{items:payload.items,revision:result.revision});return result.revision},
   async respondAttendance(id,status){await call('attendanceSave',{id,status});const entry=streams.get(streamKey('attendanceRead',{id}));if(entry?.hasValue){const rows=entry.value.filter(row=>row.stageName!==state.stageName);rows.push({stageName:state.stageName,status});confirmed('attendanceRead',{id},rows)}refreshAttendance(id)},
@@ -48,6 +94,6 @@ export function createPinClient(endpoint,state,emit){
   async archivePast(data){const result=await call('archivePast',data);refresh(entry=>entry.action==='read');return result},
   async importLocal(data){const result=await call('importLocal',data);refresh();return result},
   async members(){return (await call('members')).members},async memberSave(member){const result=await call('memberSave',{member});rosterCache=null;return result.member},
-  async changePin(pin){await call('changePin',{pin});token='';forget();clear();identity(null)}
+  async changePin(pin){await call('changePin',{pin});signOut()}
  };
 }

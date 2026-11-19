@@ -45,7 +45,7 @@ export async function startCloud(){
   const config=await fetch('./cloud-config.json',{cache:'no-store'}).then(r=>{if(!r.ok)throw Error();return r.json()});
   if(!config.enabled){state.ready=true;emit();return}
   state.configured=true;state.provider=config.provider||'firebase';state.message='ログイン状態を確認しています。';emit();
-  if(config.provider==='apps-script'){if(!/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec$/.test(config.endpoint||''))throw Error();const {createPinClient}=await import('./pin-cloud.js?v=20261119-remember5');pinClient=createPinClient(config.endpoint,state,emit);await pinClient.start();return}
+  if(config.provider==='apps-script'){if(!/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec$/.test(config.endpoint||''))throw Error();const {createPinClient}=await import('./pin-cloud.js?v=20261119-tabs1');pinClient=createPinClient(config.endpoint,state,emit);await pinClient.start();return}
   const base='https://www.gstatic.com/firebasejs/12.6.0/';
   const [app,authApi,store]=await Promise.all([import(base+'firebase-app.js'),import(base+'firebase-auth.js'),import(base+'firebase-firestore.js')]);
   api={...authApi,...store};const firebase=app.initializeApp(config.firebase);auth=api.getAuth(firebase);db=api.getFirestore(firebase);
