@@ -1,8 +1,8 @@
-import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261119-share1';
-import {readCategories,saveCategories,categoryOptions,mountCategories} from './categories.js?v=20261119-share1';
-import {mountScheduleImport} from './schedule-import.js?v=20261119-share1';
-import {validPerformer,timeline,toRecord,transferRecord,readRecords,mergeRecords,validRecord} from './record-transfer.js?v=20261119-share1';
-import {cloud,startCloud,mountAccount} from './cloud.js?v=20261119-share1';
+import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261119-edit2';
+import {readCategories,saveCategories,categoryOptions,mountCategories} from './categories.js?v=20261119-edit2';
+import {mountScheduleImport} from './schedule-import.js?v=20261119-edit2';
+import {validPerformer,timeline,toRecord,transferRecord,readRecords,mergeRecords,validRecord} from './record-transfer.js?v=20261119-edit2';
+import {cloud,startCloud,mountAccount} from './cloud.js?v=20261119-edit2';
 'use strict';
 
 const key = 'yuitei.events.v1';
@@ -111,7 +111,7 @@ function progressMarkup(event) {
 }
 function card(event) {
   const [year, mon, day] = event.date.split('-');
-  return `<article class="event-card"><div class="date-badge" aria-hidden="true"><small>${Number(mon)}月</small><strong>${Number(day)}</strong></div><div><h3>${esc(event.title)}</h3><div class="meta"><span>${year}/${mon}/${day} ${esc(event.time||'時間未定')}</span><span>＠ ${esc(event.venue)}</span></div></div>${progressMarkup(event)}<div class="event-actions"><button class="secondary" data-event="${esc(event.id)}" aria-label="${esc(event.title)}の詳細">詳細 ›</button><button class="secondary" data-edit-event="${esc(event.id)}" aria-label="${esc(event.title)}を編集" ${editable()?'':'disabled'}>編集</button></div></article>`;
+  return `<article class="event-card"><div class="date-badge" aria-hidden="true"><small>${Number(mon)}月</small><strong>${Number(day)}</strong></div><div><h3>${esc(event.title)}</h3><div class="meta"><span>${year}/${mon}/${day} ${esc(event.time||'時間未定')}</span><span>＠ ${esc(event.venue)}</span></div></div>${progressMarkup(event)}<div class="event-actions"><button class="secondary" data-event="${esc(event.id)}" aria-label="${esc(event.title)}の詳細">詳細 ›</button></div></article>`;
 }
 function render() {
   const filter=document.getElementById('event-kind-filter');if(filter){const value=filter.value;filter.innerHTML='<option value="">全区分</option>'+categoryOptions(value,events.map(e=>e.kind));filter.value=value;}
@@ -306,7 +306,7 @@ $('schedule').onclick = async click => {
   }
 };
 $('list-tab').onclick = () => {tab = 'list'; render();};
-$('calendar-tab').onclick = () => {location.href = 'rehearsals.html?v=20261119-share1';};
+$('calendar-tab').onclick = () => {location.href = 'rehearsals.html?v=20261119-edit2';};
 $('new-event').onclick = () => renderForm();
 $('data-open').onclick = () => $('data-dialog').showModal();
 document.addEventListener('click', click => {

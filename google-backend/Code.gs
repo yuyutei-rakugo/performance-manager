@@ -1,10 +1,10 @@
 /** 結友亭 共通保存 API。Google Apps Script V8・所有者として実行するウェブアプリ。
- * 最初にスクリプトプロパティ OWNER_PIN に4桁を設定し initializeOwner をエディタで実行。
+ * 最初に initializeOwner をエディタで実行。初期PINは1111（OWNER_PINで任意指定も可）。
  * PIN・認証鍵・会員情報を公開リポジトリやログに記録しない。
  */
 function initializeOwner(){
  const lock=LockService.getScriptLock();lock.waitLock(20000);
- try{const props=PropertiesService.getScriptProperties();if(props.getProperty('DB_FILE_ID'))throw Error('初期設定済みです。');const pin=props.getProperty('OWNER_PIN');checkPin_(pin);const secret=Utilities.getUuid()+Utilities.getUuid();props.setProperty('AUTH_SECRET',secret);const owner={id:'owner',name:'勇水',role:'admin',active:true,epoch:1,salt:Utilities.getUuid(),owner:true};owner.pinHash=hashPin_(owner,pin);const file=DriveApp.createFile('結友亭の帳面-共通データ.json',JSON.stringify({version:1,members:[owner],shared:{},attendance:{}}),MimeType.PLAIN_TEXT);props.setProperty('DB_FILE_ID',file.getId());props.deleteProperty('OWNER_PIN');return '勇水を最初の管理者として登録しました。'}finally{lock.releaseLock()}
+ try{const props=PropertiesService.getScriptProperties();if(props.getProperty('DB_FILE_ID'))throw Error('初期設定済みです。');const pin=props.getProperty('OWNER_PIN')||'1111';checkPin_(pin);const secret=Utilities.getUuid()+Utilities.getUuid();props.setProperty('AUTH_SECRET',secret);const owner={id:'owner',name:'勇水',role:'admin',active:true,epoch:1,salt:Utilities.getUuid(),owner:true};owner.pinHash=hashPin_(owner,pin);const file=DriveApp.createFile('結友亭の帳面-共通データ.json',JSON.stringify({version:1,members:[owner],shared:{},attendance:{}}),MimeType.PLAIN_TEXT);props.setProperty('DB_FILE_ID',file.getId());props.deleteProperty('OWNER_PIN');return '勇水を最初の管理者として登録しました。'}finally{lock.releaseLock()}
 }
 function doGet(){return output_({ok:true,service:'yuyutei-members',version:1})}
 function doPost(event){
@@ -52,7 +52,7 @@ function saveMember_(db,actor,input){
  if(!input||typeof input.name!=='string'||!input.name.trim()||input.name.length>40||!['admin','editor','viewer'].includes(input.role)||typeof input.active!=='boolean')throw Error('会員情報を確認してください。');const name=input.name.trim().normalize('NFKC');let target=db.members.find(m=>m.id===input.id);
  if(db.members.some(m=>m.name===name&&m.id!==(target&&target.id)))throw Error('同じ登録名が使われています。');
  if(target&&target.owner)throw Error('勇水の管理者権限は変更できません。');if((input.role==='admin'||target&&target.role==='admin')&&!actor.owner)throw Error('管理者の追加・変更は勇水のみ操作できます。');
- if(!target){if(db.members.length>=100)throw Error('会員は100名までです。');checkPin_(input.pin);target={id:Utilities.getUuid(),salt:Utilities.getUuid(),epoch:1,owner:false};target.pinHash=hashPin_(target,input.pin);db.members.push(target)}else if(input.pin){checkPin_(input.pin);target.salt=Utilities.getUuid();target.pinHash=hashPin_(target,input.pin);target.epoch++}
+ if(!target){if(db.members.length>=100)throw Error('会員は100名までです。');const initialPin=input.pin||'1111';checkPin_(initialPin);target={id:Utilities.getUuid(),salt:Utilities.getUuid(),epoch:1,owner:false};target.pinHash=hashPin_(target,initialPin);db.members.push(target)}else if(input.pin){checkPin_(input.pin);target.salt=Utilities.getUuid();target.pinHash=hashPin_(target,input.pin);target.epoch++}
  target.name=name;target.active=input.active;target.role=input.role;return publicMember_(target);
 }
 
