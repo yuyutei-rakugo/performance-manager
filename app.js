@@ -1,8 +1,9 @@
-import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261119-edit2';
-import {readCategories,saveCategories,categoryOptions,mountCategories} from './categories.js?v=20261119-edit2';
-import {mountScheduleImport} from './schedule-import.js?v=20261119-edit2';
-import {validPerformer,timeline,toRecord,transferRecord,readRecords,mergeRecords,validRecord} from './record-transfer.js?v=20261119-edit2';
-import {cloud,startCloud,mountAccount} from './cloud.js?v=20261119-edit2';
+import {mountMemberHome} from './member-home.js?v=20261119-ready1';
+import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261119-ready1';
+import {readCategories,saveCategories,categoryOptions,mountCategories} from './categories.js?v=20261119-ready1';
+import {mountScheduleImport} from './schedule-import.js?v=20261119-ready1';
+import {validPerformer,timeline,toRecord,transferRecord,readRecords,mergeRecords,validRecord} from './record-transfer.js?v=20261119-ready1';
+import {cloud,startCloud,mountAccount} from './cloud.js?v=20261119-ready1';
 'use strict';
 
 const key = 'yuitei.events.v1';
@@ -94,6 +95,7 @@ async function save(next, expectedRevision=cloudRevision) {
     return false;
   }
   events = next;
+  window.dispatchEvent(new Event('schedule-data-changed'));
   render();
   return true;
 }
@@ -307,7 +309,7 @@ $('schedule').onclick = async click => {
   }
 };
 $('list-tab').onclick = () => {tab = 'list'; render();};
-$('calendar-tab').onclick = () => {location.href = 'rehearsals.html?v=20261119-edit2';};
+$('calendar-tab').onclick = () => {location.href = 'rehearsals.html?v=20261119-ready1';};
 $('new-event').onclick = () => renderForm();
 $('data-open').onclick = () => $('data-dialog').showModal();
 document.addEventListener('click', click => {
@@ -349,7 +351,7 @@ $('import-submit').onclick = async () => {
 };
 render();
 
-mountAccount();
+mountMemberHome();mountAccount();
 cloud.onState(state=>{
  const identity=state.configured?`${state.user?.uid||''}:${state.role||''}`:'local';
  if(identity===cloudIdentity)return;cloudIdentity=identity;stopCloud?.();cloudLoaded=false;
