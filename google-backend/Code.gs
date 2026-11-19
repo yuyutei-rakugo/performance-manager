@@ -1,10 +1,11 @@
 /** 結友亭 共通保存 API。Google Apps Script V8・所有者として実行するウェブアプリ。
+ * 権限はdrive.fileに限定。必ず同梱appsscript.jsonとセットで配置する。
  * 最初に initializeOwner をエディタで実行。初期PINは1111（OWNER_PINで任意指定も可）。
  * PIN・認証鍵・会員情報を公開リポジトリやログに記録しない。
  */
 function initializeOwner(){
  const lock=LockService.getScriptLock();lock.waitLock(20000);
- try{const props=PropertiesService.getScriptProperties();if(props.getProperty('DB_FILE_ID'))throw Error('初期設定済みです。');const pin=props.getProperty('OWNER_PIN')||'1111';checkPin_(pin);const secret=Utilities.getUuid()+Utilities.getUuid();props.setProperty('AUTH_SECRET',secret);const owner={id:'owner',name:'勇水',role:'admin',active:true,epoch:1,salt:Utilities.getUuid(),owner:true};owner.pinHash=hashPin_(owner,pin);const file=DriveApp.createFile('結友亭の帳面-共通データ.json',JSON.stringify({version:1,members:[owner],shared:{},attendance:{}}),MimeType.PLAIN_TEXT);props.setProperty('DB_FILE_ID',file.getId());props.deleteProperty('OWNER_PIN');return '勇水を最初の管理者として登録しました。'}finally{lock.releaseLock()}
+ try{const props=PropertiesService.getScriptProperties();if(props.getProperty('DB_FILE_ID'))throw Error('初期設定済みです。');const pin=props.getProperty('OWNER_PIN')||'1111';checkPin_(pin);const secret=Utilities.getUuid()+Utilities.getUuid();props.setProperty('AUTH_SECRET',secret);const owner={id:'owner',name:'勇水',role:'admin',active:true,epoch:1,salt:Utilities.getUuid(),owner:true};owner.pinHash=hashPin_(owner,pin);const file=Drive.Files.create({name:'結友亭の帳面-共通データ.json',mimeType:'application/json'},Utilities.newBlob(JSON.stringify({version:1,members:[owner],shared:{},attendance:{}}),'application/json'),{fields:'id'});props.setProperty('DB_FILE_ID',file.id);props.deleteProperty('OWNER_PIN');return '勇水を最初の管理者として登録しました。'}finally{lock.releaseLock()}
 }
 function doGet(){return output_({ok:true,service:'yuyutei-members',version:1})}
 function doPost(event){
@@ -35,8 +36,8 @@ function admin_(member){if(member.role!=='admin')throw Error('管理者のみ操
 function secret_(){const s=PropertiesService.getScriptProperties().getProperty('AUTH_SECRET');if(!s)throw Error('管理者の初期設定が必要です。');return s}
 function digest_(value){return Utilities.base64EncodeWebSafe(Utilities.computeHmacSha256Signature(String(value),secret_())).replace(/=+$/,'')}
 function hashPin_(m,pin){return digest_(m.id+':'+m.salt+':'+pin)}
-function readDb_(){const id=PropertiesService.getScriptProperties().getProperty('DB_FILE_ID');if(!id)throw Error('管理者の初期設定が必要です。');return JSON.parse(DriveApp.getFileById(id).getBlob().getDataAsString('UTF-8'))}
-function writeDb_(db){const text=JSON.stringify(db);if(text.length>1500000)throw Error('保存量が増えています。バックアップして管理者に確認してください。');DriveApp.getFileById(PropertiesService.getScriptProperties().getProperty('DB_FILE_ID')).setContent(text)}
+function readDb_(){const id=PropertiesService.getScriptProperties().getProperty('DB_FILE_ID');if(!id)throw Error('管理者の初期設定が必要です。');const response=UrlFetchApp.fetch('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(id)+'?alt=media',{headers:{Authorization:'Bearer '+ScriptApp.getOAuthToken()},muteHttpExceptions:true});if(response.getResponseCode()!==200)throw Error('専用データを読み込めません。Googleの接続設定を確認してください。');return JSON.parse(response.getContentText('UTF-8'))}
+function writeDb_(db){const text=JSON.stringify(db);if(text.length>1500000)throw Error('保存量が増えています。バックアップして管理者に確認してください。');Drive.Files.update({},PropertiesService.getScriptProperties().getProperty('DB_FILE_ID'),Utilities.newBlob(text,'application/json'),{fields:'id'})}
 function output_(data){return ContentService.createTextOutput(JSON.stringify(data)).setMimeType(ContentService.MimeType.JSON)}
 function publicMember_(m){return {id:m.id,name:m.name,role:m.role,active:m.active,owner:!!m.owner}}
 function login_(db,req){
