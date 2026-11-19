@@ -1,13 +1,15 @@
-import {readCategories,saveCategories} from './categories.js?v=20261119-organize1';
-import {mountScheduleImport} from './schedule-import.js?v=20261119-organize1';
-import {toRecord,transferRecord,rehearsalTitle,readRecords,mergeRecords,validRecord} from './record-transfer.js?v=20261119-organize1';
+import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261119-autoschedule1';
+import {readCategories,saveCategories} from './categories.js?v=20261119-autoschedule1';
+import {mountScheduleImport} from './schedule-import.js?v=20261119-autoschedule1';
+import {toRecord,transferRecord,rehearsalTitle,readRecords,mergeRecords,validRecord} from './record-transfer.js?v=20261119-autoschedule1';
 import {cloud,startCloud,mountAccount} from './cloud.js';
-import {statuses,rehearsalNames,validRehearsal,validAttendance,attendanceSummary} from './rehearsal-model.js?v=20261119-organize1';
+import {statuses,rehearsalNames,validRehearsal,validAttendance,attendanceSummary} from './rehearsal-model.js?v=20261119-autoschedule1';
 const $=id=>document.getElementById(id),esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const key='yuitei.rehearsals.v1';let items=[],attendance={},names=[],revision=0,loaded=false,storageOK=true,stop,stopAttendance,opened=null,detailRevision=0,busy=false;
 const notify=s=>{$('notice').textContent=s;$('notice').hidden=false;setTimeout(()=>$('notice').hidden=true,6000)};
 const canEdit=()=>!cloud.state.configured||loaded&&['admin','editor'].includes(cloud.state.role);
 const dialog=$('rehearsal-dialog');
+try{await applyConfirmedSchedule()}catch(e){notify(e.message||'予定の自動追加に失敗しました。再読み込みしてください。')}
 try{const raw=JSON.parse(localStorage.getItem(key)||'{"items":[],"attendance":{}}');if(!Array.isArray(raw.items)||!raw.items.every(validRehearsal)||!raw.attendance||!Object.values(raw.attendance).every(validAttendance))throw Error();items=raw.items;attendance=raw.attendance}catch{storageOK=false;notify('保存済みの稽古予定を読み込めません。上書きを停止しています。')}
 let localItems=structuredClone(items),localAttendance=structuredClone(attendance);
 async function save(next,expected=revision,nextAttendance=attendance){if(busy)return false;if(!canEdit()){notify('編集権限が必要です。');return false}busy=true;try{if(cloud.state.configured)await cloud.save('rehearsals',{items:next},expected);else{if(!storageOK)throw Error('保存済みデータを確認してください。');localStorage.setItem(key,JSON.stringify({items:next,attendance:nextAttendance}))}items=next;attendance=nextAttendance;if(!cloud.state.configured){localItems=structuredClone(items);localAttendance=structuredClone(attendance)}render();return true}catch(e){notify(e.message||'保存できませんでした。');return false}finally{busy=false}}

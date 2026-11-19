@@ -1,7 +1,7 @@
 const {JSDOM}=require('jsdom');
 const fs=require('fs'),assert=require('node:assert/strict');
 const path=require('node:path'),root=path.resolve(__dirname,'..');
-const html=fs.readFileSync(path.join(root,'rehearsals.html'),'utf8'),source=fs.readFileSync(path.join(root,'rehearsals.js'),'utf8').replace(/^import .*;\n/gm,''),model=fs.readFileSync(path.join(root,'rehearsal-model.js'),'utf8').replace(/export /g,'');
+const html=fs.readFileSync(path.join(root,'rehearsals.html'),'utf8'),source=fs.readFileSync(path.join(root,'rehearsals.js'),'utf8').replace(/^import .*;\n/gm,'').replace(/await applyConfirmedSchedule\(\)/g,'void 0'),model=fs.readFileSync(path.join(root,'rehearsal-model.js'),'utf8').replace(/export /g,'').replace(/await applyConfirmedSchedule\(\)/g,'void 0');
 const tick=()=>new Promise(r=>setImmediate(r));
 async function boot(stored,cloudState={configured:false}){
  const dom=new JSDOM(html,{url:'http://localhost/rehearsals.html',runScripts:'outside-only'}),w=dom.window;let stateListener,watch,watchAttendance;let confirm=true,blobData,saveError=false,respond=[];
@@ -11,7 +11,7 @@ async function boot(stored,cloudState={configured:false}){
  const cloud={state:cloudState,onState(fn){stateListener=fn;fn(this.state)},watch(name,fn){watch=fn;return()=>{}},watchAttendance(id,fn){watchAttendance=fn;return()=>{}},async save(){if(saveError)throw Error('conflict')},async respondAttendance(id,status){respond.push({id,status});if(saveError)throw Error('通信失敗')}};
  w.cloud=cloud;w.startCloud=()=>{};w.mountAccount=()=>{};
  if(stored!==undefined)w.localStorage.setItem('yuitei.rehearsals.v1',stored);
- const transfer=fs.readFileSync(path.join(root,'record-transfer.js'),'utf8').replace(/^import .*;\n/gm,'').replace(/export /g,'');w.eval(fs.readFileSync(path.join(root,'categories.js'),'utf8').replace(/export /g,'')+'\n'+fs.readFileSync(path.join(root,'schedule-import.js'),'utf8').replace(/export /g,''));w.eval(transfer+'\n'+model+'\n'+source);await tick();
+ const transfer=fs.readFileSync(path.join(root,'record-transfer.js'),'utf8').replace(/^import .*;\n/gm,'').replace(/export /g,'').replace(/await applyConfirmedSchedule\(\)/g,'void 0');w.eval(fs.readFileSync(path.join(root,'categories.js'),'utf8').replace(/export /g,'').replace(/await applyConfirmedSchedule\(\)/g,'void 0')+'\n'+fs.readFileSync(path.join(root,'schedule-import.js'),'utf8').replace(/export /g,'').replace(/await applyConfirmedSchedule\(\)/g,'void 0'));w.eval(transfer+'\n'+model+'\n'+source);await tick();
  return {w,dom,cloud,emit(s){cloud.state=s;stateListener(s)},snapshot(d){watch(d)},attendance(rows){watchAttendance(rows)},confirm(v){confirm=v},fail(v){saveError=v},responses:respond,blob:()=>blobData};
 }
 function $(t,s){return t.w.document.querySelector(s)}

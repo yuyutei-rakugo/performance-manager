@@ -1,6 +1,7 @@
-import {readCategories,saveCategories,categoryOptions,mountCategories} from './categories.js?v=20261119-organize1';
-import {mountScheduleImport} from './schedule-import.js?v=20261119-organize1';
-import {validPerformer,timeline,toRecord,transferRecord,readRecords,mergeRecords,validRecord} from './record-transfer.js?v=20261119-organize1';
+import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261119-autoschedule1';
+import {readCategories,saveCategories,categoryOptions,mountCategories} from './categories.js?v=20261119-autoschedule1';
+import {mountScheduleImport} from './schedule-import.js?v=20261119-autoschedule1';
+import {validPerformer,timeline,toRecord,transferRecord,readRecords,mergeRecords,validRecord} from './record-transfer.js?v=20261119-autoschedule1';
 import {cloud,startCloud,mountAccount} from './cloud.js';
 'use strict';
 
@@ -62,6 +63,7 @@ function notify(message) {
   clearTimeout(noticeTimer);
   noticeTimer = setTimeout(() => { notice.hidden = true; }, 4500);
 }
+try{await applyConfirmedSchedule()}catch(e){notify(e.message||'予定の自動追加に失敗しました。再読み込みしてください。')}
 try {
   const stored = localStorage.getItem(key);
   if (stored === null) events = samples();
@@ -304,7 +306,7 @@ $('schedule').onclick = async click => {
   }
 };
 $('list-tab').onclick = () => {tab = 'list'; render();};
-$('calendar-tab').onclick = () => {location.href = 'rehearsals.html?v=20261119-organize1';};
+$('calendar-tab').onclick = () => {location.href = 'rehearsals.html?v=20261119-autoschedule1';};
 $('new-event').onclick = () => renderForm();
 $('data-open').onclick = () => $('data-dialog').showModal();
 document.addEventListener('click', click => {
