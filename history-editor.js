@@ -1,6 +1,6 @@
-import {categoryOptions} from './categories.js?v=20261119-ready1';
-import {readRecords,writeRecords} from './record-transfer.js?v=20261119-ready1';
-import {cloud} from './cloud.js?v=20261119-ready1';
+import {categoryOptions} from './categories.js?v=20261119-fast1';
+import {readRecords,writeRecords} from './record-transfer.js?v=20261119-fast1';
+import {cloud} from './cloud.js?v=20261119-fast1';
 export function historyEditor(getData,refresh){
  const section=document.createElement('section');section.className='record-edit-panel';section.innerHTML='<button id="history-add" class="primary" type="button" disabled>＋ 稽古・公演記録を追加</button><p id="history-edit-status">共通保存の設定後、許可された会員が記録を追加・修正できます。</p>';
  (document.getElementById('history-tools')||document.querySelector('main')).append(section);
