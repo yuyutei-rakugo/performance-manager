@@ -4,7 +4,7 @@ export function createPinClient(endpoint,state,emit){
  async function call(action,body={}){
   const read=['session','read','attendanceRead','roster','members'].includes(action),key=JSON.stringify([epoch,action,body]);
   if(read&&pending.has(key))return pending.get(key);
-  const request=(async()=>{const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action,token,...body}),redirect:'follow'});if(!response.ok)throw Error('共通保存に接続できません。');const result=await response.json();if(!result.ok)throw Error(result.error||'操作できませんでした。');return result})();
+  const request=(async()=>{const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),30000);try{const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action,token,...body}),redirect:'follow',signal:controller.signal});if(!response.ok)throw Error('共通保存に接続できません。');const result=await response.json();if(!result.ok){const error=Error(result.error||'操作できませんでした。');error.sessionInvalid=/会員ログインが必要|ログインの期限/.test(error.message);throw error}return result}catch(error){if(error.name==='AbortError')throw Error('接続に時間がかかっています。接続を確認して再度お試しください。');throw error}finally{clearTimeout(timeout)}})();
   if(read)pending.set(key,request);
   try{return await request}finally{if(read&&pending.get(key)===request)pending.delete(key)}
  }
@@ -29,7 +29,7 @@ export function createPinClient(endpoint,state,emit){
  const refreshAttendance=id=>refresh(entry=>entry.action==='attendanceRead'&&entry.args.id===id);
  window.addEventListener('focus',()=>{for(const entry of streams.values())if(entry.subscribers.size&&Date.now()-entry.updatedAt>15000)load(entry)});
  return {
-  async start(){state.provider='apps-script';if(token)try{identity((await call('session')).member);return}catch{token='';sessionStorage.removeItem('yuitei.session');clear()}identity(null)},
+  async start(){state.provider='apps-script';if(token)try{identity((await call('session')).member);return}catch(error){if(!error.sessionInvalid)throw error;token='';sessionStorage.removeItem('yuitei.session');clear()}identity(null)},
   async login(name,pin){const result=await call('login',{name,pin});clear();token=result.token;sessionStorage.setItem('yuitei.session',token);identity(result.member)},
   async logout(){try{await call('logout')}finally{token='';sessionStorage.removeItem('yuitei.session');clear();identity(null)}},
   watch(name,fn,onError){return watch('read',{name},fn,onError)},watchAttendance(id,fn,onError){return watch('attendanceRead',{id},fn,onError)},
