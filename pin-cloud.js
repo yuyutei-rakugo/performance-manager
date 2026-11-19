@@ -1,5 +1,13 @@
 export function createPinClient(endpoint,state,emit){
- let token=sessionStorage.getItem('yuitei.session')||'',epoch=0,rosterCache=null,rosterRequest=null;
+ const sessionKey='yuitei.session';
+ const readStorage=store=>{try{return store.getItem(sessionKey)||''}catch{return ''}};
+ const removeStorage=store=>{try{store.removeItem(sessionKey)}catch{}};
+ let token=readStorage(localStorage)||readStorage(sessionStorage),remember=!!readStorage(localStorage),epoch=0,rosterCache=null,rosterRequest=null;
+ function forget(){removeStorage(localStorage);removeStorage(sessionStorage);try{sessionStorage.removeItem(sessionKey+'.temporary')}catch{}}
+ function persist(){forget();try{(remember?localStorage:sessionStorage).setItem(sessionKey,token);if(!remember)sessionStorage.setItem(sessionKey+'.temporary','yes')}catch{try{sessionStorage.setItem(sessionKey,token)}catch{}}}
+ // Upgrade a still-valid tab session without retaining the PIN.
+ if(token&&!remember){try{if(sessionStorage.getItem(sessionKey+'.temporary')!=='yes'){remember=true;persist()}}catch{}}
+
  const streams=new Map(),pending=new Map();
  async function call(action,body={}){
   const read=['session','read','attendanceRead','roster','members'].includes(action),key=JSON.stringify([epoch,action,body]);
@@ -27,11 +35,12 @@ export function createPinClient(endpoint,state,emit){
  function refresh(predicate=()=>true){for(const entry of streams.values())if(predicate(entry)){entry.version++;entry.updatedAt=0;if(entry.subscribers.size)load(entry)}}
  function confirmed(action,args,value){const entry=streams.get(streamKey(action,args));if(!entry)return;entry.version++;entry.value=value;entry.hasValue=true;entry.updatedAt=Date.now();deliver(entry)}
  const refreshAttendance=id=>refresh(entry=>entry.action==='attendanceRead'&&entry.args.id===id);
+ window.addEventListener('storage',event=>{if(event.key===sessionKey&&event.newValue!==token){token='';clear();identity(null)}});
  window.addEventListener('focus',()=>{for(const entry of streams.values())if(entry.subscribers.size&&Date.now()-entry.updatedAt>15000)load(entry)});
  return {
-  async start(){state.provider='apps-script';if(token)try{identity((await call('session')).member);return}catch(error){if(!error.sessionInvalid)throw error;token='';sessionStorage.removeItem('yuitei.session');clear()}identity(null)},
-  async login(name,pin){const result=await call('login',{name,pin});clear();token=result.token;sessionStorage.setItem('yuitei.session',token);identity(result.member)},
-  async logout(){try{await call('logout')}finally{token='';sessionStorage.removeItem('yuitei.session');clear();identity(null)}},
+  async start(){state.provider='apps-script';if(token)try{identity((await call('session',{remember})).member);return}catch(error){if(!error.sessionInvalid)throw error;token='';forget();clear()}identity(null)},
+  async login(name,pin,keep=true){const result=await call('login',{name,pin,remember:keep});clear();token=result.token;remember=keep;persist();identity(result.member)},
+  async logout(){try{await call('logout')}finally{token='';forget();clear();identity(null)}},
   watch(name,fn,onError){return watch('read',{name},fn,onError)},watchAttendance(id,fn,onError){return watch('attendanceRead',{id},fn,onError)},
   async save(name,payload,revision){const result=await call('save',{name,items:payload.items,revision});confirmed('read',{name},{items:payload.items,revision:result.revision});return result.revision},
   async respondAttendance(id,status){await call('attendanceSave',{id,status});const entry=streams.get(streamKey('attendanceRead',{id}));if(entry?.hasValue){const rows=entry.value.filter(row=>row.stageName!==state.stageName);rows.push({stageName:state.stageName,status});confirmed('attendanceRead',{id},rows)}refreshAttendance(id)},
@@ -39,6 +48,6 @@ export function createPinClient(endpoint,state,emit){
   async archivePast(data){const result=await call('archivePast',data);refresh(entry=>entry.action==='read');return result},
   async importLocal(data){const result=await call('importLocal',data);refresh();return result},
   async members(){return (await call('members')).members},async memberSave(member){const result=await call('memberSave',{member});rosterCache=null;return result.member},
-  async changePin(pin){await call('changePin',{pin});token='';sessionStorage.removeItem('yuitei.session');clear();identity(null)}
+  async changePin(pin){await call('changePin',{pin});token='';forget();clear();identity(null)}
  };
 }

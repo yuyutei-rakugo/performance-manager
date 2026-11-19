@@ -15,7 +15,7 @@ function doPost(event){
  case 'roster':data={members:db.members.filter(m=>m.active).map(m=>({name:m.name}))};break;
  case 'archivePast':admin_(member);data=archivePast_(db,req,member);writeDb_(db);break;
  case 'importLocal':admin_(member);data=importLocal_(db,req,member);writeDb_(db);break;
- case 'session':data={member:publicMember_(member)};break;
+ case 'session':if(req.remember===true){const props=PropertiesService.getScriptProperties(),key='SESSION_'+digest_(req.token),session=JSON.parse(props.getProperty(key));session.expires=Date.now()+30*24*60*60*1000;props.setProperty(key,JSON.stringify(session))}data={member:publicMember_(member)};break;
  case 'read':checkCollection_(req.name);data={doc:db.shared[req.name]||null};break;
  case 'save':if(!['admin','editor'].includes(member.role))throw Error('編集権限が必要です。');checkCollection_(req.name);validCollection_(req.name,req.items);if(!Array.isArray(req.items)||req.items.length>500)throw Error('データの形式を確認してください。');const current=db.shared[req.name];if(['events','rehearsals'].includes(req.name)){const old=new Map((current?current.items:[]).map(r=>[r.id,r]));for(const r of req.items){if((r.archivedAt||null)!==(old.get(r.id)?.archivedAt||null))throw Error('記録への移動は管理者ページから行ってください。')}for(const r of old.values())if(r.archivedAt&&!req.items.some(n=>n.id===r.id))throw Error('転記済みの予定は保持してください。')}if((current?current.revision:0)!==req.revision)throw Error('ほかの端末で更新されています。再読み込みしてください。');db.shared[req.name]={items:req.items,revision:req.revision+1,updatedBy:member.id,updatedAt:new Date().toISOString()};writeDb_(db);data={revision:req.revision+1};break;
  case 'attendanceRead':checkId_(req.id);data={rows:Object.values(db.attendance[req.id]||{})};break;
@@ -46,7 +46,7 @@ function login_(db,req){
  if(!good){const count=attempt.count+1;props.setProperty(key,JSON.stringify({count:count>=5?0:count,until:count>=5?now+15*60*1000:0}));throw Error('登録名または暗証番号が違います。')}
  props.deleteProperty(key);const token=Utilities.getUuid()+Utilities.getUuid();const all=props.getProperties();for(const k in all)if(k.indexOf('SESSION_')===0){try{if(JSON.parse(all[k]).expires<=now)props.deleteProperty(k)}catch{props.deleteProperty(k)}}
  const ownSessions=Object.entries(props.getProperties()).filter(([k,v])=>k.indexOf('SESSION_')===0&&JSON.parse(v).id===member.id).sort((a,b)=>JSON.parse(a[1]).expires-JSON.parse(b[1]).expires);while(ownSessions.length>=5)props.deleteProperty(ownSessions.shift()[0]);
- props.setProperty('SESSION_'+digest_(token),JSON.stringify({id:member.id,epoch:member.epoch,expires:now+12*60*60*1000}));return {token,member:publicMember_(member)};
+ props.setProperty('SESSION_'+digest_(token),JSON.stringify({id:member.id,epoch:member.epoch,expires:now+(req.remember===true?30*24:12)*60*60*1000}));return {token,member:publicMember_(member)};
 }
 function authorize_(db,token){if(typeof token!=='string'||token.length>100)throw Error('会員ログインが必要です。');const raw=PropertiesService.getScriptProperties().getProperty('SESSION_'+digest_(token));if(!raw)throw Error('会員ログインが必要です。');const session=JSON.parse(raw),member=db.members.find(m=>m.id===session.id&&m.active);if(!member||session.expires<=Date.now()||session.epoch!==member.epoch)throw Error('ログインの期限が切れました。再ログインしてください。');return member}
 function saveMember_(db,actor,input){
