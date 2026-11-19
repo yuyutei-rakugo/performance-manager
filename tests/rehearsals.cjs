@@ -11,12 +11,12 @@ async function boot(stored,cloudState={configured:false}){
  const cloud={state:cloudState,onState(fn){stateListener=fn;fn(this.state)},watch(name,fn){watch=fn;return()=>{}},watchAttendance(id,fn){watchAttendance=fn;return()=>{}},async save(){if(saveError)throw Error('conflict')},async respondAttendance(id,status){respond.push({id,status});if(saveError)throw Error('通信失敗')}};
  w.cloud=cloud;w.startCloud=()=>{};w.mountAccount=()=>{};
  if(stored!==undefined)w.localStorage.setItem('yuitei.rehearsals.v1',stored);
- w.eval(model+'\n'+source);await tick();
+ const transfer=fs.readFileSync(path.join(root,'record-transfer.js'),'utf8').replace(/^import .*;\n/gm,'').replace(/export /g,'');w.eval(transfer+'\n'+model+'\n'+source);await tick();
  return {w,dom,cloud,emit(s){cloud.state=s;stateListener(s)},snapshot(d){watch(d)},attendance(rows){watchAttendance(rows)},confirm(v){confirm=v},fail(v){saveError=v},responses:respond,blob:()=>blobData};
 }
 function $(t,s){return t.w.document.querySelector(s)}
 async function create(t,title='通常稽古',date='2026-12-02'){
- $(t,'#add').click();assert.deepEqual([...$(t,'[name=title]').options].map(o=>o.value),['通常稽古','師匠稽古','自主稽古','その他稽古']);assert(!$(t,'[name=kind]'));for(const [key,v] of Object.entries({title,date,time:'14:00',venue:'和室',notes:''}))$(t,`[name="${key}"]`).value=v;
+ $(t,'#add').click();assert.deepEqual([...$(t,'[name=title]').options].map(o=>o.value),['通常稽古','師匠稽古','自主稽古','その他']);assert(!$(t,'[name=kind]'));for(const [key,v] of Object.entries({title,date,time:'14:00',venue:'和室',notes:''}))$(t,`[name="${key}"]`).value=v;
  await $(t,'#rehearsal-form').onsubmit({preventDefault(){},target:$(t,'#rehearsal-form')});
 }
 async function response(t,name,status){const select=$(t,`[data-person="${name}"]`);select.value=status;await $(t,'#attendance').onchange({target:select})}
@@ -34,5 +34,7 @@ async function response(t,name,status){const select=$(t,`[data-person="${name}"]
  const malformed=await boot('{bad');await create(malformed);assert.equal(malformed.w.localStorage.getItem('yuitei.rehearsals.v1'),'{bad');
  const viewer=await boot(undefined,{configured:true,role:'viewer',stageName:'勇水'});viewer.snapshot({items:data.items,revision:1});assert($(viewer,'#add').disabled);$(viewer,'[data-detail]').click();viewer.attendance([]);assert(!$(viewer,'[data-person="勇水"]').disabled);assert($(viewer,'[data-person="日光"]').disabled);await response(viewer,'勇水','出席');assert.equal(viewer.responses.length,1);
  const admin=await boot(undefined,{configured:true,role:'admin',stageName:'勇水'});admin.snapshot({items:data.items,revision:1});admin.fail(true);$(admin,'[data-edit]').click();$(admin,'[name="venue"]').value='競合';await $(admin,'#rehearsal-form').onsubmit({preventDefault(){},target:$(admin,'#rehearsal-form')});assert($(admin,'#rehearsal-dialog').open);assert(!$(admin,'#rehearsals').textContent.includes('競合'));
+ const practice=await boot();await create(practice);$(practice,'[data-detail]').click();$(practice,'#add-practice').click();$(practice,'#practice-rows [name=stageName]').value='勇水';$(practice,'#practice-rows [name=piece]').value='火焔太鼓';$(practice,'#practice-rows [name=minutes]').value='12';$(practice,'#practice-rows [name=seconds]').value='30';await $(practice,'#practice-form').onsubmit({preventDefault(){}});assert.equal(JSON.parse(practice.w.localStorage.getItem('yuitei.rehearsals.v1')).items[0].practices[0].durationSeconds,750);await $(practice,'#transfer-rehearsal').onclick();const archive=JSON.parse(practice.w.localStorage.getItem('yuitei.history.v1'));assert.equal(archive.items[0].pieces['勇水'],'火焔太鼓（12分30秒）');$(practice,'[data-detail]').click();await $(practice,'#transfer-rehearsal').onclick();assert.equal(JSON.parse(practice.w.localStorage.getItem('yuitei.history.v1')).items.length,1);
+ const other=await boot();$(other,'#add').click();$(other,'[name=title]').value='その他';$(other,'[name=title]').onchange();assert(!$(other,'#other-content-field').hidden);assert($(other,'[name=otherContent]').required);
  console.log('PASS: create both types; chronological order; four attendance states; counts and participants; reload; edit; guarded deletion/cancel; JSON export/import; corrupt storage preservation; viewer UI restrictions/self RSVP; cloud save failure preservation.');
 })().catch(e=>{console.error(e.stack);process.exitCode=1});
