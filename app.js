@@ -1,8 +1,8 @@
-import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261119-autoschedule1';
-import {readCategories,saveCategories,categoryOptions,mountCategories} from './categories.js?v=20261119-autoschedule1';
-import {mountScheduleImport} from './schedule-import.js?v=20261119-autoschedule1';
-import {validPerformer,timeline,toRecord,transferRecord,readRecords,mergeRecords,validRecord} from './record-transfer.js?v=20261119-autoschedule1';
-import {cloud,startCloud,mountAccount} from './cloud.js';
+import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261119-share1';
+import {readCategories,saveCategories,categoryOptions,mountCategories} from './categories.js?v=20261119-share1';
+import {mountScheduleImport} from './schedule-import.js?v=20261119-share1';
+import {validPerformer,timeline,toRecord,transferRecord,readRecords,mergeRecords,validRecord} from './record-transfer.js?v=20261119-share1';
+import {cloud,startCloud,mountAccount} from './cloud.js?v=20261119-share1';
 'use strict';
 
 const key = 'yuitei.events.v1';
@@ -117,13 +117,13 @@ function render() {
   const filter=document.getElementById('event-kind-filter');if(filter){const value=filter.value;filter.innerHTML='<option value="">全区分</option>'+categoryOptions(value,events.map(e=>e.kind));filter.value=value;}
   const scheduled = events.filter(e=>!e.archivedAt&&upcoming(e));
   const stats = [['▦','予定の公演',scheduled.length],['◷','準備未完了',scheduled.filter(event => progress(event) < event.checklist.length).length],['✓','準備完了',scheduled.filter(event => progress(event) === event.checklist.length).length]];
-  $('stats').innerHTML = stats.map(([icon,label,count]) => `<div class="stat"><span class="stat-icon" aria-hidden="true">${icon}</span><div><small>${label}</small><strong>${count}</strong><span class="unit">件</span></div></div>`).join('');
+  if($('stats'))$('stats').innerHTML = stats.map(([icon,label,count]) => `<div class="stat"><span class="stat-icon" aria-hidden="true">${icon}</span><div><small>${label}</small><strong>${count}</strong><span class="unit">件</span></div></div>`).join('');
   $('list-tab').setAttribute('aria-pressed', tab === 'list');
   $('calendar-tab').setAttribute('aria-pressed', tab === 'calendar');
   $('schedule').innerHTML = tab === 'list'
     ? sortedEvents(events.filter(e=>!e.archivedAt)).map(card).join('') || '<p class="empty">公演がありません。「公演を登録」から追加できます。</p>'
     : calendar();
-  const archived=sortedEvents(events.filter(e=>e.archivedAt));if(archived.length)$('schedule').innerHTML+=`<details class="block"><summary>記録へ移した公演（${archived.length}件）</summary>${archived.map(card).join('')}</details>`;
+
 }
 function calendar() {
   const [year, mon] = month.split('-').map(Number);
@@ -154,8 +154,8 @@ function renderDetails(id) {
     <p>${dateLabel(event.date)} ${esc(event.time||'時間未定')}<br>会場　${esc(event.venue)}</p><div class="form-actions"><button class="primary" data-edit ${editable()?'':'disabled'}>編集する</button></div>
     <section class="block"><h3>出演順・演目</h3>${program}</section>
     <section class="block"><h3>準備チェックリスト</h3>${progressMarkup(event)}${event.checklist.map((item,i) => `<div class="check-row"><label><input type="checkbox" data-check="${i}" ${editable()?'':'disabled'} ${item.done ? 'checked' : ''}>${esc(item.label)}</label><small>担当：${esc((item.assignees||[]).join('・')||'未設定')} ／ 完了予定：${esc(item.dueDate||'未設定')}</small></div>`).join('')}</section>
-    <section class="block"><h3>メモ</h3><p class="memo">${esc(event.memo) || 'メモはありません。'}</p></section><section class="block"><button type="button" class="primary" id="transfer-event" ${editable()?'':'disabled'}>${event.archivedAt?'記録を更新する':'終了して記録へ移す'}</button><p class="muted">終了した内容を記録に保存します。元データは転記済みの一覧に残ります。</p>${event.archivedAt?'<button type="button" class="secondary" id="unarchive-event">公演一覧に戻す</button>':''}</section></div>`;
-  $('transfer-event').onclick=async()=>{if(!editable()||!confirm('終了した公演を稽古・公演記録へ移しますか？同じ公演は重複せず更新されます。'))return;try{await transferRecord(toRecord('event',event,memberNames));if(await save(events.map(e=>e.id===id?{...e,archivedAt:new Date().toISOString()}:e))){eventDialog.close();notify('稽古・公演記録へ移しました。')}else notify('記録への保存は完了しましたが、転記済み表示を保存できませんでした。再実行しても重複しません。')}catch(e){notify(e.message)}};
+    <section class="block"><h3>メモ</h3><p class="memo">${esc(event.memo) || 'メモはありません。'}</p></section><section class="block" hidden><button type="button" class="primary" id="transfer-event" ${editable()?'':'disabled'}>${event.archivedAt?'記録を更新する':'終了して記録へ移す'}</button><p class="muted">終了した内容を記録に保存します。元データは転記済みの一覧に残ります。</p>${event.archivedAt?'<button type="button" class="secondary" id="unarchive-event">公演一覧に戻す</button>':''}</section></div>`;
+  $('transfer-event').onclick=async()=>{if(cloud.state.role!=='admin'||event.date>=today()||!confirm('終了した公演を稽古・公演記録へ移しますか？同じ公演は重複せず更新されます。'))return;try{await transferRecord(toRecord('event',event,memberNames));if(await save(events.map(e=>e.id===id?{...e,archivedAt:new Date().toISOString()}:e))){eventDialog.close();notify('稽古・公演記録へ移しました。')}else notify('記録への保存は完了しましたが、転記済み表示を保存できませんでした。再実行しても重複しません。')}catch(e){notify(e.message)}};
   if($('unarchive-event'))$('unarchive-event').onclick=async()=>{if(await save(events.map(e=>e.id===id?{...e,archivedAt:null}:e))){eventDialog.close();notify('公演一覧に戻しました。転記した記録は残しています。')}};
   eventDialog.querySelector('[data-edit]').onclick = () => renderForm(events.find(item => item.id === id));
   eventDialog.onchange = async change => {
@@ -306,7 +306,7 @@ $('schedule').onclick = async click => {
   }
 };
 $('list-tab').onclick = () => {tab = 'list'; render();};
-$('calendar-tab').onclick = () => {location.href = 'rehearsals.html?v=20261119-autoschedule1';};
+$('calendar-tab').onclick = () => {location.href = 'rehearsals.html?v=20261119-share1';};
 $('new-event').onclick = () => renderForm();
 $('data-open').onclick = () => $('data-dialog').showModal();
 document.addEventListener('click', click => {

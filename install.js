@@ -3,7 +3,9 @@
  const standalone=()=>matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
  const strip=document.createElement('div');strip.className='install-strip';
  const button=document.createElement('button');button.type='button';button.className='secondary';button.textContent='ホーム画面に追加';strip.append(button);
- if(!standalone())document.querySelector('.tabs')?.after(strip);
+ const actions=document.querySelector('.header-actions')||document.querySelector('.top-inner');if(!standalone())actions?.append(strip);
+ const share=document.createElement('button');share.type='button';share.className='data-button';share.textContent='LINEで共有';actions?.append(share);share.onclick=()=>{const url=new URL('./',location.href);url.searchParams.set('v','20261119-share1');window.open('https://line.me/R/share?text='+encodeURIComponent('結友亭の帳面\n公演予定・稽古出欠はこちら\n'+url.href),'_blank','noopener,noreferrer')};
+ const admin=document.createElement('a');admin.className='data-button';admin.href='./admin.html?v=20261119-share1';admin.textContent='管理者';actions?.append(admin);
  window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferred=e;});
  window.addEventListener('appinstalled',()=>{strip.remove();deferred=null;});
  button.onclick=async()=>{
