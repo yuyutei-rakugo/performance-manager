@@ -2,3 +2,14 @@
 @media print{.record-filters,.table-controls,.edit-record,#history-tools{display:none!important}.scroll{overflow:visible;border:0}table{font-size:8px}td,th{min-width:0;padding:5px}td:last-child{min-width:0}th{position:static}@page{size:A4 landscape;margin:10mm}}
 
 td:last-child{white-space:pre-line}
+
+/* Pin only the two identifier columns; performer columns remain scrollable. */
+.history-page .scroll{--date-width:7rem;--occasion-width:8rem;isolation:isolate;max-width:100%}
+.history-page .scroll table{border-collapse:separate;border-spacing:0;table-layout:fixed;width:max-content;min-width:100%;font-size:1rem}
+.history-page .scroll td,.history-page .scroll th{box-sizing:border-box;min-width:0;width:8rem;border-width:0 1px 1px 0;overflow-wrap:anywhere}
+.history-page .scroll .fixed-date{position:sticky;left:0;width:var(--date-width);min-width:var(--date-width);max-width:var(--date-width);background:white;z-index:2;white-space:nowrap;padding-inline:.5rem;font-variant-numeric:tabular-nums}
+.history-page .scroll .fixed-occasion{position:sticky;left:var(--date-width);width:var(--occasion-width);min-width:var(--occasion-width);max-width:var(--occasion-width);background:white;z-index:2;box-shadow:3px 0 3px #071d4220}
+.history-page .scroll th.fixed-date,.history-page .scroll th.fixed-occasion{background:var(--navy);z-index:4;white-space:normal}
+.history-page .scroll td.uncertain{background:#fff4d8}
+@media(max-width:480px){.history-page .scroll{--date-width:6.3rem;--occasion-width:6.4rem}.history-page .scroll td,.history-page .scroll th{padding:.6rem .45rem}}
+@media print{.history-page .scroll table{width:100%!important;min-width:0;table-layout:auto;font-size:8px}.history-page .scroll col{width:auto!important}.history-page .scroll .fixed-date,.history-page .scroll .fixed-occasion{position:static;width:auto;min-width:0;max-width:none;box-shadow:none}.history-page .scroll td,.history-page .scroll th{width:auto;padding:5px;overflow-wrap:normal}}
