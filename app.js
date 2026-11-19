@@ -1,4 +1,4 @@
-import {mountMemberHome} from './member-home.js?v=20261119-fast1';
+import {mountMemberHome} from './member-home.js?v=20261119-detail2';
 import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261119-fast1';
 import {readCategories,saveCategories,categoryOptions,mountCategories} from './categories.js?v=20261119-fast1';
 import {mountScheduleImport} from './schedule-import.js?v=20261119-fast1';
