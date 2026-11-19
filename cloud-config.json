@@ -1,5 +1,5 @@
 {
-  "enabled": false,
+  "enabled": true,
   "firebase": {
     "apiKey": "AIzaSyB9jWH7cCC65Wp2c3Dxs3on8AYDH_HEGAI",
     "authDomain": "yuyutei-rakugo.firebaseapp.com",
@@ -7,5 +7,7 @@
     "storageBucket": "yuyutei-rakugo.firebasestorage.app",
     "messagingSenderId": "841552171661",
     "appId": "1:841552171661:web:55ddeb12bbbdac2cb448c4"
-  }
+  },
+  "provider": "apps-script",
+  "endpoint": "https://script.google.com/macros/s/AKfycbw3wKXXdNXjTCIlKHrdUs6zX9EjfjqrFCfRlb6_RiquFLdkg_C4IpiQBkF2WRYTqzwR/exec"
 }
