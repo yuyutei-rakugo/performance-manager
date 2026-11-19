@@ -1,9 +1,9 @@
-import {mountMemberHome} from './member-home.js?v=20261119-ready1';
-import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261119-ready1';
-import {readCategories,saveCategories,categoryOptions,mountCategories} from './categories.js?v=20261119-ready1';
-import {mountScheduleImport} from './schedule-import.js?v=20261119-ready1';
-import {validPerformer,timeline,toRecord,transferRecord,readRecords,mergeRecords,validRecord} from './record-transfer.js?v=20261119-ready1';
-import {cloud,startCloud,mountAccount} from './cloud.js?v=20261119-ready1';
+import {mountMemberHome} from './member-home.js?v=20261119-fast1';
+import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261119-fast1';
+import {readCategories,saveCategories,categoryOptions,mountCategories} from './categories.js?v=20261119-fast1';
+import {mountScheduleImport} from './schedule-import.js?v=20261119-fast1';
+import {validPerformer,timeline,toRecord,transferRecord,readRecords,mergeRecords,validRecord} from './record-transfer.js?v=20261119-fast1';
+import {cloud,startCloud,mountAccount} from './cloud.js?v=20261119-fast1';
 'use strict';
 
 const key = 'yuitei.events.v1';
@@ -310,7 +310,7 @@ $('schedule').onclick = async click => {
   }
 };
 $('list-tab').onclick = () => {tab = 'list'; render();};
-$('calendar-tab').onclick = () => {location.href = 'rehearsals.html?v=20261119-ready1';};
+$('calendar-tab').onclick = () => {location.href = 'rehearsals.html?v=20261119-fast1';};
 $('new-event').onclick = () => renderForm();
 $('data-open').onclick = () => $('data-dialog').showModal();
 document.addEventListener('click', click => {
