@@ -116,13 +116,14 @@ function card(event) {
   return `<article class="event-card"><div class="date-badge" aria-hidden="true"><small>${Number(mon)}月</small><strong>${Number(day)}</strong></div><div><h3>${esc(event.title)}</h3><div class="meta"><span>${year}/${mon}/${day} ${esc(event.time||'時間未定')}</span><span>＠ ${esc(event.venue)}</span></div></div>${progressMarkup(event)}<div class="event-actions"><button class="secondary" data-event="${esc(event.id)}" aria-label="${esc(event.title)}の詳細">詳細 ›</button></div></article>`;
 }
 function render() {
+  $('new-event').disabled=!editable();
   const filter=document.getElementById('event-kind-filter');if(filter){const value=filter.value;filter.innerHTML='<option value="">全区分</option>'+categoryOptions(value,events.map(e=>e.kind));filter.value=value;}
   const scheduled = events.filter(e=>!e.archivedAt&&upcoming(e));
   const stats = [['▦','予定の公演',scheduled.length],['◷','準備未完了',scheduled.filter(event => progress(event) < event.checklist.length).length],['✓','準備完了',scheduled.filter(event => progress(event) === event.checklist.length).length]];
   if($('stats'))$('stats').innerHTML = stats.map(([icon,label,count]) => `<div class="stat"><span class="stat-icon" aria-hidden="true">${icon}</span><div><small>${label}</small><strong>${count}</strong><span class="unit">件</span></div></div>`).join('');
   $('list-tab').setAttribute('aria-pressed', tab === 'list');
   $('calendar-tab').setAttribute('aria-pressed', tab === 'calendar');
-  $('schedule').innerHTML = tab === 'list'
+  $('schedule').innerHTML = cloud.state.configured&&!cloudLoaded ? '<p class="empty">'+(cloud.state.role?'公演予定を読み込んでいます。':'公演予定を見るには会員ログインしてください。端末内のデータは保持しています。')+'</p>' : tab === 'list'
     ? sortedEvents(events.filter(e=>!e.archivedAt)).map(card).join('') || '<p class="empty">公演がありません。「公演を登録」から追加できます。</p>'
     : calendar();
 
