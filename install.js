@@ -4,8 +4,8 @@
  const strip=document.createElement('div');strip.className='install-strip';
  const button=document.createElement('button');button.type='button';button.className='secondary';button.textContent='ホーム画面に追加';strip.append(button);
  const actions=document.querySelector('.header-actions')||document.querySelector('.top-inner');actions?.append(strip);
- const share=document.createElement('button');share.type='button';share.className='data-button';share.textContent='LINEで共有';actions?.append(share);share.onclick=()=>{const url=new URL('./',location.href);url.searchParams.set('v','20261119-remember5');window.open('https://line.me/R/share?text='+encodeURIComponent('結友亭の帳面\n公演予定・稽古出欠はこちら\n'+url.href),'_blank','noopener,noreferrer')};
- const admin=document.createElement('a');admin.className='data-button';admin.href='./admin.html?v=20261119-remember5';admin.textContent='管理者';actions?.append(admin);
+ const share=document.createElement('button');share.type='button';share.className='data-button';share.textContent='LINEで共有';actions?.append(share);share.onclick=()=>{const url=new URL('./',location.href);url.searchParams.set('v','20261119-tabs1');window.open('https://line.me/R/share?text='+encodeURIComponent('結友亭の帳面\n公演予定・稽古出欠はこちら\n'+url.href),'_blank','noopener,noreferrer')};
+ const admin=document.createElement('a');admin.className='data-button';admin.href='./admin.html?v=20261119-tabs1';admin.textContent='管理者';actions?.append(admin);
  window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferred=e;const quick=document.getElementById('install-now');if(quick)quick.hidden=false;});
  window.addEventListener('appinstalled',()=>{deferred=null;});
  button.onclick=async()=>{

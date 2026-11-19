@@ -1,10 +1,10 @@
-import {mountMemberHome} from './member-home.js?v=20261119-remember5';
-import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261119-remember5';
-import {readCategories,saveCategories} from './categories.js?v=20261119-remember5';
-import {mountScheduleImport} from './schedule-import.js?v=20261119-remember5';
-import {toRecord,transferRecord,rehearsalTitle,readRecords,mergeRecords,validRecord} from './record-transfer.js?v=20261119-remember5';
-import {cloud,startCloud,mountAccount} from './cloud.js?v=20261119-remember5';
-import {statuses,rehearsalNames,validRehearsal,validAttendance,attendanceSummary} from './rehearsal-model.js?v=20261119-remember5';
+import {mountMemberHome} from './member-home.js?v=20261119-tabs1';
+import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261119-tabs1';
+import {readCategories,saveCategories} from './categories.js?v=20261119-tabs1';
+import {mountScheduleImport} from './schedule-import.js?v=20261119-tabs1';
+import {toRecord,transferRecord,rehearsalTitle,readRecords,mergeRecords,validRecord} from './record-transfer.js?v=20261119-tabs1';
+import {cloud,startCloud,mountAccount} from './cloud.js?v=20261119-tabs1';
+import {statuses,rehearsalNames,validRehearsal,validAttendance,attendanceSummary} from './rehearsal-model.js?v=20261119-tabs1';
 const $=id=>document.getElementById(id),esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const key='yuitei.rehearsals.v1';let items=[],attendance={},names=[],revision=0,loaded=false,storageOK=true,stop,stopAttendance,opened=null,detailRevision=0,busy=false;
 const notify=s=>{$('notice').textContent=s;$('notice').hidden=false;setTimeout(()=>$('notice').hidden=true,6000)};
