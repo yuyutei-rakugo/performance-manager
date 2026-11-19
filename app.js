@@ -197,7 +197,7 @@ function renderForm(existing) {
     <section class="block"><h3>出演順・演目</h3><datalist id="member-options">${memberNames.map(n=>`<option value="${esc(n)}"></option>`).join('')}</datalist><p class="muted">会員名を選ぶか、ゲストの高座名を自由に入力できます。終了予定は開演時刻と持ち時間から計算します。時刻を指定して調整することもできます。</p><div id="performers"></div><button type="button" class="secondary" id="add-performer">＋ 出演者を追加</button> <button type="button" class="secondary" id="add-break">＋ 仲入りを追加</button></section>
     <section class="block"><h3>準備チェックリスト</h3>${!existing?'<p class="muted">最新のリストの項目をコピーしました。完了・担当者・完了予定日はリセットしています。</p>':''}<div id="task-rows"></div><button type="button" class="secondary" id="add-task">＋ 末尾に項目を追加</button></section>
     <section class="block"><label>公演メモ<textarea name="memo" rows="4"></textarea></label></section><p class="muted" id="form-feedback" role="alert" hidden></p>
-    <div class="form-actions"><button class="primary" type="submit">保存する</button><button class="secondary" type="button" id="cancel-edit">キャンセル</button></div>${existing?'<details class="delete-zone"><summary>この公演を削除する</summary><p>削除すると、この公演の出演者・準備リスト・メモも削除されます。</p><label><input type="checkbox" id="confirm-delete">この公演を削除することを確認しました</label><button type="button" class="danger" id="delete-event" disabled>公演を削除する</button></details>':''}</form></div>`;
+    <div class="form-actions"><button class="primary" type="submit">保存する</button><button class="secondary" type="button" id="cancel-edit">キャンセル</button></div>${existing?'<section class="delete-zone"><button type="button" class="secondary" id="show-delete" aria-expanded="false" aria-controls="delete-confirmation">この公演を削除する…</button><div id="delete-confirmation" hidden><p>削除すると、この公演の出演者・準備リスト・メモも削除されます。</p><label><input type="checkbox" id="confirm-delete">この公演を削除することを確認しました</label><button type="button" class="danger" id="delete-event" disabled>公演を削除する</button></div></section>':''}</form></div>`;
   $('event-form').elements.memo.value = event.memo;
   const taskRows=$('task-rows');
   function addTask(item,before=null) {
@@ -215,6 +215,7 @@ function renderForm(existing) {
     addTask(blankTask(),button.hasAttribute('data-insert-before')?row:row.nextElementSibling).querySelector('[name="label"]').focus();
   };
   if(existing){
+    $('show-delete').onclick=()=>{const panel=$('delete-confirmation');panel.hidden=!panel.hidden;$('show-delete').setAttribute('aria-expanded',String(!panel.hidden));if(!panel.hidden)panel.scrollIntoView?.({block:'nearest'});};
     $('confirm-delete').onchange=e=>{$('delete-event').disabled=!e.target.checked};
     $('delete-event').onclick=()=>{if($('confirm-delete').checked)deleteEvent(existing.id)};
   }
