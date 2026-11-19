@@ -1,4 +1,6 @@
-import {validPerformer,timeline,toRecord,transferRecord,readRecords,mergeRecords,validRecord} from './record-transfer.js?v=20261119-program1';
+import {readCategories,saveCategories,categoryOptions,mountCategories} from './categories.js?v=20261119-organize1';
+import {mountScheduleImport} from './schedule-import.js?v=20261119-organize1';
+import {validPerformer,timeline,toRecord,transferRecord,readRecords,mergeRecords,validRecord} from './record-transfer.js?v=20261119-organize1';
 import {cloud,startCloud,mountAccount} from './cloud.js';
 'use strict';
 
@@ -41,7 +43,7 @@ const isText = value => typeof value === 'string';
 function validEvent(event) {
   if (!event || !['id','title','date','time','venue','memo'].every(field => isText(event[field]))) return false;
   if (!event.id.trim() || !event.title.trim() || !event.venue.trim()) return false;
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(event.date) || localDate(new Date(event.date + 'T00:00:00')) !== event.date || !/^([01]\d|2[0-3]):[0-5]\d$/.test(event.time)) return false;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(event.date) || localDate(new Date(event.date + 'T00:00:00')) !== event.date || (event.time!==''&&!/^([01]\d|2[0-3]):[0-5]\d$/.test(event.time))) return false;
   return Array.isArray(event.performers) && event.performers.length<=200 && event.performers.every(validPerformer)
     && Array.isArray(event.checklist) && event.checklist.length > 0 && event.checklist.length <= 200 && event.checklist.every(item => item && isText(item.label) && item.label.trim() && typeof item.done === 'boolean' && (item.dueDate===undefined||item.dueDate===''||(isText(item.dueDate)&&/^\d{4}-\d{2}-\d{2}$/.test(item.dueDate)&&localDate(new Date(item.dueDate+'T00:00:00'))===item.dueDate)) && (item.assignees === undefined || (Array.isArray(item.assignees)&&item.assignees.every(isText))));
 }
@@ -95,9 +97,10 @@ async function save(next, expectedRevision=cloudRevision) {
 }
 
 function upcoming(event) {
-  return new Date(event.date + 'T' + event.time) >= new Date();
+  return new Date(event.date + 'T' + (event.time||'23:59')) >= new Date();
 }
 function sortedEvents(list) {
+  const filter=document.getElementById('event-kind-filter'),order=document.getElementById('event-sort');list=list.filter(e=>!filter?.value||(e.kind||'その他公演')===filter.value);if(order?.value==='kind'){const kinds=readCategories(events.map(e=>e.kind));return [...list].sort((a,b)=>kinds.indexOf(a.kind||'その他公演')-kinds.indexOf(b.kind||'その他公演')||(a.date+a.time).localeCompare(b.date+b.time))}
   return [...list].sort((a,b) => (a.date + a.time).localeCompare(b.date + b.time));
 }
 function progressMarkup(event) {
@@ -106,9 +109,10 @@ function progressMarkup(event) {
 }
 function card(event) {
   const [year, mon, day] = event.date.split('-');
-  return `<article class="event-card"><div class="date-badge" aria-hidden="true"><small>${Number(mon)}月</small><strong>${Number(day)}</strong></div><div><h3>${esc(event.title)}</h3><div class="meta"><span>${year}/${mon}/${day} ${event.time}</span><span>＠ ${esc(event.venue)}</span></div></div>${progressMarkup(event)}<div class="event-actions"><button class="secondary" data-event="${esc(event.id)}" aria-label="${esc(event.title)}の詳細">詳細 ›</button><button class="secondary" data-edit-event="${esc(event.id)}" aria-label="${esc(event.title)}を編集" ${editable()?'':'disabled'}>編集</button></div></article>`;
+  return `<article class="event-card"><div class="date-badge" aria-hidden="true"><small>${Number(mon)}月</small><strong>${Number(day)}</strong></div><div><h3>${esc(event.title)}</h3><div class="meta"><span>${year}/${mon}/${day} ${esc(event.time||'時間未定')}</span><span>＠ ${esc(event.venue)}</span></div></div>${progressMarkup(event)}<div class="event-actions"><button class="secondary" data-event="${esc(event.id)}" aria-label="${esc(event.title)}の詳細">詳細 ›</button><button class="secondary" data-edit-event="${esc(event.id)}" aria-label="${esc(event.title)}を編集" ${editable()?'':'disabled'}>編集</button></div></article>`;
 }
 function render() {
+  const filter=document.getElementById('event-kind-filter');if(filter){const value=filter.value;filter.innerHTML='<option value="">全区分</option>'+categoryOptions(value,events.map(e=>e.kind));filter.value=value;}
   const scheduled = events.filter(e=>!e.archivedAt&&upcoming(e));
   const stats = [['▦','予定の公演',scheduled.length],['◷','準備未完了',scheduled.filter(event => progress(event) < event.checklist.length).length],['✓','準備完了',scheduled.filter(event => progress(event) === event.checklist.length).length]];
   $('stats').innerHTML = stats.map(([icon,label,count]) => `<div class="stat"><span class="stat-icon" aria-hidden="true">${icon}</span><div><small>${label}</small><strong>${count}</strong><span class="unit">件</span></div></div>`).join('');
@@ -145,7 +149,7 @@ function renderDetails(id) {
   const program=rows.length?`<div class="program-scroll"><table class="program-table"><thead><tr><th>順</th><th>演者・仲入り</th><th>ネタ・演し物</th><th>持ち時間</th><th>終了予定</th></tr></thead><tbody>${rows.map((p,i)=>`<tr><td>${i+1}</td><td>${esc(p.type==='break'?'仲入り':p.stageName)}</td><td>${esc(p.piece)}</td><td>${p.minutes}分</td><td>${p.end}</td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">出演者は未登録です。</p>';
 
   eventDialog.innerHTML = `<div class="dialog-body"><div class="dialog-head"><h2 id="event-heading">${esc(event.title)}</h2><button type="button" data-close="event-dialog" aria-label="閉じる">×</button></div>
-    <p>${dateLabel(event.date)} ${event.time}<br>会場　${esc(event.venue)}</p><div class="form-actions"><button class="primary" data-edit ${editable()?'':'disabled'}>編集する</button></div>
+    <p>${dateLabel(event.date)} ${esc(event.time||'時間未定')}<br>会場　${esc(event.venue)}</p><div class="form-actions"><button class="primary" data-edit ${editable()?'':'disabled'}>編集する</button></div>
     <section class="block"><h3>出演順・演目</h3>${program}</section>
     <section class="block"><h3>準備チェックリスト</h3>${progressMarkup(event)}${event.checklist.map((item,i) => `<div class="check-row"><label><input type="checkbox" data-check="${i}" ${editable()?'':'disabled'} ${item.done ? 'checked' : ''}>${esc(item.label)}</label><small>担当：${esc((item.assignees||[]).join('・')||'未設定')} ／ 完了予定：${esc(item.dueDate||'未設定')}</small></div>`).join('')}</section>
     <section class="block"><h3>メモ</h3><p class="memo">${esc(event.memo) || 'メモはありません。'}</p></section><section class="block"><button type="button" class="primary" id="transfer-event" ${editable()?'':'disabled'}>${event.archivedAt?'記録を更新する':'終了して記録へ移す'}</button><p class="muted">終了した内容を記録に保存します。元データは転記済みの一覧に残ります。</p>${event.archivedAt?'<button type="button" class="secondary" id="unarchive-event">公演一覧に戻す</button>':''}</section></div>`;
@@ -187,7 +191,7 @@ function renderForm(existing) {
   const event = existing || {title:'',date:tab === 'calendar' ? selected : today(),time:'14:00',venue:'',memo:'',performers:[],checklist:copiedTasks()};
   eventDialog.onchange = null;
   eventDialog.innerHTML = `<div class="dialog-body"><div class="dialog-head"><h2 id="event-heading">${existing ? '公演を編集' : '公演を登録'}</h2><button type="button" data-close="event-dialog" aria-label="閉じる">×</button></div>
-    <form id="event-form"><div class="fields"><label class="wide">公演名<input name="title" value="${esc(event.title)}" required></label><label>開催日<input name="date" type="date" value="${event.date}" required></label><label>開演時刻<input name="time" type="time" value="${event.time}" required></label><label class="wide">会場<input name="venue" value="${esc(event.venue)}" required></label></div>
+    <form id="event-form"><div class="fields"><label class="wide">公演名<input name="title" value="${esc(event.title)}" required></label><label>区分<select name="kind">${categoryOptions(event.kind||'その他公演',events.map(e=>e.kind))}</select></label><label>開催日<input name="date" type="date" value="${event.date}" required></label><label>開始時刻（空欄は時間未定）<input name="time" type="time" value="${esc(event.time)}"></label><label class="wide">会場<input name="venue" value="${esc(event.venue)}" required></label></div>
     <section class="block"><h3>出演順・演目</h3><datalist id="member-options">${memberNames.map(n=>`<option value="${esc(n)}"></option>`).join('')}</datalist><p class="muted">会員名を選ぶか、ゲストの高座名を自由に入力できます。終了予定は開演時刻と持ち時間から計算します。時刻を指定して調整することもできます。</p><div id="performers"></div><button type="button" class="secondary" id="add-performer">＋ 出演者を追加</button> <button type="button" class="secondary" id="add-break">＋ 仲入りを追加</button></section>
     <section class="block"><h3>準備チェックリスト</h3>${!existing?'<p class="muted">最新のリストの項目をコピーしました。完了・担当者・完了予定日はリセットしています。</p>':''}<div id="task-rows"></div><button type="button" class="secondary" id="add-task">＋ 末尾に項目を追加</button></section>
     <section class="block"><label>公演メモ<textarea name="memo" rows="4"></textarea></label></section><p class="muted" id="form-feedback" role="alert" hidden></p>
@@ -253,7 +257,7 @@ function renderForm(existing) {
       ...existing,
       id:existing?.id || (globalThis.crypto.randomUUID?.() ?? 'event-' + Date.now() + '-' + Math.random().toString(36).slice(2)),
       checklistUpdatedAt:new Date().toISOString(),
-      title:text('title'),date:text('date'),time:text('time'),venue:text('venue'),memo:form.get('memo'),
+      kind:text('kind'),title:text('title'),date:text('date'),time:text('time'),venue:text('venue'),memo:form.get('memo'),
       performers:[...list.children].map(row => Object.fromEntries([...row.querySelectorAll('input')].map(input => [input.name,input.type === 'number' ? input.valueAsNumber : input.value.trim()]))),
       checklist:[...taskRows.children].map(row=>({label:row.querySelector('[name="label"]').value.trim(),done:row.dataset.done==='true',dueDate:row.querySelector('[data-due]').value,assignees:[...row.querySelectorAll('[data-owner]:checked')].map(el=>el.value)}))
     };
@@ -300,7 +304,7 @@ $('schedule').onclick = async click => {
   }
 };
 $('list-tab').onclick = () => {tab = 'list'; render();};
-$('calendar-tab').onclick = () => {location.href = 'rehearsals.html?v=20261119-program1';};
+$('calendar-tab').onclick = () => {location.href = 'rehearsals.html?v=20261119-organize1';};
 $('new-event').onclick = () => renderForm();
 $('data-open').onclick = () => $('data-dialog').showModal();
 document.addEventListener('click', click => {
@@ -308,7 +312,7 @@ document.addEventListener('click', click => {
   if (button) $(button.dataset.close).close();
 });
 $('export-file').onclick = () => {try{
-  const url = URL.createObjectURL(new Blob([JSON.stringify({version:1,events,records:readRecords()},null,2)],{type:'application/json'}));
+  const url = URL.createObjectURL(new Blob([JSON.stringify({version:1,categories:readCategories(events.map(e=>e.kind)),events,records:readRecords()},null,2)],{type:'application/json'}));
   const link = document.createElement('a');
   link.href = url;
   link.download = 'yuitei-' + today() + '.json';
@@ -328,7 +332,7 @@ $('import-submit').onclick = async () => {
     const data = JSON.parse(await file.text());
     if (data?.version !== 1 || !Array.isArray(data.events) || !data.events.every(validEvent) || new Set(data.events.map(event => event.id)).size !== data.events.length) throw new Error('Invalid import');
     if(data.records!==undefined){if(!Array.isArray(data.records)||!data.records.every(validRecord))throw Error('Invalid records');mergeRecords(data.records);}
-    incoming = data.events;
+    if(data.categories)saveCategories(data.categories);incoming = data.events;
   } catch {
     feedback.textContent = '取り込めませんでした。JSONの形式と必須項目を確認してください。';
     return;
@@ -349,3 +353,5 @@ cloud.onState(state=>{
  if(state.configured){events=[];eventDialog.close();render();if(state.role){stopCloud=cloud.watch('events',doc=>{if(doc&&(!Array.isArray(doc.items)||!doc.items.every(validEvent))){notify('共通データの形式を確認してください。');return}events=doc?.items||[];cloudRevision=doc?.revision||0;cloudLoaded=true;render()},notify)}}
 });
 startCloud();
+
+const organize=document.createElement('div');organize.className='record-filters';organize.innerHTML='<label>区分<select id="event-kind-filter"><option value="">全区分</option></select></label><label>表示順<select id="event-sort"><option value="date">日付順</option><option value="kind">区分順</option></select></label>';$('schedule').before(organize);mountCategories(organize,()=>events.map(e=>e.kind));organize.onchange=()=>render();window.addEventListener('categories-changed',()=>render());mountScheduleImport(document.querySelector('#data-dialog .dialog-body')||organize,'events',()=>events,save,notify,copiedTasks);render();

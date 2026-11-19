@@ -11,7 +11,7 @@ async function boot(stored,cloudState={configured:false}){
  const cloud={state:cloudState,onState(fn){stateListener=fn;fn(this.state)},watch(name,fn){watch=fn;return()=>{}},watchAttendance(id,fn){watchAttendance=fn;return()=>{}},async save(){if(saveError)throw Error('conflict')},async respondAttendance(id,status){respond.push({id,status});if(saveError)throw Error('通信失敗')}};
  w.cloud=cloud;w.startCloud=()=>{};w.mountAccount=()=>{};
  if(stored!==undefined)w.localStorage.setItem('yuitei.rehearsals.v1',stored);
- const transfer=fs.readFileSync(path.join(root,'record-transfer.js'),'utf8').replace(/^import .*;\n/gm,'').replace(/export /g,'');w.eval(transfer+'\n'+model+'\n'+source);await tick();
+ const transfer=fs.readFileSync(path.join(root,'record-transfer.js'),'utf8').replace(/^import .*;\n/gm,'').replace(/export /g,'');w.eval(fs.readFileSync(path.join(root,'categories.js'),'utf8').replace(/export /g,'')+'\n'+fs.readFileSync(path.join(root,'schedule-import.js'),'utf8').replace(/export /g,''));w.eval(transfer+'\n'+model+'\n'+source);await tick();
  return {w,dom,cloud,emit(s){cloud.state=s;stateListener(s)},snapshot(d){watch(d)},attendance(rows){watchAttendance(rows)},confirm(v){confirm=v},fail(v){saveError=v},responses:respond,blob:()=>blobData};
 }
 function $(t,s){return t.w.document.querySelector(s)}

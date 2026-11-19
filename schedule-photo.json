@@ -1,0 +1,156 @@
+{
+  "events": [
+    {
+      "id": "schedule-photo-2026-12-20",
+      "title": "第6回 結友亭落語会",
+      "kind": "定期落語会",
+      "date": "2026-12-20",
+      "time": "",
+      "venue": "はさき地域交流センター",
+      "memo": "9:00～17:00。開演時刻は未確認。13:00～16:00 第二・第三会議室の予約状況は要確認。",
+      "performers": [],
+      "checklist": [
+        {
+          "label": "開催日時を確定する",
+          "done": false,
+          "assignees": [],
+          "dueDate": ""
+        }
+      ]
+    },
+    {
+      "id": "schedule-photo-2027-01-10",
+      "title": "第6回飯沼観音寄席",
+      "kind": "飯沼観音寄席",
+      "date": "2027-01-10",
+      "time": "",
+      "venue": "銚子飯沼観音",
+      "memo": "",
+      "performers": [],
+      "checklist": [
+        {
+          "label": "開催日時を確定する",
+          "done": false,
+          "assignees": [],
+          "dueDate": ""
+        }
+      ]
+    },
+    {
+      "id": "schedule-photo-2027-01-31",
+      "title": "第5回 図書館寄席",
+      "kind": "図書館寄席",
+      "date": "2027-01-31",
+      "time": "",
+      "venue": "神栖市中央図書館",
+      "memo": "",
+      "performers": [],
+      "checklist": [
+        {
+          "label": "開催日時を確定する",
+          "done": false,
+          "assignees": [],
+          "dueDate": ""
+        }
+      ]
+    },
+    {
+      "id": "schedule-photo-2027-03-20",
+      "title": "三之助さん落語会",
+      "kind": "その他公演",
+      "date": "2027-03-20",
+      "time": "",
+      "venue": "会場未定",
+      "memo": "",
+      "performers": [],
+      "checklist": [
+        {
+          "label": "開催日時を確定する",
+          "done": false,
+          "assignees": [],
+          "dueDate": ""
+        }
+      ]
+    },
+    {
+      "id": "schedule-photo-2027-05-30",
+      "title": "飯沼観音寄席（予定）",
+      "kind": "飯沼観音寄席",
+      "date": "2027-05-30",
+      "time": "",
+      "venue": "銚子飯沼観音",
+      "memo": "5月30日は未確定。",
+      "performers": [],
+      "checklist": [
+        {
+          "label": "開催日時を確定する",
+          "done": false,
+          "assignees": [],
+          "dueDate": ""
+        }
+      ]
+    }
+  ],
+  "rehearsals": [
+    {
+      "id": "schedule-photo-2026-11-21",
+      "title": "通常稽古",
+      "date": "2026-11-21",
+      "time": "17:00",
+      "venue": "はさき地域交流センター",
+      "notes": "終了予定：21:00",
+      "otherContent": "",
+      "practices": []
+    },
+    {
+      "id": "schedule-photo-2026-12-13",
+      "title": "師匠稽古",
+      "date": "2026-12-13",
+      "time": "15:00",
+      "venue": "はさき地域交流センター",
+      "notes": "終了予定：19:00",
+      "otherContent": "",
+      "practices": []
+    },
+    {
+      "id": "schedule-photo-2026-12-19",
+      "title": "その他",
+      "date": "2026-12-19",
+      "time": "17:00",
+      "venue": "はさき地域交流センター 第一会議室",
+      "notes": "終了予定：21:00",
+      "otherContent": "定期落語会の前日準備",
+      "practices": []
+    },
+    {
+      "id": "schedule-photo-2027-01-16",
+      "title": "通常稽古",
+      "date": "2027-01-16",
+      "time": "17:00",
+      "venue": "はさき地域交流センター",
+      "notes": "終了予定：21:00",
+      "otherContent": "",
+      "practices": []
+    },
+    {
+      "id": "schedule-photo-2027-02-20",
+      "title": "通常稽古",
+      "date": "2027-02-20",
+      "time": "16:00",
+      "venue": "はさき地域交流センター",
+      "notes": "終了予定：21:00",
+      "otherContent": "",
+      "practices": []
+    },
+    {
+      "id": "schedule-photo-2027-03-13",
+      "title": "通常稽古",
+      "date": "2027-03-13",
+      "time": "15:00",
+      "venue": "はさき地域交流センター",
+      "notes": "終了予定：21:00",
+      "otherContent": "",
+      "practices": []
+    }
+  ]
+}
