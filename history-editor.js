@@ -12,7 +12,8 @@ export function historyEditor(getData,refresh){
  const feedback=message=>section.querySelector('p').textContent=message;
  function controls(){section.querySelector('button').disabled=!allowed();document.querySelectorAll('[data-record-edit]').forEach(el=>el.hidden=!allowed()||(!cloud.state.configured&&publicIds.has(el.dataset.recordEdit)))}
  cloud.onState(s=>{
-  const next=`${s.user?.uid||''}:${s.role||''}`;if(next===identity)return;identity=next;stop?.();loaded=false;dialog.close();getData().records=structuredClone(original);refresh();controls();if(!s.configured)feedback('転記した記録はこのブラウザに保存します。転記後の内容も修正できます。');
+  const next=`${s.configured?'shared':'local'}:${s.user?.uid||''}:${s.role||''}`;if(next===identity)return;identity=next;stop?.();loaded=false;dialog.close();getData().records=structuredClone(original);refresh();controls();if(!s.configured)feedback('転記した記録はこのブラウザに保存します。転記後の内容も修正できます。');
+  if(s.configured&&!s.role)feedback('会員ログイン後、権限に応じて記録を追加・修正できます。');
   if(s.configured&&s.role)stop=cloud.watch('history',doc=>{
    if(doc&&(!Array.isArray(doc.items)||!doc.items.every(valid))){feedback('共通記録の形式を確認してください。');return}
    revision=doc?.revision||0;loaded=true;
