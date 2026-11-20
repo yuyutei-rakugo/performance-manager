@@ -1,7 +1,10 @@
 export function createPinClient(endpoint,state,emit){
  const sessionKey='yuitei.session';
  const identityKey=sessionKey+'.identity';
- const identityMaxAge=5*60*1000;
+ const viewKey=sessionKey+'.views.v1';
+ const identityMaxAge=30*60*1000;
+ const freshFor=60*1000,maxViewAge=10*60*1000;
+
  const readStorage=store=>{try{return store.getItem(sessionKey)||''}catch{return ''}};
  const removeStorage=store=>{try{store.removeItem(sessionKey)}catch{}};
  let token=readStorage(localStorage)||readStorage(sessionStorage),remember=!!readStorage(localStorage),epoch=0,rosterCache=null,rosterRequest=null;
@@ -10,6 +13,31 @@ export function createPinClient(endpoint,state,emit){
  // Upgrade a still-valid tab session without retaining the PIN.
  if(token&&!remember){try{if(sessionStorage.getItem(sessionKey+'.temporary')!=='yes'){remember=true;persist()}}catch{}}
 
+ // This tab may show recent server responses while new authenticated reads are in flight.
+ const views=new Map();
+ function readViews(){
+  try{
+   const saved=JSON.parse(sessionStorage.getItem(viewKey));
+   if(saved.token!==token||saved.endpoint!==endpoint||!Array.isArray(saved.entries))return;
+   for(const [key,entry] of saved.entries){
+    const age=Date.now()-entry.time;
+    if(age>=0&&age<maxViewAge)views.set(key,entry);
+   }
+  }catch{}
+ }
+ function saveView(key,value,time=Date.now()){
+  views.delete(key);views.set(key,{value,time});
+  flushViews();
+ }
+ function flushViews(){
+  try{
+   for(const [key,entry] of views)if(Date.now()-entry.time>=maxViewAge)views.delete(key);
+   while(views.size>20)views.delete(views.keys().next().value);
+   const serialized=JSON.stringify({token,endpoint,entries:[...views]});
+   if(serialized.length<=1500000)sessionStorage.setItem(viewKey,serialized);
+   else sessionStorage.removeItem(viewKey);
+  }catch{}
+ }
  const streams=new Map(),pending=new Map(),attendanceWrites=new Set();
  async function call(action,body={}){
   const version=epoch;
@@ -42,13 +70,13 @@ export function createPinClient(endpoint,state,emit){
   try{
    const saved=JSON.parse(sessionStorage.getItem(identityKey));
    const age=Date.now()-saved.checkedAt;
-   return saved.token===token&&age>=0&&age<identityMaxAge?saved.member:null;
+   return saved.token===token&&saved.endpoint===endpoint&&age>=0&&age<identityMaxAge?saved.member:null;
   }catch{return null}
  }
  function rememberMember(member){
-  try{sessionStorage.setItem(identityKey,JSON.stringify({token,member,checkedAt:Date.now()}))}catch{}
+  try{sessionStorage.setItem(identityKey,JSON.stringify({token,endpoint,member,checkedAt:Date.now()}))}catch{}
  }
- function clear(){try{sessionStorage.removeItem(identityKey)}catch{}epoch++;rosterCache=null;rosterRequest=null;for(const entry of streams.values()){stopTimer(entry);entry.closed=true}streams.clear();pending.clear();attendanceWrites.clear()}
+ function clear(){try{sessionStorage.removeItem(identityKey);sessionStorage.removeItem(viewKey)}catch{}views.clear();epoch++;rosterCache=null;rosterRequest=null;for(const entry of streams.values()){stopTimer(entry);entry.closed=true}streams.clear();pending.clear();attendanceWrites.clear()}
  function identity(member){state.user=member?{uid:member.id,email:member.name}:null;state.stageName=member?.name||null;state.role=member?.role||null;state.owner=!!member?.owner;state.ready=true;state.message=member?'共通保存：'+member.name+'（'+({admin:'管理者',editor:'編集可',viewer:'会員'}[member.role])+'）':'登録名と4桁の暗証番号でログインしてください。';emit()}
  function signOut(){
   if(readStorage(localStorage)===token)removeStorage(localStorage);
@@ -78,10 +106,11 @@ export function createPinClient(endpoint,state,emit){
    const changed=!entry.hasValue||(entry.action==='read'
     ? value?.revision!==entry.value?.revision
     : JSON.stringify(value)!==JSON.stringify(entry.value));
-   entry.value=value;entry.hasValue=true;entry.updatedAt=Date.now();
+   entry.value=value;entry.hasValue=true;entry.updatedAt=Date.now();entry.error='';
+   if(state.user)saveView(streamKey(entry.action,entry.args),value,entry.updatedAt);
    deliver(entry,null,changed);
   }catch(error){
-   if(!entry.closed&&version===entry.version){entry.hasValue=false;deliver(entry,error.message)}
+   if(!entry.closed&&version===entry.version){entry.error=error.message;deliver(entry,error.message)}
   }finally{
    entry.inFlight=false;
    if(entry.again){entry.again=false;load(entry)}
@@ -94,34 +123,58 @@ export function createPinClient(endpoint,state,emit){
   }
   let entry=streams.get(key);
   if(!entry){
-   entry={action,args,subscribers:new Set(),hasValue:false,value:null,updatedAt:0,version:0,inFlight:false,closed:false,timer:null};
+   const saved=views.get(key);
+   entry={action,args,subscribers:new Set(),hasValue:!!saved,value:saved?.value,updatedAt:saved?.time||0,error:'',version:0,inFlight:false,closed:false,timer:null};
    streams.set(key,entry);
   }
   const subscriber={fn,onError,needsValue:true};
   entry.subscribers.add(subscriber);
   if(entry.timer===null)entry.timer=setInterval(()=>{if(document.visibilityState!=='hidden')load(entry)},60000);
-  if(entry.hasValue&&now-entry.updatedAt<=15000){
+  if(entry.hasValue&&now-entry.updatedAt<maxViewAge){
    queueMicrotask(()=>{
     if(entry.closed||!entry.hasValue||!entry.subscribers.has(subscriber)||!subscriber.needsValue)return;
     subscriber.needsValue=false;
     fn(structuredClone(entry.value));
+    if(entry.error)onError?.(entry.error);
    });
-  }else load(entry);
+  }
+  if(!entry.hasValue||entry.error||now-entry.updatedAt>=freshFor)load(entry);
   return()=>{entry.subscribers.delete(subscriber);if(!entry.subscribers.size)stopTimer(entry)};
  }
- function refresh(predicate=()=>true){for(const entry of streams.values())if(predicate(entry)){entry.version++;entry.updatedAt=0;if(entry.inFlight)entry.again=true;else load(entry)}}
- function confirmed(action,args,value){const entry=streams.get(streamKey(action,args));if(!entry)return;entry.version++;entry.value=value;entry.hasValue=true;entry.updatedAt=Date.now();deliver(entry)}
+ function refresh(action){
+  for(const key of views.keys())if(!action||JSON.parse(key)[0]===action)views.delete(key);
+  flushViews();
+  for(const entry of streams.values())if(!action||entry.action===action){
+   entry.version++;entry.updatedAt=0;
+   if(entry.inFlight)entry.again=true;else load(entry);
+  }
+ }
+ function confirmed(action,args,value){
+  const key=streamKey(action,args),entry=streams.get(key);
+  const time=action==='read'?Date.now():entry.updatedAt;
+  if(state.user)saveView(key,value,time);
+  if(!entry)return;
+  entry.version++;entry.value=value;entry.hasValue=true;entry.updatedAt=time;deliver(entry);
+ }
  window.addEventListener('storage',event=>{if(event.storageArea===localStorage&&(event.key===sessionKey||event.key===null)&&readStorage(localStorage)!==token&&remember){signOut()}});
- window.addEventListener('focus',()=>{for(const entry of streams.values())if(entry.subscribers.size&&Date.now()-entry.updatedAt>15000)load(entry)});
+ function refreshVisible(){
+  for(const entry of streams.values())if(entry.subscribers.size&&Date.now()-entry.updatedAt>=freshFor)load(entry);
+ }
+ window.addEventListener('focus',refreshVisible);
+ window.addEventListener('pageshow',event=>{
+  if(!event.persisted||!token)return;
+  if((readStorage(localStorage)||readStorage(sessionStorage))!==token)signOut();
+  else refreshVisible();
+ });
  return {
   async start(){
    state.provider='apps-script';
    if(!token){identity(null);return}
    const member=cachedMember();
-   if(member){identity(member);return}
+   if(member){readViews();identity(member);return}
    try{
     const {member}=await call('session',{remember});
-    rememberMember(member);identity(member);
+    rememberMember(member);readViews();identity(member);
    }catch(error){if(!error.sessionInvalid)throw error}
   },
   async login(name,pin,keep=true){const result=await call('login',{name,pin,remember:keep});clear();token=result.token;remember=keep;persist();rememberMember(result.member);identity(result.member)},
@@ -147,10 +200,22 @@ export function createPinClient(endpoint,state,emit){
     }
    }finally{if(version===epoch)attendanceWrites.delete(id)}
   },
-  async roster(){if(rosterCache&&Date.now()-rosterCache.time<60000)return structuredClone(rosterCache.members);if(rosterRequest)return rosterRequest;const version=epoch;rosterRequest=call('roster').then(result=>{if(version===epoch)rosterCache={time:Date.now(),members:result.members};return structuredClone(result.members)}).finally(()=>{if(version===epoch)rosterRequest=null});return rosterRequest},
-  async archivePast(data){const result=await call('archivePast',data);refresh(entry=>entry.action==='read');return result},
+  async roster(){
+   const key=streamKey('roster',{});
+   const cached=views.get(key);
+   if(cached&&Date.now()-cached.time<freshFor)return structuredClone(cached.value);
+   if(rosterCache&&Date.now()-rosterCache.time<freshFor)return structuredClone(rosterCache.members);
+   if(rosterRequest)return rosterRequest;
+   const version=epoch;
+   rosterRequest=call('roster').then(result=>{
+    if(version===epoch){rosterCache={time:Date.now(),members:result.members};if(state.user)saveView(key,result.members)}
+    return structuredClone(result.members);
+   }).finally(()=>{if(version===epoch)rosterRequest=null});
+   return rosterRequest;
+  },
+  async archivePast(data){const result=await call('archivePast',data);refresh('read');return result},
   async importLocal(data){const result=await call('importLocal',data);refresh();return result},
-  async members(){return (await call('members')).members},async memberSave(member){const result=await call('memberSave',{member});rosterCache=null;return result.member},
+  async members(){return (await call('members')).members},async memberSave(member){const result=await call('memberSave',{member});rosterCache=null;views.delete(streamKey('roster',{}));flushViews();return result.member},
   async changePin(pin){await call('changePin',{pin});signOut()}
  };
 }

@@ -1,4 +1,4 @@
-import {loadCloudConfig} from './schedule-bootstrap.js?v=20261120-notebook2';
+import {loadCloudConfig} from './schedule-bootstrap.js?v=20261120-fast1';
 // Configuration is enabled only after the Firebase project and access rules are ready.
 const listeners = new Set();
 const state = {ready:false, configured:false, user:null, role:null,stageName:null, message:'共通保存は設定準備中です。現在はこの端末に保存します。'};
@@ -48,7 +48,7 @@ export async function startCloud(){
   const config=await loadCloudConfig();
   if(!config.enabled){state.ready=true;emit();return}
   state.configured=true;state.provider=config.provider||'firebase';state.message='ログイン状態を確認しています。';emit();
-  if(config.provider==='apps-script'){if(!/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec$/.test(config.endpoint||''))throw Error();const {createPinClient}=await import('./pin-cloud.js?v=20261120-notebook2');pinClient=createPinClient(config.endpoint,state,emit);await pinClient.start();return}
+  if(config.provider==='apps-script'){if(!/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec$/.test(config.endpoint||''))throw Error();const {createPinClient}=await import('./pin-cloud.js?v=20261120-fast1');pinClient=createPinClient(config.endpoint,state,emit);await pinClient.start();return}
   const base='https://www.gstatic.com/firebasejs/12.6.0/';
   const [app,authApi,store]=await Promise.all([import(base+'firebase-app.js'),import(base+'firebase-auth.js'),import(base+'firebase-firestore.js')]);
   api={...authApi,...store};const firebase=app.initializeApp(config.firebase);auth=api.getAuth(firebase);db=api.getFirestore(firebase);
@@ -65,14 +65,68 @@ export async function startCloud(){
  }catch{state.configured=true;state.ready=true;state.message='共通保存に接続できません。接続を確認して再読み込みしてください。';emit()}
 }
 export function mountAccount(){
- const panel=document.createElement('section');panel.className='account-panel';panel.innerHTML='<p id="cloud-status" role="status"></p><button type="button" id="cloud-login" hidden>Googleで会員ログイン</button> <button type="button" id="cloud-logout" hidden>ログアウト</button>';
- (document.querySelector('main')||document.body).prepend(panel);
- const pinTools=document.createElement('details');pinTools.hidden=true;pinTools.innerHTML='<summary>自分の暗証番号を変更</summary><p>ログイン中の本人の番号だけを変更します。変更後は再ログインしてください。</p><form><label>新しい暗証番号（数字4桁）<input name=pin type=password inputmode=numeric pattern="[0-9]{4}" maxlength=4 autocomplete=new-password required></label><button type=submit>変更する</button><p role=status></p></form>';panel.append(pinTools);
- pinTools.querySelector('form').onsubmit=async e=>{e.preventDefault();const form=e.target,button=form.querySelector('button');button.disabled=true;try{await cloud.changePin(form.elements.pin.value);form.reset();status.textContent='暗証番号を変更しました。新しい番号でログインしてください。'}catch(error){form.querySelector('p').textContent=error.message}finally{button.disabled=false}};
- const status=panel.querySelector('p'),login=panel.querySelector('#cloud-login'),logout=panel.querySelector('#cloud-logout');
- cloud.onState(s=>{pinTools.hidden=!s.user||s.provider!=='apps-script';if(pinTools.hidden){pinTools.open=false;pinTools.querySelector('form').reset()}status.textContent=s.message;login.hidden=!s.configured||!s.ready||!!s.user;logout.hidden=!s.user;login.textContent=s.provider==='apps-script'?'会員ログイン':'Googleで会員ログイン'});
- login.onclick=async()=>{if(state.provider==='apps-script'){showPinLogin();return}try{await cloud.login()}catch{status.textContent='ログインできませんでした。通常のブラウザで開き、ポップアップの設定を確認して再度お試しください。'}};
- logout.onclick=async()=>{try{await cloud.logout()}catch{status.textContent='ログアウトできませんでした。'}};
+ const actions=document.querySelector('.header-actions');
+ const dataButton=actions.querySelector('#data-open');
+ const menu=document.createElement('dialog');
+ menu.className='record-dialog settings-dialog';
+ menu.setAttribute('aria-labelledby','settings-title');
+ menu.innerHTML=`<div class="dialog-body"><div class="dialog-head"><h2 id="settings-title">設定</h2><button type="button" data-settings-close aria-label="閉じる">×</button></div>
+ <p id="cloud-status" role="status"></p>
+ <div class="settings-actions">
+  <button type="button" class="secondary" data-install>ホーム画面に追加</button>
+  <button type="button" class="secondary" data-share>LINEで共有</button>
+  <a class="secondary" id="settings-admin" href="./admin.html?v=20261120-fast1" hidden>管理者ページ</a>
+  <button type="button" class="secondary" id="cloud-logout" hidden>ログアウト</button>
+ </div>
+ <details id="settings-pin" hidden><summary>暗証番号を変更</summary><form><label>新しい暗証番号（数字4桁）<input name="pin" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="new-password" required></label><button type="submit" class="secondary">変更する</button><p role="status"></p></form></details></div>`;
+ document.body.append(menu);
+ const settings=document.createElement('button'),login=document.createElement('button');
+ settings.type=login.type='button';settings.id='settings-open';login.id='cloud-login';
+ settings.className=login.className='data-button';
+ settings.textContent='設定';login.textContent='会員ログイン';login.hidden=true;
+ settings.setAttribute('aria-haspopup','dialog');
+ actions.append(login,settings);
+ if(dataButton){
+  dataButton.className='secondary';dataButton.hidden=true;
+  menu.querySelector('.settings-actions').prepend(dataButton);
+  dataButton.addEventListener('click',()=>{if(!cloud.state.configured||cloud.state.role==='admin')menu.close()},true);
+ }
+ const title=menu.querySelector('h2'),status=menu.querySelector('#cloud-status');
+ const pinTools=menu.querySelector('#settings-pin'),pinForm=pinTools.querySelector('form'),pinMessage=pinForm.querySelector('p');
+ const logout=menu.querySelector('#cloud-logout'),admin=menu.querySelector('#settings-admin');
+ menu.querySelector('[data-settings-close]').onclick=()=>menu.close();
+ settings.onclick=()=>menu.showModal();
+ menu.querySelector('[data-install]').onclick=()=>menu.close();
+ cloud.onState(s=>{
+  const administrator=s.role==='admin';
+  settings.textContent=title.textContent=administrator?'管理者設定':'設定';
+  if(dataButton)dataButton.hidden=!s.ready||s.configured&&!administrator;
+  admin.hidden=!s.ready||!administrator;
+  login.hidden=!s.configured||!s.ready||!!s.user;
+  login.textContent=s.provider==='apps-script'?'会員ログイン':'Googleで会員ログイン';
+  logout.hidden=!s.user;
+  pinTools.hidden=!s.user||s.provider!=='apps-script';
+  if(pinTools.hidden){pinTools.open=false;pinForm.reset();pinMessage.textContent=''}
+  status.textContent=s.message;
+ });
+ pinForm.onsubmit=async e=>{
+  e.preventDefault();
+  const button=pinForm.querySelector('button');
+  if(button.disabled)return;
+  button.disabled=true;
+  try{await cloud.changePin(pinForm.elements.pin.value);status.textContent='暗証番号を変更しました。新しい番号でログインしてください。'}
+  catch(error){pinMessage.textContent=error.message}
+  finally{button.disabled=false}
+ };
+ login.onclick=async()=>{
+  if(state.provider==='apps-script'){showPinLogin();return}
+  try{await cloud.login()}
+  catch{status.textContent='ログインできませんでした。接続を確認して再度お試しください。';menu.showModal()}
+ };
+ logout.onclick=async()=>{
+  try{await cloud.logout();menu.close()}
+  catch{status.textContent='この端末からログアウトしました。サーバーへの通知を確認できませんでした。'}
+ };
 }
 
 export function showPinLogin(){const dialog=document.createElement('dialog');dialog.className='record-dialog';dialog.innerHTML='<form class="dialog-body"><h2>会員ログイン</h2><label>登録名<input name="memberName" autocomplete="username" required placeholder="高座名"></label><label>暗証番号（数字4桁）<input name="pin" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="current-password" required></label><label class="remember-login"><input name="remember" type="checkbox" checked>この端末でログイン状態を記憶する</label><p class="muted">30日間使わなかった場合は再ログインします。共有端末ではチェックを外してください。</p><p role="alert"></p><div class="form-actions"><button class="primary">ログイン</button><button type="button" data-close>キャンセル</button></div></form>';document.body.append(dialog);try{dialog.querySelector('[name=memberName]').value=localStorage.getItem('yuitei.login.name')||''}catch{}dialog.querySelector('[data-close]').onclick=()=>{dialog.close();dialog.remove()};dialog.querySelector('form').onsubmit=async e=>{e.preventDefault();const f=e.target,b=f.querySelector('button');b.disabled=true;try{await cloud.login(f.elements.memberName.value.trim(),f.elements.pin.value,f.elements.remember.checked);try{localStorage.setItem('yuitei.login.name',f.elements.memberName.value.trim())}catch{}f.elements.pin.value='';dialog.close();dialog.remove()}catch(error){f.querySelector('[role=alert]').textContent=error.message}finally{b.disabled=false}};dialog.showModal()}
