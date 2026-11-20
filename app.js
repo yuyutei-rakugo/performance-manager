@@ -1,9 +1,9 @@
-import {mountMemberHome} from './member-home.js?v=20261119-tabs1';
-import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261119-tabs1';
-import {readCategories,saveCategories,categoryOptions,mountCategories} from './categories.js?v=20261119-tabs1';
-import {mountScheduleImport} from './schedule-import.js?v=20261119-tabs1';
-import {validPerformer,timeline,toRecord,transferRecord,readRecords,mergeRecords,validRecord} from './record-transfer.js?v=20261119-tabs1';
-import {cloud,startCloud,mountAccount} from './cloud.js?v=20261119-tabs1';
+import {mountMemberHome} from './member-home.js?v=20261120-notebook2';
+import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261120-notebook2';
+import {readCategories,saveCategories,categoryOptions,mountCategories} from './categories.js?v=20261120-notebook2';
+import {mountScheduleImport} from './schedule-import.js?v=20261120-notebook2';
+import {validPerformer,timeline,toRecord,transferRecord,readRecords,mergeRecords,validRecord} from './record-transfer.js?v=20261120-notebook2';
+import {cloud,startCloud,mountAccount} from './cloud.js?v=20261120-notebook2';
 'use strict';
 
 const key = 'yuitei.events.v1';
@@ -16,6 +16,7 @@ const localDate = date => [date.getFullYear(), date.getMonth() + 1, date.getDate
 const today = () => localDate(new Date());
 const dateLabel = value => new Intl.DateTimeFormat('ja-JP', {year:'numeric',month:'long',day:'numeric',weekday:'short'}).format(new Date(value + 'T00:00:00'));
 const newTasks = () => tasks.map(label => ({label, done:false,assignees:[],dueDate:''}));
+let cloudLoadError='';
 let memberNames=['勇水','小薔薇','懐古','華詩','世喜音','やすゑ','一悟','日光'],cloudRevision=0,cloudLoaded=false,stopCloud,cloudIdentity='',saving=false;
 fetch('./history-data.json').then(r=>r.json()).then(d=>{memberNames=d.names.filter(n=>n!=='藤本')}).catch(()=>{});
 const editable=()=>!cloud.state.configured||(['admin','editor'].includes(cloud.state.role)&&cloudLoaded);
@@ -123,7 +124,7 @@ function render() {
   if($('stats'))$('stats').innerHTML = stats.map(([icon,label,count]) => `<div class="stat"><span class="stat-icon" aria-hidden="true">${icon}</span><div><small>${label}</small><strong>${count}</strong><span class="unit">件</span></div></div>`).join('');
   $('list-tab').setAttribute('aria-pressed', tab === 'list');
   $('calendar-tab').setAttribute('aria-pressed', tab === 'calendar');
-  $('schedule').innerHTML = cloud.state.configured&&!cloudLoaded ? '<p class="empty">'+(cloud.state.role?'公演予定を読み込んでいます。':'公演予定を見るには会員ログインしてください。端末内のデータは保持しています。')+'</p>' : tab === 'list'
+  $('schedule').innerHTML = cloud.state.configured&&!cloudLoaded ? '<p class="empty">'+(cloud.state.role?esc(cloudLoadError||'公演予定を読み込んでいます。'):'公演予定を見るには会員ログインしてください。端末内のデータは保持しています。')+'</p>' : tab === 'list'
     ? sortedEvents(events.filter(e=>!e.archivedAt)).map(card).join('') || '<p class="empty">公演がありません。「公演を登録」から追加できます。</p>'
     : calendar();
 
@@ -310,7 +311,7 @@ $('schedule').onclick = async click => {
   }
 };
 $('list-tab').onclick = () => {tab = 'list'; render();};
-$('calendar-tab').onclick = () => {location.href = 'rehearsals.html?v=20261119-tabs1';};
+$('calendar-tab').onclick = () => {location.href = 'rehearsals.html?v=20261120-notebook2';};
 $('new-event').onclick = () => renderForm();
 $('data-open').onclick = () => $('data-dialog').showModal();
 document.addEventListener('click', click => {
@@ -355,8 +356,8 @@ render();
 mountMemberHome();mountAccount();
 cloud.onState(state=>{
  const identity=state.configured?`${state.user?.uid||''}:${state.role||''}`:'local';
- if(identity===cloudIdentity)return;cloudIdentity=identity;stopCloud?.();cloudLoaded=false;
- if(state.configured){events=[];eventDialog.close();render();if(state.role){stopCloud=cloud.watch('events',doc=>{if(doc&&(!Array.isArray(doc.items)||!doc.items.every(validEvent))){notify('共通データの形式を確認してください。');return}events=doc?.items||[];cloudRevision=doc?.revision||0;cloudLoaded=true;render()},notify)}}
+ if(identity===cloudIdentity)return;cloudIdentity=identity;stopCloud?.();cloudLoaded=false;cloudLoadError='';
+ if(state.configured){events=[];eventDialog.close();if($('data-dialog').open)$('data-dialog').close();render();if(state.role){stopCloud=cloud.watch('events',doc=>{if(doc&&(!Array.isArray(doc.items)||!doc.items.every(validEvent))){notify('共通データの形式を確認してください。');return}events=doc?.items||[];cloudRevision=doc?.revision||0;cloudLoaded=true;cloudLoadError='';render()},message=>{cloudLoadError=message;notify(message);if(!cloudLoaded)render()})}}
 });
 startCloud();
 
