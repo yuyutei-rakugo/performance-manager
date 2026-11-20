@@ -1,9 +1,10 @@
-import {mountMemberHome} from './member-home.js?v=20261120-fast1';
-import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261120-fast1';
-import {readCategories,saveCategories,categoryOptions,mountCategories} from './categories.js?v=20261120-fast1';
-import {mountScheduleImport} from './schedule-import.js?v=20261120-fast1';
-import {validPerformer,timeline,toRecord,transferRecord,readRecords,mergeRecords,validRecord} from './record-transfer.js?v=20261120-fast1';
-import {cloud,startCloud,mountAccount} from './cloud.js?v=20261120-fast1';
+import {performerPicker,updatePerformerPickers,readPerformer,showPerformerRoster} from './performer-picker.js?v=20261120-performers1';
+import {mountMemberHome} from './member-home.js?v=20261120-performers1';
+import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261120-performers1';
+import {readCategories,saveCategories,categoryOptions,mountCategories} from './categories.js?v=20261120-performers1';
+import {mountScheduleImport} from './schedule-import.js?v=20261120-performers1';
+import {validPerformer,timeline,toRecord,transferRecord,readRecords,mergeRecords,validRecord} from './record-transfer.js?v=20261120-performers1';
+import {cloud,startCloud,mountAccount} from './cloud.js?v=20261120-performers1';
 'use strict';
 
 const key = 'yuitei.events.v1';
@@ -158,9 +159,14 @@ function renderDetails(id) {
 
   eventDialog.innerHTML = `<div class="dialog-body"><div class="dialog-head"><h2 id="event-heading">${esc(event.title)}</h2><button type="button" data-close="event-dialog" aria-label="閉じる">×</button></div>
     <p>${dateLabel(event.date)} ${esc(event.time||'時間未定')}<br>会場　${esc(event.venue)}</p><div class="form-actions"><button class="primary" data-edit ${editable()?'':'disabled'}>編集する</button></div>
-    <section class="block"><h3>出演順・演目</h3>${program}</section>
+    <section class="block" id="event-program"><h3>出演順・演目</h3>${program}${rows.length?'<button type="button" class="secondary" id="print-program">番組表を印刷</button>':''}</section>
     <section class="block"><h3>準備チェックリスト</h3>${progressMarkup(event)}${event.checklist.map((item,i) => `<div class="check-row"><label><input type="checkbox" data-check="${i}" ${editable()?'':'disabled'} ${item.done ? 'checked' : ''}>${esc(item.label)}</label><small>担当：${esc((item.assignees||[]).join('・')||'未設定')} ／ 完了予定：${esc(item.dueDate||'未設定')}</small></div>`).join('')}</section>
     <section class="block"><h3>メモ</h3><p class="memo">${esc(event.memo) || 'メモはありません。'}</p></section><section class="block" hidden><button type="button" class="primary" id="transfer-event" ${editable()?'':'disabled'}>${event.archivedAt?'記録を更新する':'終了して記録へ移す'}</button><p class="muted">終了した内容を記録に保存します。元データは転記済みの一覧に残ります。</p>${event.archivedAt?'<button type="button" class="secondary" id="unarchive-event">公演一覧に戻す</button>':''}</section></div>`;
+  if($('print-program'))$('print-program').onclick=()=>{
+    document.body.classList.add('print-program');
+    window.addEventListener('afterprint',()=>document.body.classList.remove('print-program'),{once:true});
+    window.print();
+  };
   $('transfer-event').onclick=async()=>{if(cloud.state.role!=='admin'||event.date>=today()||!confirm('終了した公演を稽古・公演記録へ移しますか？同じ公演は重複せず更新されます。'))return;try{await transferRecord(toRecord('event',event,memberNames));if(await save(events.map(e=>e.id===id?{...e,archivedAt:new Date().toISOString()}:e))){eventDialog.close();notify('稽古・公演記録へ移しました。')}else notify('記録への保存は完了しましたが、転記済み表示を保存できませんでした。再実行しても重複しません。')}catch(e){notify(e.message)}};
   if($('unarchive-event'))$('unarchive-event').onclick=async()=>{if(await save(events.map(e=>e.id===id?{...e,archivedAt:null}:e))){eventDialog.close();notify('公演一覧に戻しました。転記した記録は残しています。')}};
   eventDialog.querySelector('[data-edit]').onclick = () => renderForm(events.find(item => item.id === id));
@@ -186,11 +192,32 @@ async function deleteEvent(id) {
   }
 }
 
+let performerNames=[];
+function loadPerformerRoster(form,force=false){
+  if(!cloud.state.configured||cloud.state.provider!=='apps-script'){
+    performerNames=memberNames;
+    updatePerformerPickers(form,performerNames);
+    showPerformerRoster(form,'ready',performerNames,()=>loadPerformerRoster(form,true));
+    return;
+  }
+  const retry=()=>loadPerformerRoster(form,true);
+  showPerformerRoster(form,'loading',performerNames,retry);
+  cloud.roster({force}).then(rows=>{
+    if($('event-form')!==form||!eventDialog.open)return;
+    performerNames=rows.map(row=>row.name);
+    updatePerformerPickers(form,performerNames);
+    showPerformerRoster(form,'ready',performerNames,retry);
+  }).catch(()=>{
+    if($('event-form')!==form||!eventDialog.open)return;
+    showPerformerRoster(form,'error',performerNames,retry);
+  });
+}
 function performerRow(person) {
   const row = document.createElement('div');
   row.className = 'performer';
   row.innerHTML = `<div class="performer-head"><strong></strong><button type="button" class="icon-button" data-move="-1" aria-label="出演順を上げる">↑</button><button type="button" class="icon-button" data-move="1" aria-label="出演順を下げる">↓</button><button type="button" class="danger" data-remove>削除</button></div>
-    <div class="fields"><input type="hidden" name="type" value="${person.type||'performance'}"><label>演者（会員・ゲスト）<input list="member-options" name="stageName" value="${esc(person.stageName)}" required></label><label>氏名（任意）<input name="name" value="${esc(person.name)}"></label><label>ネタ・演し物<input name="piece" value="${esc(person.piece)}" required></label><label>持ち時間（分）<input name="minutes" type="number" min="0.1" max="1440" step="0.1" value="${person.minutes}" required></label><label>終了予定時刻（任意）<input name="endTime" type="time" value="${esc(person.endTime||'')}"></label><p class="wide">終了予定（自動計算・指定反映）：<output data-end-time></output></p></div>`;
+    <div class="fields"><input type="hidden" name="type" value="${person.type||'performance'}">${person.type==='break'?`<input type="hidden" name="stageName" value="${esc(person.stageName)}">`:'<div data-performer-slot></div>'}<label>氏名（任意）<input name="name" value="${esc(person.name)}"></label><label>ネタ・演し物<input name="piece" value="${esc(person.piece)}" required></label><label>持ち時間（分）<input name="minutes" type="number" min="0.1" max="1440" step="0.1" value="${person.minutes}" required></label><label>終了予定時刻（任意）<input name="endTime" type="time" value="${esc(person.endTime||'')}"></label><p class="wide">終了予定（自動計算・指定反映）：<output data-end-time></output></p></div>`;
+  row.querySelector('[data-performer-slot]')?.replaceWith(performerPicker(person,performerNames));
   return row;
 }
 function renderForm(existing) {
@@ -200,7 +227,7 @@ function renderForm(existing) {
   eventDialog.onchange = null;
   eventDialog.innerHTML = `<div class="dialog-body"><div class="dialog-head"><h2 id="event-heading">${existing ? '公演を編集' : '公演を登録'}</h2><button type="button" data-close="event-dialog" aria-label="閉じる">×</button></div>
     <form id="event-form"><div class="fields"><label class="wide">公演名<input name="title" value="${esc(event.title)}" required></label><label>区分<select name="kind">${categoryOptions(event.kind||'その他公演',events.map(e=>e.kind))}</select></label><label>開催日<input name="date" type="date" value="${event.date}" required></label><label>開始時刻（空欄は時間未定）<input name="time" type="time" value="${esc(event.time)}"></label><label class="wide">会場<input name="venue" value="${esc(event.venue)}" required></label></div>
-    <section class="block"><h3>出演順・演目</h3><datalist id="member-options">${memberNames.map(n=>`<option value="${esc(n)}"></option>`).join('')}</datalist><p class="muted">会員名を選ぶか、ゲストの高座名を自由に入力できます。終了予定は開演時刻と持ち時間から計算します。時刻を指定して調整することもできます。</p><div id="performers"></div><button type="button" class="secondary" id="add-performer">＋ 出演者を追加</button> <button type="button" class="secondary" id="add-break">＋ 仲入りを追加</button></section>
+    <section class="block"><h3>出演順・演目</h3><p class="muted">会員を選ぶか、「ゲスト演者を入力」から高座名を入力できます。終了予定は開演時刻と持ち時間から計算します。</p><p class="muted" role="status" data-roster-status></p><button type="button" class="secondary" data-roster-retry hidden>名簿を更新</button><div id="performers"></div><button type="button" class="secondary" id="add-performer">＋ 出演者を追加</button> <button type="button" class="secondary" id="add-break">＋ 仲入りを追加</button></section>
     <section class="block"><h3>準備チェックリスト</h3>${!existing?'<p class="muted">最新のリストの項目をコピーしました。完了・担当者・完了予定日はリセットしています。</p>':''}<div id="task-rows"></div><button type="button" class="secondary" id="add-task">＋ 末尾に項目を追加</button></section>
     <section class="block"><label>公演メモ<textarea name="memo" rows="4"></textarea></label></section><p class="muted" id="form-feedback" role="alert" hidden></p>
     <div class="form-actions"><button class="primary" type="submit">保存する</button><button class="secondary" type="button" id="cancel-edit">キャンセル</button></div>${existing?'<section class="delete-zone"><button type="button" class="secondary" id="show-delete" aria-expanded="false" aria-controls="delete-confirmation">この公演を削除する…</button><div id="delete-confirmation" hidden><p>削除すると、この公演の出演者・準備リスト・メモも削除されます。</p><label><input type="checkbox" id="confirm-delete">この公演を削除することを確認しました</label><button type="button" class="danger" id="delete-event" disabled>公演を削除する</button></div></section>':''}</form></div>`;
@@ -267,7 +294,15 @@ function renderForm(existing) {
       id:existing?.id || (globalThis.crypto.randomUUID?.() ?? 'event-' + Date.now() + '-' + Math.random().toString(36).slice(2)),
       checklistUpdatedAt:new Date().toISOString(),
       kind:text('kind'),title:text('title'),date:text('date'),time:text('time'),venue:text('venue'),memo:form.get('memo'),
-      performers:[...list.children].map(row => Object.fromEntries([...row.querySelectorAll('input')].map(input => [input.name,input.type === 'number' ? input.valueAsNumber : input.value.trim()]))),
+      performers:[...list.children].map(row => {
+        const input=name=>row.querySelector(`[name=${name}]`);
+        const type=input('type').value;
+        return {
+          type,...(type==='break'?{stageName:input('stageName').value}:readPerformer(row)),
+          name:input('name').value.trim(),piece:input('piece').value.trim(),
+          minutes:input('minutes').valueAsNumber,endTime:input('endTime').value
+        };
+      }),
       checklist:[...taskRows.children].map(row=>({label:row.querySelector('[name="label"]').value.trim(),done:row.dataset.done==='true',dueDate:row.querySelector('[data-due]').value,assignees:[...row.querySelectorAll('[data-owner]:checked')].map(el=>el.value)}))
     };
     const feedback = $('form-feedback');
@@ -290,6 +325,7 @@ function renderForm(existing) {
     renderDetails(next.id);
   };
   showEvent();
+  loadPerformerRoster($('event-form'));
 }
 
 $('schedule').onclick = async click => {
@@ -313,7 +349,7 @@ $('schedule').onclick = async click => {
   }
 };
 $('list-tab').onclick = () => {tab = 'list'; render();};
-$('calendar-tab').onclick = () => {location.href = 'rehearsals.html?v=20261120-fast1';};
+$('calendar-tab').onclick = () => {location.href = 'rehearsals.html?v=20261120-performers1';};
 $('new-event').onclick = () => renderForm();
 $('data-open').onclick = () => $('data-dialog').showModal();
 document.addEventListener('click', click => {
@@ -358,7 +394,7 @@ render();
 mountMemberHome();mountAccount();
 cloud.onState(state=>{
  const identity=state.configured?`${state.user?.uid||''}:${state.role||''}`:'local';
- if(identity===cloudIdentity)return;cloudIdentity=identity;stopCloud?.();cloudLoaded=false;cloudLoadError='';
+ if(identity===cloudIdentity)return;cloudIdentity=identity;performerNames=[];stopCloud?.();cloudLoaded=false;cloudLoadError='';
  if(state.configured){events=[];eventDialog.close();if($('data-dialog').open)$('data-dialog').close();render();if(state.role){stopCloud=cloud.watch('events',doc=>{if(doc&&(!Array.isArray(doc.items)||!doc.items.every(validEvent))){notify('共通データの形式を確認してください。');return}events=doc?.items||[];cloudRevision=doc?.revision||0;cloudLoaded=true;cloudLoadError='';render()},message=>{cloudLoadError=message;notify(message);render()})}}
 });
 startCloud();

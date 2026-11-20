@@ -1,10 +1,11 @@
-import {mountMemberHome} from './member-home.js?v=20261120-fast1';
-import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261120-fast1';
-import {readCategories,saveCategories} from './categories.js?v=20261120-fast1';
-import {mountScheduleImport} from './schedule-import.js?v=20261120-fast1';
-import {toRecord,transferRecord,rehearsalTitle,readRecords,mergeRecords,validRecord} from './record-transfer.js?v=20261120-fast1';
-import {cloud,startCloud,mountAccount} from './cloud.js?v=20261120-fast1';
-import {statuses,rehearsalNames,validRehearsal,validAttendance,attendanceSummary} from './rehearsal-model.js?v=20261120-fast1';
+import {performerPicker,updatePerformerPickers,readPerformer,showPerformerRoster} from './performer-picker.js?v=20261120-performers1';
+import {mountMemberHome} from './member-home.js?v=20261120-performers1';
+import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261120-performers1';
+import {readCategories,saveCategories} from './categories.js?v=20261120-performers1';
+import {mountScheduleImport} from './schedule-import.js?v=20261120-performers1';
+import {toRecord,transferRecord,rehearsalTitle,readRecords,mergeRecords,validRecord} from './record-transfer.js?v=20261120-performers1';
+import {cloud,startCloud,mountAccount} from './cloud.js?v=20261120-performers1';
+import {statuses,rehearsalNames,validRehearsal,validAttendance,attendanceSummary} from './rehearsal-model.js?v=20261120-performers1';
 const $=id=>document.getElementById(id),esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const key='yuitei.rehearsals.v1';let items=[],attendance={},names=[],revision=0,loaded=false,storageOK=true,stop,stopAttendance,opened=null,detailRevision=0,busy=false;
 let noticeTimer;
@@ -44,17 +45,27 @@ function watchDetailAttendance(id){
   attendanceState=Object.hasOwn(attendance,id)?'stale':'error';attendanceView(id);
  });
 }
-function loadRoster(){
- const generation=accountGeneration;
- rosterState='loading';
+function drawRoster(){
+ const form=$('practice-form');
+ if(form){
+  updatePerformerPickers(form,names);
+  showPerformerRoster(form,rosterState,names,()=>loadRoster(true));
+ }
  if(opened)attendanceView(opened);
- cloud.roster().then(rows=>{
+}
+function loadRoster(force=false){
+ const generation=accountGeneration;
+ rosterState='loading';drawRoster();
+ const request=cloud.state.configured&&cloud.state.provider==='apps-script'
+  ? cloud.roster({force}).then(rows=>rows.map(row=>row.name))
+  : fetch('./history-data.json').then(r=>r.json()).then(data=>data.names.filter(name=>name!=='藤本'));
+ request.then(next=>{
   if(generation!==accountGeneration)return;
-  names=rows.map(r=>r.name);rosterState='ready';
-  if(opened)attendanceView(opened);
+  names=next;rosterState='ready';drawRoster();
+  if(!cloud.state.configured)render();
  }).catch(()=>{
   if(generation!==accountGeneration)return;
-  rosterState='error';if(opened)attendanceView(opened);
+  rosterState='error';drawRoster();
  });
 }
 function practiceView(id){
@@ -64,11 +75,19 @@ function practiceView(id){
   section.innerHTML='<h3>稽古したネタ・長さ</h3>'+(entries?'<ul>'+entries+'</ul>':'<p>ネタの記録はありません。</p>');
   return;
  }
- section.innerHTML=`<h3>稽古したネタ・長さ</h3><p class="muted">演者ごとに複数のネタを追加できます。長さは任意です。</p><form id="practice-form"><div id="practice-rows"></div><div class="form-actions"><button class="secondary" type="button" id="add-practice" ${canEdit()?'':'disabled'}>＋ ネタを追加</button><button class="primary" type="submit" ${canEdit()?'':'disabled'}>ネタ・時間を保存</button></div></form>`;
+ section.innerHTML=`<h3>稽古したネタ・長さ</h3><p class="muted">会員またはゲストに複数のネタを追加できます。長さは任意です。</p><form id="practice-form"><p class="muted" role="status" data-roster-status></p><button type="button" class="secondary" data-roster-retry hidden>名簿を更新</button><div id="practice-rows"></div><div class="form-actions"><button class="secondary" type="button" id="add-practice" ${canEdit()?'':'disabled'}>＋ ネタを追加</button><button class="primary" type="submit" ${canEdit()?'':'disabled'}>ネタ・時間を保存</button></div></form>`;
  const list=$('practice-rows');$('practice-form').oninput=()=>{$('practice-form').dataset.dirty='true'};
- function row(p={stageName:cloud.state.stageName||names[0]||'',piece:'',durationSeconds:null}){const el=document.createElement('div');el.className='practice-row';const choices=[...new Set([...names,p.stageName])].filter(Boolean);el.innerHTML=`<div class="fields"><label>演者<select name="stageName" ${canEdit()?'':'disabled'}>${choices.map(n=>`<option ${n===p.stageName?'selected':''}>${esc(n)}</option>`).join('')}</select></label><label>稽古したネタ<input name="piece" required value="${esc(p.piece)}" ${canEdit()?'':'disabled'}></label><label>長さ（分・任意）<input name="minutes" type="number" min="0" max="1440" step="1" value="${p.durationSeconds===null?'':Math.floor(p.durationSeconds/60)}" ${canEdit()?'':'disabled'}></label><label>秒（任意）<input name="seconds" type="number" min="0" max="59" step="1" value="${p.durationSeconds===null?'':p.durationSeconds%60}" ${canEdit()?'':'disabled'}></label></div><button type="button" class="secondary" data-remove-practice ${canEdit()?'':'disabled'}>このネタを外す</button>`;el.querySelector('[data-remove-practice]').onclick=()=>{el.remove();$('practice-form').dataset.dirty='true'};list.append(el);}
- (r.practices||[]).forEach(row);$('add-practice').onclick=()=>{if(list.children.length>=200){notify('ネタは200件までです。');return}row();$('practice-form').dataset.dirty='true'};
- $('practice-form').onsubmit=async e=>{e.preventDefault();if(!canEdit())return;const practices=[...list.children].map(el=>{const input=n=>el.querySelector(`[name=${n}]`).value;return {stageName:input('stageName'),piece:input('piece').trim(),durationSeconds:input('minutes')===''&&input('seconds')===''?null:Number(input('minutes')||0)*60+Number(input('seconds')||0)}});const current=items.find(x=>x.id===id),next={...current,practices};if(!validRehearsal(next)){notify('ネタ名と長さを確認してください。');return}if(await save(items.map(x=>x.id===id?next:x),detailRevision)){notify('稽古したネタ・時間を保存しました。');detail(id)}};
+ function row(p={stageName:'',piece:'',durationSeconds:null}){
+  const el=document.createElement('div');
+  el.className='practice-row';
+  el.innerHTML=`<div class="fields"><div data-performer-slot></div><label>稽古したネタ<input name="piece" required value="${esc(p.piece)}"></label><label>長さ（分・任意）<input name="minutes" type="number" min="0" max="1440" step="1" value="${p.durationSeconds===null?'':Math.floor(p.durationSeconds/60)}"></label><label>秒（任意）<input name="seconds" type="number" min="0" max="59" step="1" value="${p.durationSeconds===null?'':p.durationSeconds%60}"></label></div><button type="button" class="secondary" data-remove-practice>このネタを外す</button>`;
+  el.querySelector('[data-performer-slot]').replaceWith(performerPicker(p,names));
+  el.querySelector('[data-remove-practice]').onclick=()=>{el.remove();$('practice-form').dataset.dirty='true'};
+  list.append(el);
+ }
+ (r.practices||[]).forEach(row);
+ showPerformerRoster($('practice-form'),rosterState,names,()=>loadRoster(true));$('add-practice').onclick=()=>{if(list.children.length>=200){notify('ネタは200件までです。');return}row();$('practice-form').dataset.dirty='true'};
+ $('practice-form').onsubmit=async e=>{e.preventDefault();if(!canEdit())return;const practices=[...list.children].map(el=>{const input=n=>el.querySelector(`[name=${n}]`).value;return {...readPerformer(el),piece:input('piece').trim(),durationSeconds:input('minutes')===''&&input('seconds')===''?null:Number(input('minutes')||0)*60+Number(input('seconds')||0)}});const current=items.find(x=>x.id===id),next={...current,practices};if(!validRehearsal(next)){notify('ネタ名と長さを確認してください。');return}if(await save(items.map(x=>x.id===id?next:x),detailRevision)){notify('稽古したネタ・時間を保存しました。');detail(id)}};
 }
 
 function attendanceView(id){
@@ -80,7 +99,7 @@ function attendanceView(id){
   panel.onchange=null;
   panel.onclick=event=>{
    if(!event.target.closest('button'))return;
-   if(rosterState==='error')loadRoster();
+   if(rosterState==='error')loadRoster(true);
    if(attendanceState==='error')watchDetailAttendance(id);
   };
   return;
@@ -129,14 +148,8 @@ cloud.onState(s=>{
    render();
   },message=>{if(generation===accountGeneration){scheduleError=message;notify(message);render()}});
  }else{items=structuredClone(localItems);attendance=structuredClone(localAttendance)}
- if(s.ready!==false){
-  if(s.configured&&s.provider==='apps-script'){if(s.role)loadRoster()}
-  else fetch('./history-data.json').then(r=>r.json()).then(d=>{
-   if(generation!==accountGeneration)return;
-   names=d.names.filter(n=>n!=='藤本');rosterState='ready';if(!s.configured)render();
-   if(opened)attendanceView(opened);
-  }).catch(()=>{if(generation===accountGeneration){rosterState='error';notify('会員名を読み込めませんでした。再読み込みしてください。')}});
- }
+ if(s.ready!==false&&(!s.configured||s.role))loadRoster();
+
  render();
 });
 mountMemberHome();mountAccount();startCloud();
