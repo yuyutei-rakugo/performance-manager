@@ -1,9 +1,12 @@
-import {categoryOptions} from './categories.js?v=20261120-notebook2';
-import {readRecords,writeRecords} from './record-transfer.js?v=20261120-notebook2';
-import {cloud} from './cloud.js?v=20261120-notebook2';
+import {categoryOptions} from './categories.js?v=20261120-fast1';
+import {readRecords,writeRecords} from './record-transfer.js?v=20261120-fast1';
+import {cloud} from './cloud.js?v=20261120-fast1';
 export function historyEditor(getData,refresh){
  const section=document.createElement('section');section.className='record-edit-panel';section.innerHTML='<button id="history-add" class="primary" type="button" disabled>＋ 稽古・公演記録を追加</button><p id="history-edit-status">共通保存の設定後、許可された会員が記録を追加・修正できます。</p>';
  (document.getElementById('history-tools')||document.querySelector('main')).append(section);
+ const syncWarning=document.createElement('p');
+ syncWarning.className='sync-warning';syncWarning.setAttribute('role','status');syncWarning.hidden=true;
+ section.before(syncWarning);
  const dialog=document.createElement('dialog');dialog.className='record-dialog';document.body.append(dialog);
  const original=structuredClone(getData().records);
  let revision=0,loaded=false,stop,identity='',busy=false;
@@ -13,14 +16,14 @@ export function historyEditor(getData,refresh){
  function controls(){section.querySelector('button').disabled=!allowed();document.querySelectorAll('[data-record-edit]').forEach(el=>el.hidden=!allowed()||(!cloud.state.configured&&publicIds.has(el.dataset.recordEdit)))}
  cloud.onState(s=>{
   section.hidden=s.configured&&!['admin','editor'].includes(s.role);
-  const next=`${s.configured?'shared':'local'}:${s.user?.uid||''}:${s.role||''}`;if(next===identity)return;identity=next;stop?.();loaded=false;dialog.close();getData().records=structuredClone(original);refresh();controls();if(!s.configured)feedback('転記した記録はこのブラウザに保存します。転記後の内容も修正できます。');
+  const next=`${s.configured?'shared':'local'}:${s.user?.uid||''}:${s.role||''}`;if(next===identity)return;identity=next;stop?.();loaded=false;syncWarning.hidden=true;dialog.close();getData().records=structuredClone(original);refresh();controls();if(!s.configured)feedback('転記した記録はこのブラウザに保存します。転記後の内容も修正できます。');
   if(s.configured&&!s.role)feedback('会員ログイン後、権限に応じて記録を追加・修正できます。');
   if(s.configured&&s.role)stop=cloud.watch('history',doc=>{
    if(doc&&(!Array.isArray(doc.items)||!doc.items.every(valid))){feedback('共通記録の形式を確認してください。');return}
-   revision=doc?.revision||0;loaded=true;
+   revision=doc?.revision||0;loaded=true;syncWarning.hidden=true;
    if(doc){getData().records=doc.items;refresh()}
    feedback(s.role==='viewer'?'閲覧のみの会員です。':'記録を追加・修正できます。保存すると会員の端末に反映されます。');controls();
-  },message=>{loaded=false;feedback(message);controls()});
+  },message=>{syncWarning.textContent=loaded||!syncWarning.hidden?'共通記録を更新できませんでした。前回の表示を残しています。':message;syncWarning.hidden=false;loaded=false;feedback(message);controls()});
  });
  function valid(r){return r&&typeof r.id==='string'&&typeof r.date==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(r.date)&&typeof r.kind==='string'&&typeof r.occasion==='string'&&typeof r.note==='string'&&r.pieces&&typeof r.pieces==='object'&&Object.values(r.pieces).every(v=>typeof v==='string')}
  async function persist(items,expected){if(busy)return false;busy=true;try{if(cloud.state.configured)await cloud.save('history',{items},expected);else writeRecords(items.filter(r=>!publicIds.has(r.id)));getData().records=items;refresh();controls();return true}catch(e){if(dialog.open){feedback(e.message);dialog.querySelector('[role=alert]').textContent=e.message}return false}finally{busy=false}}

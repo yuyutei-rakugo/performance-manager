@@ -1,10 +1,10 @@
-import {mountMemberHome} from './member-home.js?v=20261120-notebook2';
-import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261120-notebook2';
-import {readCategories,saveCategories} from './categories.js?v=20261120-notebook2';
-import {mountScheduleImport} from './schedule-import.js?v=20261120-notebook2';
-import {toRecord,transferRecord,rehearsalTitle,readRecords,mergeRecords,validRecord} from './record-transfer.js?v=20261120-notebook2';
-import {cloud,startCloud,mountAccount} from './cloud.js?v=20261120-notebook2';
-import {statuses,rehearsalNames,validRehearsal,validAttendance,attendanceSummary} from './rehearsal-model.js?v=20261120-notebook2';
+import {mountMemberHome} from './member-home.js?v=20261120-fast1';
+import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261120-fast1';
+import {readCategories,saveCategories} from './categories.js?v=20261120-fast1';
+import {mountScheduleImport} from './schedule-import.js?v=20261120-fast1';
+import {toRecord,transferRecord,rehearsalTitle,readRecords,mergeRecords,validRecord} from './record-transfer.js?v=20261120-fast1';
+import {cloud,startCloud,mountAccount} from './cloud.js?v=20261120-fast1';
+import {statuses,rehearsalNames,validRehearsal,validAttendance,attendanceSummary} from './rehearsal-model.js?v=20261120-fast1';
 const $=id=>document.getElementById(id),esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const key='yuitei.rehearsals.v1';let items=[],attendance={},names=[],revision=0,loaded=false,storageOK=true,stop,stopAttendance,opened=null,detailRevision=0,busy=false;
 let noticeTimer;
@@ -23,6 +23,7 @@ function render(){
  const upcoming=items.filter(r=>!r.archivedAt&&r.date>=new Date().toLocaleDateString('sv-SE'));if($('stats'))$('stats').innerHTML=[['予定の稽古',upcoming.length],['師匠稽古',upcoming.filter(r=>r.title==='師匠稽古').length],['自主稽古',upcoming.filter(r=>r.title==='自主稽古').length]].map(([label,count])=>`<div class="stat"><span class="stat-icon">▦</span><div><small>${label}</small><strong>${count}</strong><span class="unit">件</span></div></div>`).join('');
  $('add').disabled=!canEdit();$('mode').textContent=cloud.state.configured?(cloud.state.role?'予定ごとに「出欠・詳細」から回答・一覧を確認できます。':'出欠は会員ログイン後に回答できます。'):'現在はこのブラウザに保存します。自分の名前を選んで出欠を入力します。本人認証・端末間の同期はまだ有効ではありません。';
  $('rehearsals').innerHTML=items.filter(r=>!r.archivedAt).sort((a,b)=>(!!a.archivedAt-!!b.archivedAt)||(a.date+a.time).localeCompare(b.date+b.time)).map(r=>{const s=cloud.state.configured?null:attendanceSummary(names,attendance[r.id]||{});return `<article class="event-card rehearsal-card"><div class="date-badge" aria-hidden="true"><small>${Number(r.date.slice(5,7))}月</small><strong>${Number(r.date.slice(8))}</strong></div><div><h3>${esc(rehearsalTitle(r))}${r.archivedAt?' <small>（記録へ移動済み）</small>':''}</h3><div class="meta"><span>${r.date.replaceAll('-','/')} ${r.time}</span><span>＠ ${esc(r.venue)}</span></div></div>${s?`<div class="progress"><span class="progress-label">出席 ${s.count}人 ／ 未回答 ${s.unanswered}人</span></div>`:''}<div class="event-actions"><button class="secondary" data-detail="${esc(r.id)}">出欠・詳細</button></div></article>`}).join('')||(cloud.state.configured&&!loaded?'<p class="empty">'+(cloud.state.role?esc(scheduleError||'稽古予定を読み込み中…'):'稽古予定を見るには会員ログインしてください。')+'</p>':'<p class="empty">稽古予定はまだありません。</p>');
+ if(loaded&&scheduleError)$('rehearsals').insertAdjacentHTML('afterbegin','<p class="sync-warning" role="status">更新できませんでした。前回取得した稽古予定を表示しています。</p>');
  openRequestedDetail();
 }
 function form(existing){if(!canEdit())return;stopAttendance?.();opened=null;const version=revision,r=existing?{...existing,title:existing.title==='その他稽古'?'その他':existing.title}:{title:rehearsalNames[0],date:new Date().toLocaleDateString('sv-SE'),time:'14:00',venue:'',notes:''};dialog.innerHTML=`<div class="dialog-body"><div class="dialog-head"><h2>${existing?'稽古を編集':'稽古を登録'}</h2><button type="button" data-close aria-label="閉じる">×</button></div><form id="rehearsal-form"><div class="fields"><label class="wide">稽古名<select name="title" required>${[...new Set([...rehearsalNames,...(r.title&&!rehearsalNames.includes(r.title)?[r.title]:[])])].map(n=>`<option value="${esc(n)}" ${n===r.title?'selected':''}>${esc(n)}</option>`).join('')}</select></label><label class="wide" id="other-content-field">その他の内容<input name="otherContent" value="${esc(r.otherContent||'')}" placeholder="例：交流会、打ち合わせ"></label><label>開催日<input name="date" type="date" required value="${r.date}"></label><label>開演・開始時刻<input name="time" type="time" required value="${r.time}"></label><label class="wide">会場・場所<input name="venue" required value="${esc(r.venue)}"></label></div><label>内容・連絡事項（任意）<textarea name="notes" rows="4"></textarea></label><div class="form-actions"><button class="primary">保存する</button><button class="secondary" type="button" data-close>キャンセル</button></div>${existing?'<details class="delete-zone"><summary>この稽古を削除する</summary><label><input type="checkbox" id="delete-confirm">削除することを確認しました</label><button class="danger" type="button" id="delete-rehearsal" disabled>削除する</button></details>':''}</form></div>`;dialog.querySelector('textarea').value=r.notes;const toggleOther=()=>{const yes=$('rehearsal-form').elements.title.value==='その他';$('other-content-field').hidden=!yes;$('rehearsal-form').elements.otherContent.required=yes};$('rehearsal-form').elements.title.onchange=toggleOther;toggleOther();
@@ -40,7 +41,7 @@ function watchDetailAttendance(id){
   attendanceState='ready';attendanceView(id);
  },()=>{
   if(opened!==id)return;
-  delete attendance[id];attendanceState='error';attendanceView(id);
+  attendanceState=Object.hasOwn(attendance,id)?'stale':'error';attendanceView(id);
  });
 }
 function loadRoster(){
@@ -73,7 +74,7 @@ function practiceView(id){
 function attendanceView(id){
  if(opened!==id)return;
  const panel=$('attendance');
- if(cloud.state.configured&&(!cloud.state.role||attendanceState!=='ready'||rosterState!=='ready')){
+ if(cloud.state.configured&&(!cloud.state.role||!['ready','stale'].includes(attendanceState)||rosterState!=='ready')){
   const failed=attendanceState==='error'||rosterState==='error';
   panel.innerHTML='<h3>出欠一覧</h3><p role="status">'+(!cloud.state.role?'会員ログインが必要です。':failed?'出欠一覧を取得できませんでした。':'出欠を読み込んでいます。')+'</p>'+(failed?'<button type="button" class="secondary">再読み込み</button>':'');
   panel.onchange=null;
@@ -84,11 +85,12 @@ function attendanceView(id){
   };
   return;
  }
+ const stale=attendanceState==='stale';
  const responses=attendance[id]||{},self=cloud.state.configured?cloud.state.stageName:localStorage.getItem('yuitei.attendance.person')||'';
  const groups=statuses.map(status=>({status,label:status==='未回答'?'未登録':status,people:names.filter(n=>(responses[n]||'未回答')===status)}));
- $('attendance').innerHTML=`<h3>出欠一覧</h3>${!cloud.state.configured?`<label>自分の名前<select id="attendance-person"><option value="">選んでください</option>${names.map(n=>`<option value="${esc(n)}" ${n===self?'selected':''}>${esc(n)}</option>`).join('')}</select></label><p class="muted">端末内保存です。この名前選択は本人認証ではありません。共通保存に接続すると、ログインした本人だけが回答できます。</p>`:''}${self&&names.includes(self)?`<label>自分の出欠（${esc(self)}）<select data-person="${esc(self)}">${statuses.map(v=>`<option value="${v}" ${v===(responses[self]||'未回答')?'selected':''}>${v==='未回答'?'未登録':v}</option>`).join('')}</select></label>`:'<p>自分の出欠を回答するには、'+(cloud.state.configured?'会員ログインと高座名の登録が必要です。':'自分の名前を選んでください。')+'</p>'}<div class="rsvp-buttons">${self&&names.includes(self)?['出席','欠席','未定'].map(v=>`<button type="button" class="secondary" data-self-status="${v}" aria-pressed="${responses[self]===v}">${v}</button>`).join(''):''}</div><p class="save-feedback" id="attendance-feedback" role="status"></p><div class="attendance-summary">${groups.map(g=>`<section><h4>${g.label} ${g.people.length}人</h4><p>${g.people.length?esc(g.people.join('・')):'なし'}</p></section>`).join('')}</div>`;
- if(responding)panel.querySelectorAll('select,button').forEach(el=>el.disabled=true);
- $('attendance').onclick=async e=>{const b=e.target.closest('[data-self-status]');if(b)await respondSelf(id,self,b.dataset.selfStatus)};
+ $('attendance').innerHTML=`<h3>出欠一覧</h3>${stale?'<p class="sync-warning" role="status">更新できませんでした。前回取得した出欠を表示しています。</p><button type="button" class="secondary" data-retry-attendance>再読み込み</button>':''}${!cloud.state.configured?`<label>自分の名前<select id="attendance-person"><option value="">選んでください</option>${names.map(n=>`<option value="${esc(n)}" ${n===self?'selected':''}>${esc(n)}</option>`).join('')}</select></label><p class="muted">端末内保存です。この名前選択は本人認証ではありません。共通保存に接続すると、ログインした本人だけが回答できます。</p>`:''}${self&&names.includes(self)?`<label>自分の出欠（${esc(self)}）<select data-person="${esc(self)}">${statuses.map(v=>`<option value="${v}" ${v===(responses[self]||'未回答')?'selected':''}>${v==='未回答'?'未登録':v}</option>`).join('')}</select></label>`:'<p>自分の出欠を回答するには、'+(cloud.state.configured?'会員ログインと高座名の登録が必要です。':'自分の名前を選んでください。')+'</p>'}<div class="rsvp-buttons">${self&&names.includes(self)?['出席','欠席','未定'].map(v=>`<button type="button" class="secondary" data-self-status="${v}" aria-pressed="${responses[self]===v}">${v}</button>`).join(''):''}</div><p class="save-feedback" id="attendance-feedback" role="status"></p><div class="attendance-summary">${groups.map(g=>`<section><h4>${g.label} ${g.people.length}人</h4><p>${g.people.length?esc(g.people.join('・')):'なし'}</p></section>`).join('')}</div>`;
+ if(responding||stale)panel.querySelectorAll('select,[data-self-status]').forEach(el=>el.disabled=true);
+ $('attendance').onclick=async e=>{if(e.target.closest('[data-retry-attendance]')){watchDetailAttendance(id);return}const b=e.target.closest('[data-self-status]');if(b)await respondSelf(id,self,b.dataset.selfStatus)};
  $('attendance').onchange=async e=>{
   if(e.target.id==='attendance-person'){localStorage.setItem('yuitei.attendance.person',e.target.value);attendanceView(id);return}
   const n=e.target.dataset.person;if(!n||n!==self||!names.includes(n)||!statuses.includes(e.target.value))return;

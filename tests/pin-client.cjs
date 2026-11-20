@@ -1,19 +1,19 @@
 const fs=require('fs'),vm=require('vm'),assert=require('node:assert/strict');
-let calls=[],requests=[],timers=[],clearedTimers=[],focus,now=Date.now();
+let calls=[],requests=[],timers=[],clearedTimers=[],listeners={},now=Date.now();
 class Clock extends Date { static now(){return now} }
 const persistent=new Map();
 const state={stageName:'勇水'},storage=new Map([['yuitei.session','test-session']]);
-const sandbox={AbortController,setTimeout,clearTimeout,Date:Clock,JSON,Map,Set,Error,Object,String,Promise,structuredClone,queueMicrotask,localStorage:{getItem:k=>persistent.get(k),setItem:(k,v)=>persistent.set(k,v),removeItem:k=>persistent.delete(k)},sessionStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},document:{visibilityState:'visible'},window:{addEventListener:(event,fn)=>{if(event==='focus')focus=fn}},setInterval:fn=>{timers.push(fn);return timers.length},clearInterval:id=>clearedTimers.push(id),fetch:(url,options)=>{const body=JSON.parse(options.body);calls.push(body);return new Promise(resolve=>requests.push({body,resolve:result=>resolve({ok:true,json:async()=>result})}))}};
+const sandbox={AbortController,setTimeout,clearTimeout,Date:Clock,JSON,Map,Set,Error,Object,String,Promise,structuredClone,queueMicrotask,localStorage:{getItem:k=>persistent.get(k),setItem:(k,v)=>persistent.set(k,v),removeItem:k=>persistent.delete(k)},sessionStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},document:{visibilityState:'visible'},window:{addEventListener:(event,fn)=>{listeners[event]=fn}},setInterval:fn=>{timers.push(fn);return timers.length},clearInterval:id=>clearedTimers.push(id),fetch:(url,options)=>{const body=JSON.parse(options.body);calls.push(body);return new Promise(resolve=>requests.push({body,resolve:result=>resolve({ok:true,json:async()=>result})}))}};
 vm.createContext(sandbox);vm.runInContext(fs.readFileSync('pin-cloud.js','utf8').replace('export function','function')+'\nthis.client=createPinClient("https://example.test",this.state,()=>{});',Object.assign(sandbox,{state}));
 const client=sandbox.client,tick=()=>new Promise(r=>setImmediate(r));
 function respond(action,data){const i=requests.findIndex(r=>r.body.action===action);assert(i>=0,'missing '+action);requests.splice(i,1)[0].resolve({ok:true,...data})}
 (async()=>{
  let a=[],b=[],errors=[];const stopA=client.watch('rehearsals',d=>a.push(d),e=>errors.push(e));const stopB=client.watch('rehearsals',d=>b.push(d));assert.equal(calls.length,1);assert.equal(timers.length,1);respond('read',{doc:{items:[],revision:1}});await tick();assert.equal(a.length,1);assert.equal(b.length,1);
  stopA();assert.equal(clearedTimers.length,0);stopB();assert.deepEqual(clearedTimers,[1]);let c=[];const stopC=client.watch('rehearsals',d=>c.push(d));await tick();assert.equal(c.length,1);assert.equal(calls.length,1,'reuse recently confirmed document');
- now+=16000;
+ now+=61000;
  let fresh=[];
  const stopFresh=client.watch('rehearsals',d=>fresh.push(d));await tick();
- assert.equal(fresh.length,0,'a new view waits for revalidation when the cached reply is old');
+ assert.equal(fresh.length,1,'a recent view renders before revalidation');
  respond('read',{doc:{items:[],revision:1}});await tick();
  assert.equal(fresh.length,1,'the new view receives an unchanged result');
  assert.equal(c.length,1,'the existing view is not redrawn');
@@ -51,12 +51,28 @@ function respond(action,data){const i=requests.findIndex(r=>r.body.action===acti
  await restored.start();assert.equal(calls.length,beforeNavigation,'recent navigation skips session request');
  assert.equal(state.role,'admin');
  const stop=restored.watch('events',()=>{});assert.equal(calls.at(-1).action,'read');assert.equal(calls.at(-1).token,'kept');respond('read',{doc:null});await tick();stop();
- now+=5*60*1000;
+ const cached=restart('cached'),beforeCache=calls.length;
+ await cached.start();
+ const recent=[];cached.watch('events',doc=>recent.push(doc));await tick();
+ assert.deepEqual(recent,[null]);assert.equal(calls.length,beforeCache,'warm navigation skips the data request');
+ now+=61000;
+ const stale=restart('stale'),staleResults=[],staleErrors=[];
+ await stale.start();stale.watch('events',doc=>staleResults.push(doc),message=>staleErrors.push(message));await tick();
+ assert.deepEqual(staleResults,[null]);
+ respond('read',{ok:false,error:'取得失敗'});await tick();
+ assert.deepEqual(staleResults,[null]);assert.deepEqual(staleErrors,['取得失敗']);
+ now+=10*60*1000;
+ const old=restart('old'),oldResults=[];
+ await old.start();old.watch('events',doc=>oldResults.push(doc));await tick();
+ assert.deepEqual(oldResults,[],'expired data is not replayed');
+ respond('read',{doc:{items:[],revision:3}});await tick();assert.equal(oldResults.length,1);
+ now+=30*60*1000;
  const renewed=restart('renewed'),renew=renewed.start();
  assert.equal(requests.at(-1).body.token,'kept');assert.equal(requests.at(-1).body.remember,true);
  respond('session',{member:{id:'owner',name:'勇水',role:'admin'}});await renew;
  const end=renewed.logout();respond('logout',{});await end;
  assert.equal(storage.has('yuitei.session.identity'),false);
+ assert.equal(storage.has('yuitei.session.views.v1'),false,'logout removes private cached data');
  const temporary=client.login('勇水','2468',false);respond('login',{token:'temporary',member:{id:'member',name:'勇水',role:'viewer'}});await temporary;
  assert.equal(persistent.has('yuitei.session'),false);assert.equal(storage.get('yuitei.session'),'temporary');
  const temporaryClient=restart('temporaryClient');
@@ -66,6 +82,9 @@ function respond(action,data){const i=requests.findIndex(r=>r.body.action===acti
  temporaryClient.watch('events',()=>delivered++);
  respond('read',{ok:false,error:'ログインの期限が切れました。'});await tick();
  assert.equal(state.role,null);assert.equal(delivered,0);assert.equal(storage.has('yuitei.session'),false);assert.equal(storage.has('yuitei.session.identity'),false);
+ const backLogin=client.login('勇水','2468',false);respond('login',{token:'back',member:{id:'back-member',name:'勇水',role:'viewer'}});await backLogin;
+ const back=restart('back');await back.start();storage.delete('yuitei.session');
+ listeners.pageshow({persisted:true});assert.equal(state.user,null,'restored pages respect the cleared session');
  console.log('PASS remembered login survives client restart, opt-out stays temporary, PIN never stored, expiry and logout clear tokens');
  console.log('PASS shared read coalescing, one timer per resource, recent in-memory reuse, roster coalescing, attendance write coalescing and stale-poll isolation, confirmed writes, failure preservation and session isolation');
 })().catch(error=>{console.error(error);process.exitCode=1});
