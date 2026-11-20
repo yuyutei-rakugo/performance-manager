@@ -1,9 +1,20 @@
-import {cloud} from './cloud.js?v=20261120-values1';
+import {cloud} from './cloud.js?v=20261120-audit1';
 export const historyKey='yuitei.history.v1';
 export const validRecord=r=>r&&typeof r.id==='string'&&typeof r.date==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(r.date)&&typeof r.kind==='string'&&typeof r.occasion==='string'&&typeof r.note==='string'&&r.pieces&&typeof r.pieces==='object'&&!Array.isArray(r.pieces)&&Object.values(r.pieces).every(v=>typeof v==='string');
 export function readRecords(){const raw=JSON.parse(localStorage.getItem(historyKey)||'{"version":1,"items":[]}');if(raw.version!==1||!Array.isArray(raw.items)||!raw.items.every(validRecord))throw Error('保存済みの記録を読み込めません。上書きを停止しています。');return raw.items;}
 export function writeRecords(items){if(!Array.isArray(items)||items.length>500||!items.every(validRecord))throw Error('記録の形式を確認してください。');readRecords();localStorage.setItem(historyKey,JSON.stringify({version:1,items}));}
-export function mergeRecords(incoming){if(!Array.isArray(incoming)||!incoming.every(validRecord))throw Error('記録の形式を確認してください。');const map=new Map(readRecords().map(r=>[r.id,r]));incoming.forEach(r=>map.set(r.id,r));const items=[...map.values()];if(items.length>500)throw Error('追加記録は500件までです。');localStorage.setItem(historyKey,JSON.stringify({version:1,items}));return items;}
+export function mergedRecords(incoming){
+ if(!Array.isArray(incoming)||!incoming.every(validRecord))throw Error('記録の形式を確認してください。');
+ const map=new Map(readRecords().map(record=>[record.id,record]));
+ incoming.forEach(record=>map.set(record.id,record));
+ if(map.size>500)throw Error('追加記録は500件までです。');
+ return [...map.values()];
+}
+export function mergeRecords(incoming){
+ const items=mergedRecords(incoming);
+ localStorage.setItem(historyKey,JSON.stringify({version:1,items}));
+ return items;
+}
 export function validPerformer(p){return p&&['name','stageName','piece'].every(k=>typeof p[k]==='string')&&p.stageName.trim()&&p.piece.trim()&&Number.isFinite(p.minutes)&&p.minutes>0&&p.minutes<=1440&&(p.type===undefined||['performance','break'].includes(p.type))&&(p.endTime===undefined||p.endTime===''||typeof p.endTime==='string'&&/^([01]\d|2[0-3]):[0-5]\d$/.test(p.endTime));}
 export function timeline(start,people){if(!start)return people.map(p=>({...p,begin:'時間未定',end:p.endTime||'時間未定'}));let total=(Number(start.slice(0,2))*60+Number(start.slice(3)))*60;const label=seconds=>{const days=Math.floor(seconds/86400);seconds%=86400;const hours=Math.floor(seconds/3600),minutes=Math.floor(seconds%3600/60),secs=seconds%60;return (days?'翌'+(days>1?days:'')+'日 ':'')+String(hours).padStart(2,'0')+':'+String(minutes).padStart(2,'0')+(secs?':'+String(secs).padStart(2,'0'):'')};return people.map(p=>{const begin=label(total),previous=total;total+=Math.round((Number(p.minutes)||0)*60);if(p.endTime){total=Math.floor(previous/86400)*86400+(Number(p.endTime.slice(0,2))*60+Number(p.endTime.slice(3)))*60;if(total<previous)total+=86400;}return {...p,begin,end:label(total)}});}
 

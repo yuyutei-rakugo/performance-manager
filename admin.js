@@ -1,18 +1,63 @@
-import {cloud,startCloud,mountAccount} from './cloud.js?v=20261120-values1';
-import {toRecord,readRecords,mergeRecords} from './record-transfer.js?v=20261120-values1';
-const $=id=>document.getElementById(id),status=$('admin-status');let docs={},past=[],members=[],accountGeneration=0;
+import {cloud,startCloud,mountAccount} from './cloud.js?v=20261120-audit1';
+import {toRecord,readRecords,mergeRecords} from './record-transfer.js?v=20261120-audit1';
+const $=id=>document.getElementById(id),status=$('admin-status');let docs={},past=[],members=[],accountGeneration=0,archiveBusy=false;
 const today=()=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Tokyo'}).format(new Date());
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const read=async name=>(await cloud.readShared(name))||{items:[],revision:0};
 async function refresh(){const generation=accountGeneration,local=!cloud.state.configured;const practice=local?JSON.parse(localStorage.getItem('yuitei.rehearsals.v1')||'{"items":[],"attendance":{}}'):null;const [events,rehearsals,history]=local?[{items:JSON.parse(localStorage.getItem('yuitei.events.v1')||'[]')},practice,{items:readRecords()}]:await Promise.all(['events','rehearsals','history'].map(read));if(generation!==accountGeneration)return;docs={events,rehearsals,history};past=[...events.items.filter(r=>!r.archivedAt&&r.date<today()).map(source=>({type:'event',source})),...rehearsals.items.filter(r=>!r.archivedAt&&r.date<today()).map(source=>({type:'rehearsal',source}))].sort((a,b)=>a.source.date.localeCompare(b.source.date));$('past-items').innerHTML=past.length?past.map((p,i)=>`<label><input type="checkbox" data-past="${i}"> ${esc(p.source.date)} ${esc(p.source.title)} ／ ${esc(p.source.venue)}</label>`).join(''):'<p>日付が過ぎた未転記の予定はありません。</p>';$('archive-selected').disabled=true;}
-$('past-items').onchange=()=>$('archive-selected').disabled=!document.querySelector('[data-past]:checked');
+$('past-items').onchange=()=>$('archive-selected').disabled=archiveBusy||!document.querySelector('[data-past]:checked');
 $('refresh-past').onclick=()=>refresh().catch(e=>status.textContent=e.message);
-$('archive-selected').onclick=async()=>{const b=$('archive-selected');b.disabled=true;try{const selected=[...document.querySelectorAll('[data-past]:checked')].map(el=>past[Number(el.dataset.past)]);if(!selected.length||!confirm(selected.length+'件を稽古・公演記録へ移しますか？'))return;if(!cloud.state.configured){const keys=['yuitei.events.v1','yuitei.rehearsals.v1','yuitei.history.v1'];const backup=keys.map(k=>localStorage.getItem(k));try{const practice=JSON.parse(backup[1]||'{"items":[],"attendance":{}}');const records=selected.map(p=>toRecord(p.type,p.source,Object.keys(practice.attendance?.[p.source.id]||{}),p.type==='rehearsal'?(practice.attendance?.[p.source.id]||{}):{}));mergeRecords(records);const archivedAt=new Date().toISOString();const eventIds=new Set(selected.filter(p=>p.type==='event').map(p=>p.source.id));const practiceIds=new Set(selected.filter(p=>p.type==='rehearsal').map(p=>p.source.id));localStorage.setItem(keys[0],JSON.stringify(docs.events.items.map(r=>eventIds.has(r.id)?{...r,archivedAt}:r)));localStorage.setItem(keys[1],JSON.stringify({...practice,items:practice.items.map(r=>practiceIds.has(r.id)?{...r,archivedAt}:r)}));}catch(error){keys.forEach((k,i)=>backup[i]===null?localStorage.removeItem(k):localStorage.setItem(k,backup[i]));throw error}$('archive-result').textContent=selected.length+'件をこの端末の稽古・公演記録へ移しました。';await refresh();return;}const roster=await cloud.roster();const transfers=await Promise.all(selected.map(async p=>{let responses={};if(p.type==='rehearsal')responses=await Object.fromEntries((await cloud.readAttendance(p.source.id)).map(r=>[r.stageName,r.status]));return {type:p.type,id:p.source.id,record:toRecord(p.type,p.source,roster.map(m=>m.name),responses)}}));const result=await cloud.archivePast({transfers,revisions:Object.fromEntries(Object.entries(docs).map(([k,v])=>[k,v.revision]))});$('archive-result').textContent=result.count+'件を記録へ移しました。';await refresh()}catch(e){$('archive-result').textContent=e.message}finally{b.disabled=false}};
+async function refreshAfterSave(update,result){
+ try{await update()}
+ catch{result.textContent+=' 一覧を更新できませんでした。再読み込みして確認してください。'}
+}
+$('archive-selected').onclick=async()=>{
+ if(archiveBusy)return;
+ const button=$('archive-selected'),feedback=$('archive-result');
+ const selected=[...document.querySelectorAll('[data-past]:checked')].map(el=>past[Number(el.dataset.past)]);
+ if(!selected.length||!confirm(selected.length+'件を稽古・公演記録へ移しますか？'))return;
+ const snapshot=docs,generation=accountGeneration;
+ archiveBusy=true;button.disabled=true;
+ try{
+  if(!cloud.state.configured){
+   const keys=['yuitei.events.v1','yuitei.rehearsals.v1','yuitei.history.v1'],backup=keys.map(key=>localStorage.getItem(key));
+   const events=JSON.parse(backup[0]||'[]'),rehearsals=JSON.parse(backup[1]||'{"items":[],"attendance":{}}');
+   if(JSON.stringify(events)!==JSON.stringify(snapshot.events.items)||JSON.stringify(rehearsals.items)!==JSON.stringify(snapshot.rehearsals.items)){
+    throw Error('予定が更新されています。「一覧を更新」で確認してから移してください。');
+   }
+   const records=selected.map(p=>toRecord(p.type,p.source,Object.keys(rehearsals.attendance?.[p.source.id]||{}),p.type==='rehearsal'?(rehearsals.attendance?.[p.source.id]||{}):{}));
+   const archivedAt=new Date().toISOString();
+   const archived=(type,items)=>{
+    const ids=new Set(selected.filter(p=>p.type===type).map(p=>p.source.id));
+    return items.map(item=>ids.has(item.id)?{...item,archivedAt}:item);
+   };
+   try{
+    mergeRecords(records);
+    localStorage.setItem(keys[0],JSON.stringify(archived('event',events)));
+    localStorage.setItem(keys[1],JSON.stringify({...rehearsals,items:archived('rehearsal',rehearsals.items)}));
+   }catch(error){keys.forEach((key,i)=>backup[i]===null?localStorage.removeItem(key):localStorage.setItem(key,backup[i]));throw error}
+   feedback.textContent=selected.length+'件をこの端末の稽古・公演記録へ移しました。';
+  }else{
+   const revisions=Object.fromEntries(Object.entries(snapshot).map(([key,doc])=>[key,doc.revision]));
+   const names=(await cloud.roster()).map(member=>member.name);
+   const transfers=await Promise.all(selected.map(async p=>{
+    const responses=p.type==='rehearsal'?Object.fromEntries((await cloud.readAttendance(p.source.id)).map(row=>[row.stageName,row.status])):{};
+    return {type:p.type,id:p.source.id,record:toRecord(p.type,p.source,names,responses)};
+   }));
+   if(generation!==accountGeneration)return;
+   const result=await cloud.archivePast({transfers,revisions});
+   feedback.textContent=result.count+'件を記録へ移しました。';
+  }
+  await refreshAfterSave(refresh,feedback);
+ }catch(error){feedback.textContent=error.message}
+ finally{archiveBusy=false;button.disabled=!document.querySelector('[data-past]:checked')}
+};
+
 async function refreshMembers(){const generation=accountGeneration;const rows=await cloud.members();if(generation!==accountGeneration)return;members=rows;$('member-list').innerHTML=members.map(m=>`<div class="admin-member"><span>${esc(m.name)} ／ ${{admin:'管理者',editor:'編集担当',viewer:'会員'}[m.role]}${m.active?'':'（停止中）'}</span>${m.owner?'':`<button type="button" data-member="${esc(m.id)}">編集</button>`}</div>`).join('');$('member-form').elements.role.querySelector('[value="admin"]').disabled=!cloud.state.owner;}
 $('member-list').onclick=e=>{const button=e.target.closest('[data-member]');if(!button)return;const m=members.find(m=>m.id===button.dataset.member),f=$('member-form');f.elements.id.value=m.id;f.elements.name.value=m.name;f.elements.role.value=m.role;f.elements.active.checked=m.active;f.elements.pin.value='';f.scrollIntoView({behavior:'smooth'})};
 $('new-member').onclick=()=>$('member-form').reset();
-$('member-form').onsubmit=async e=>{e.preventDefault();const f=e.target,b=f.querySelector('button');b.disabled=true;try{await cloud.memberSave({id:f.elements.id.value,name:f.elements.name.value.trim(),role:f.elements.role.value,active:f.elements.active.checked,pin:f.elements.pin.value});f.reset();$('member-result').textContent='会員情報を保存しました。';await refreshMembers()}catch(error){$('member-result').textContent=error.message}finally{b.disabled=false}};
-$('migrate-local').onclick=async()=>{const b=$('migrate-local');b.disabled=true;try{if(!confirm('この端末の予定・記録・出欠を共通保存へ追加しますか？'))return;const response=await fetch('./history-data.json?v=20261120-values1');if(!response.ok)throw Error('原記録を読み込めません。');const history=await response.json(),events=JSON.parse(localStorage.getItem('yuitei.events.v1')||'[]'),rehearsals=JSON.parse(localStorage.getItem('yuitei.rehearsals.v1')||'{"items":[],"attendance":{}}');await cloud.importLocal({documents:{events,rehearsals:rehearsals.items,history:[...history.records,...readRecords()]},attendance:rehearsals.attendance});$('migrate-result').textContent='共通保存へ追加しました。別のスマホでも確認してください。';await refresh()}catch(e){$('migrate-result').textContent=e.message}finally{b.disabled=false}};
+$('member-form').onsubmit=async e=>{e.preventDefault();const f=e.target,b=f.querySelector('button');b.disabled=true;try{await cloud.memberSave({id:f.elements.id.value,name:f.elements.name.value.trim(),role:f.elements.role.value,active:f.elements.active.checked,pin:f.elements.pin.value});f.reset();$('member-result').textContent='会員情報を保存しました。';await refreshAfterSave(refreshMembers,$('member-result'))}catch(error){$('member-result').textContent=error.message}finally{b.disabled=false}};
+$('migrate-local').onclick=async()=>{const b=$('migrate-local');b.disabled=true;try{if(!confirm('この端末の予定・記録・出欠を共通保存へ追加しますか？'))return;const response=await fetch('./history-data.json?v=20261120-audit1');if(!response.ok)throw Error('原記録を読み込めません。');const history=await response.json(),events=JSON.parse(localStorage.getItem('yuitei.events.v1')||'[]'),rehearsals=JSON.parse(localStorage.getItem('yuitei.rehearsals.v1')||'{"items":[],"attendance":{}}');await cloud.importLocal({documents:{events,rehearsals:rehearsals.items,history:[...new Map([...history.records,...readRecords()].map(record=>[record.id,record])).values()]},attendance:rehearsals.attendance});$('migrate-result').textContent='共通保存へ追加しました。別のスマホでも確認してください。';await refreshAfterSave(refresh,$('migrate-result'))}catch(e){$('migrate-result').textContent=e.message}finally{b.disabled=false}};
 $('pin-form').onsubmit=async e=>{e.preventDefault();try{await cloud.changePin(e.target.elements.pin.value);e.target.reset();e.target.querySelector('p').textContent='変更しました。新しい暗証番号でログインしてください。'}catch(error){e.target.querySelector('p').textContent=error.message}};
 $('data-open').onclick=()=>$('data-dialog').showModal();$('data-close').onclick=()=>$('data-dialog').close();
 cloud.onState(s=>{accountGeneration++;docs={};past=[];members=[];$('past-items').replaceChildren();$('member-list').replaceChildren();$('member-form').reset();$('pin-form').reset();if($('data-dialog').open)$('data-dialog').close();const ready=s.configured&&s.provider==='apps-script';$('admin-tools').hidden=s.ready===false||s.configured&&(!ready||s.role!=='admin');$('member-tools').hidden=!ready||s.role!=='admin';$('pin-form').querySelector('button').disabled=!ready||!s.user;if(s.ready===false)return;if(!s.configured){status.textContent='現在は端末内保存です。下で選んだ予定を、この端末の記録へ移せます。共通保存と会員・管理者の認証はまだ設定されていません。';refresh().catch(e=>status.textContent=e.message)}else if(!ready)status.textContent='この接続では管理者機能を利用できません。';else if(!s.user)status.textContent='登録名と暗証番号でログインしてください。';else if(s.role!=='admin')status.textContent='会員としてログインしています。管理者の操作は利用できません。';else{status.textContent=s.stageName+'：管理者としてログイン中';Promise.all([refresh(),refreshMembers()]).catch(e=>status.textContent=e.message)}});mountAccount();startCloud();
