@@ -141,16 +141,17 @@ export function createPinClient(endpoint,state,emit){
   if(!entry.hasValue||entry.error||now-entry.updatedAt>=freshFor)load(entry);
   return()=>{entry.subscribers.delete(subscriber);if(!entry.subscribers.size)stopTimer(entry)};
  }
- function refresh(action){
-  for(const key of views.keys())if(!action||JSON.parse(key)[0]===action)views.delete(key);
+ function refresh(action,name){
+  for(const key of views.keys()){const [type,args]=JSON.parse(key);if((!action||type===action)&&(!name||args.name===name))views.delete(key)}
   flushViews();
-  for(const entry of streams.values())if(!action||entry.action===action){
+  for(const entry of streams.values())if((!action||entry.action===action)&&(!name||entry.args.name===name)){
    entry.version++;entry.updatedAt=0;
    if(entry.inFlight)entry.again=true;else load(entry);
   }
  }
  function confirmed(action,args,value){
   const key=streamKey(action,args),entry=streams.get(key);
+  if(action==='read'&&(entry?.value?.revision??views.get(key)?.value?.revision)>value.revision)return;
   const time=action==='read'?Date.now():entry.updatedAt;
   if(state.user)saveView(key,value,time);
   if(!entry)return;
@@ -182,7 +183,16 @@ export function createPinClient(endpoint,state,emit){
   async readShared(name){return (await call('read',{name})).doc},
   async readAttendance(id){return (await call('attendanceRead',{id})).rows},
   watch(name,fn,onError){return watch('read',{name},fn,onError)},watchAttendance(id,fn,onError){return watch('attendanceRead',{id},fn,onError)},
-  async save(name,payload,revision){const result=await call('save',{name,items:payload.items,revision});confirmed('read',{name},{items:payload.items,revision:result.revision});return result.revision},
+  async save(name,payload,revision){
+   try{
+    const result=await call('save',{name,items:payload.items,revision});
+    confirmed('read',{name},{items:payload.items,revision:result.revision});
+    return result.revision;
+   }catch(error){
+    if(/ほかの端末で更新/.test(error.message))refresh('read',name);
+    throw error;
+   }
+  },
   async respondAttendance(id,status){
    if(attendanceWrites.has(id))throw Error('出欠を保存しています。しばらくお待ちください。');
    const version=epoch;

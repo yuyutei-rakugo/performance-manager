@@ -47,6 +47,15 @@ function respond(action,data){const i=requests.findIndex(r=>r.body.action===acti
  stopAttendance();stopDuplicate();
  const failure=client.respondAttendance('p1','欠席');const r=requests.find(r=>r.body.action==='attendanceSave');requests.splice(requests.indexOf(r),1);r.resolve({ok:false,error:'通信失敗'});await assert.rejects(failure,/通信失敗/);assert.equal(rows.at(-1)[0].status,'出席','failed write must not publish selected answer');
  const docSave=client.save('rehearsals',{items:[{id:'updated'}]},1);respond('save',{revision:2});assert.equal(await docSave,2);assert.equal(c.at(-1).revision,2);assert.equal(c.at(-1).items[0].id,'updated');
+ const delayed=client.save('rehearsals',{items:[{id:'superseded'}]},2);
+ timers[1]();respond('read',{doc:{items:[{id:'newer'}],revision:4}});await tick();
+ respond('save',{revision:3});assert.equal(await delayed,3);
+ assert.equal(c.at(-1).items[0].id,'newer');
+ const conflict=client.save('rehearsals',{items:[]},3);
+ respond('save',{ok:false,error:'ほかの端末で更新されています。再読み込みしてください。'});
+ await assert.rejects(conflict,/更新されています/);
+ respond('read',{doc:{items:[{id:'conflict-current'}],revision:5}});await tick();
+ assert.equal(c.at(-1).items[0].id,'conflict-current');
  const retry=client.start();respond('session',{ok:false,error:'一時接続エラー'});await assert.rejects(retry,/一時接続エラー/);assert.equal(persistent.get('yuitei.session'),'test-session','temporary failures preserve session');
  let oldDelivered=0;timers[1]();client.watch('rehearsals',()=>oldDelivered++);await tick();const logout=client.logout();assert.equal(state.user,null,'logout clears UI without waiting for network');respond('logout',{});await logout;const count=oldDelivered;respond('read',{doc:{items:[{id:'old-user'}],revision:3}});await tick();assert.equal(oldDelivered,count,'pending response cannot escape logout');assert.equal(storage.has('yuitei.session'),false);
  assert.equal(persistent.has('yuitei.session'),false);

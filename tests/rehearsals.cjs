@@ -32,6 +32,11 @@ async function response(t,name,status){const select=$(t,`[data-person="${name}"]
  $(t,'[data-detail]').click();$(t,'#edit-rehearsal-inside').click();$(t,'#delete-rehearsal').onclick();assert.equal(JSON.parse(t.w.localStorage.getItem('yuitei.rehearsals.v1')).items.length,2);$(t,'#delete-confirm').checked=true;$(t,'#delete-confirm').onchange({target:$(t,'#delete-confirm')});t.confirm(false);await $(t,'#delete-rehearsal').onclick();assert.equal(JSON.parse(t.w.localStorage.getItem('yuitei.rehearsals.v1')).items.length,2);t.confirm(true);await $(t,'#delete-rehearsal').onclick();assert.equal(JSON.parse(t.w.localStorage.getItem('yuitei.rehearsals.v1')).items.length,1);
  $(t,'#backup').click();const contents=await new Promise(resolve=>{const r=new t.w.FileReader();r.onload=()=>resolve(r.result);r.readAsText(t.blob())});const data=JSON.parse(contents);assert.equal(data.type,'yuyutei-rehearsals');assert.equal(data.items.length,1);
  const fresh=await boot();Object.defineProperty($(fresh,'#restore'),'files',{configurable:true,value:[{text:async()=>contents}]});await $(fresh,'#restore').onchange({target:$(fresh,'#restore')});assert.equal(JSON.parse(fresh.w.localStorage.getItem('yuitei.rehearsals.v1')).items.length,1);
+ const cancelled=await boot();cancelled.confirm(false);
+ const staged={...JSON.parse(contents),records:[{id:'staged',date:'2026-12-02',kind:'通常稽古',occasion:'中止',note:'',pieces:{}}],categories:['取り込み専用']};
+ Object.defineProperty($(cancelled,'#restore'),'files',{configurable:true,value:[{text:async()=>JSON.stringify(staged)}]});
+ await $(cancelled,'#restore').onchange({target:$(cancelled,'#restore')});
+ for(const key of ['yuitei.history.v1','yuitei.categories.v1','yuitei.rehearsals.v1'])assert.equal(cancelled.w.localStorage.getItem(key),null);
  const malformed=await boot('{bad');await create(malformed);assert.equal(malformed.w.localStorage.getItem('yuitei.rehearsals.v1'),'{bad');
  const viewer=await boot(undefined,{configured:true,role:'viewer',stageName:'勇水'});viewer.snapshot({items:data.items,revision:1});assert($(viewer,'#add').disabled);$(viewer,'[data-detail]').click();
  assert.match($(viewer,'#attendance').textContent,/読み込んでいます/);
