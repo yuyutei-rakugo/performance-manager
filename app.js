@@ -1,10 +1,10 @@
-import {performerPicker,updatePerformerPickers,readPerformer,showPerformerRoster} from './performer-picker.js?v=20261120-values1';
-import {mountMemberHome} from './member-home.js?v=20261120-values1';
-import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261120-values1';
-import {readCategories,saveCategories,validCategories,categoryOptions,mountCategories} from './categories.js?v=20261120-values1';
-import {mountScheduleImport} from './schedule-import.js?v=20261120-values1';
-import {validPerformer,timeline,toRecord,transferRecord,readRecords,mergeRecords,validRecord} from './record-transfer.js?v=20261120-values1';
-import {cloud,startCloud,mountAccount} from './cloud.js?v=20261120-values1';
+import {performerPicker,updatePerformerPickers,readPerformer,showPerformerRoster} from './performer-picker.js?v=20261120-audit1';
+import {mountMemberHome} from './member-home.js?v=20261120-audit1';
+import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261120-audit1';
+import {readCategories,saveCategories,validCategories,categoryOptions,mountCategories} from './categories.js?v=20261120-audit1';
+import {mountScheduleImport} from './schedule-import.js?v=20261120-audit1';
+import {validPerformer,timeline,toRecord,transferRecord,readRecords,mergeRecords,mergedRecords} from './record-transfer.js?v=20261120-audit1';
+import {cloud,startCloud,mountAccount} from './cloud.js?v=20261120-audit1';
 'use strict';
 
 const key = 'yuitei.events.v1';
@@ -199,8 +199,9 @@ async function deleteEvent(id) {
   if (!editable()) { notify('編集できる会員でログインしてください。'); return; }
   const event = events.find(item => item.id === id);
   if (!event) return;
-  if (confirm('「' + event.title + '」を削除しますか？') && await save(events.filter(item => item.id !== id))) {
-    if (eventDialog.open) eventDialog.close();
+  const dialogContent=eventDialog.firstElementChild;
+  if (confirm('「' + event.title + '」を削除しますか？既に転記した記録は残ります。') && await save(events.filter(item => item.id !== id))) {
+    if(eventDialog.open&&eventDialog.firstElementChild===dialogContent)eventDialog.close();
     notify('公演を削除しました。');
   }
 }
@@ -326,15 +327,22 @@ function renderForm(existing) {
       return;
     }
     const updated = existing ? events.map(item => item.id === next.id ? next : item) : [...events,next];
-    if (!await save(updated,formRevision)) {
-      feedback.textContent = '公演を保存できませんでした。';
-      feedback.hidden = false;
+    const activeForm=submit.currentTarget;
+    activeForm.inert=true;
+    let saved;
+    try{saved=await save(updated,formRevision)}
+    finally{activeForm.inert=false}
+    if(!activeForm.isConnected||!eventDialog.open){
+      if(saved)notify('公演を保存しました。');
       return;
     }
-    if (tab === 'calendar') {
-      selected = next.date;
-      month = next.date.slice(0,7);
-      render();
+    if(!saved){
+      feedback.textContent='公演を保存できませんでした。';
+      feedback.hidden=false;
+      return;
+    }
+    if(tab==='calendar'){
+      selected=next.date;month=next.date.slice(0,7);render();
     }
     renderDetails(next.id);
   };
@@ -363,7 +371,7 @@ $('schedule').onclick = async click => {
   }
 };
 $('list-tab').onclick = () => {tab = 'list'; render();};
-$('calendar-tab').onclick = () => {location.href = 'rehearsals.html?v=20261120-values1';};
+$('calendar-tab').onclick = () => {location.href = 'rehearsals.html?v=20261120-audit1';};
 $('new-event').onclick = () => renderForm();
 $('data-open').onclick = () => $('data-dialog').showModal();
 document.addEventListener('click', click => {
@@ -392,7 +400,7 @@ $('import-submit').onclick = async () => {
     try{
       data=JSON.parse(await file.text());
       if(data?.version!==1||!Array.isArray(data.events)||!data.events.every(validEvent)||new Set(data.events.map(event=>event.id)).size!==data.events.length)throw Error('Invalid import');
-      if(data.records!==undefined&&(!Array.isArray(data.records)||!data.records.every(validRecord)))throw Error('Invalid records');
+      if(data.records!==undefined)mergedRecords(data.records);
       if(data.categories!==undefined&&!validCategories(data.categories))throw Error('Invalid categories');
     }catch{
       feedback.textContent='取り込めませんでした。JSONの形式と必須項目を確認してください。';
