@@ -13,7 +13,7 @@ const docs = {
   }]}
 };
 const attendance=new Map();
-let pending;
+let pending,delayedHistory;
 const hold = collection => {
   let release, started;
   const response = new Promise(resolve => {release=resolve});
@@ -37,7 +37,9 @@ async function main(){
         const ok=payload=>answer({ok:true,...payload});
         switch(request.action){
           case 'session':return ok({member:{id:role,name:'試験会員',role,active:true}});
-          case 'read':return ok({doc:docs[request.name]});
+          case 'read':
+            if(request.name==='history'&&delayedHistory)await delayedHistory;
+            return ok({doc:docs[request.name]});
           case 'roster':return ok({members:['試験会員','別の会員'].map(name=>({name}))});
           case 'attendanceRead':return ok({rows:attendance.get(request.id)||[]});
           case 'attendanceSave':{
@@ -104,6 +106,14 @@ async function main(){
     await rehearsal.locator('[name=notes]').fill('\n連絡事項');
     await rehearsal.locator('button.primary').click();
     await page.locator('[data-detail]').click();
+    const savedRehearsal=JSON.stringify(docs.rehearsals);
+    await page.locator('#edit-rehearsal-inside').click();
+    await rehearsal.locator('[name=venue]').fill('保存しない会場');
+    await rehearsal.getByRole('button',{name:'キャンセル'}).click();
+    await page.locator('#rehearsal-dialog #attendance').waitFor();
+    assert.equal(await page.locator('#rehearsal-form').count(),0);
+    assert(!await page.locator('#rehearsal-dialog').getByText('保存しない会場').count());
+    assert.equal(JSON.stringify(docs.rehearsals),savedRehearsal);
     await page.locator('#add-practice').click();
     const practice=page.locator('.practice-row');
     await practice.locator('[name=stageName]').selectOption('guest');
@@ -120,7 +130,14 @@ async function main(){
     assert.equal(docs.rehearsals.items[0].practices[0].durationSeconds,45);
 
     await page.evaluate(()=>localStorage.setItem('yuitei.history.v1','{broken'));
+    let releaseRead;
+    delayedHistory=new Promise(resolve=>{releaseRead=resolve});
     await page.goto(new URL('history.html',base).href);
+    await page.locator('#history-edit-status').getByText('共通の記録を読み込んでいます…').waitFor();
+    assert(await page.locator('#history-add').isDisabled());
+    delayedHistory=null;
+    releaseRead();
+
     await page.locator('[data-record-edit=history-old]').click();
     const history=page.locator('.record-dialog[open] form');
     const note='\n全角「日本語」\n'+ '長い注記 '.repeat(80);

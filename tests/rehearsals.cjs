@@ -28,6 +28,17 @@ async function response(t,name,status){const select=$(t,`[data-person="${name}"]
  await response(t,'勇水','出席');assert.equal($(t,'[data-person=日光]'),null);const picker=$(t,'#attendance-person');picker.value='日光';await $(t,'#attendance').onchange({target:picker});await response(t,'日光','出席');assert.match($(t,'#attendance').textContent,/出席 2人/);assert.match($(t,'#attendance').textContent,/勇水・日光/);
  t.emit({configured:false});assert.equal(t.w.document.querySelectorAll('.rehearsal-card').length,2,'local data survives connection state refresh');
  const saved=t.w.localStorage.getItem('yuitei.rehearsals.v1');const reloaded=await boot(saved);$(reloaded,'[data-detail]').click();assert.equal($(reloaded,'[data-person="勇水"]').value,'出席');
+ $(t,'#edit-rehearsal-inside').click();
+ $(t,'[name=venue]').value='未保存の会場';
+ $(t,'[data-cancel-edit]').click();
+ assert($(t,'#rehearsal-dialog').open);
+ assert($(t,'#attendance'));
+ assert(!$(t,'#rehearsal-dialog').textContent.includes('未保存の会場'));
+ assert.equal(t.w.localStorage.getItem('yuitei.rehearsals.v1'),saved);
+ $(t,'#add').click();
+ $(t,'[data-cancel-edit]').click();
+ assert(!$(t,'#rehearsal-dialog').open,'new form cancellation still closes');
+ $(t,'[data-detail]').click();
  $(t,'[data-close]').click();$(t,'[data-detail]').click();$(t,'#edit-rehearsal-inside').click();assert($(t,'#delete-rehearsal').disabled);$(t,'[name="venue"]').value='交流センター';await $(t,'#rehearsal-form').onsubmit({preventDefault(){},target:$(t,'#rehearsal-form')});assert.match($(t,'#rehearsals').textContent,/交流センター/);
  $(t,'[data-detail]').click();$(t,'#edit-rehearsal-inside').click();$(t,'#delete-rehearsal').onclick();assert.equal(JSON.parse(t.w.localStorage.getItem('yuitei.rehearsals.v1')).items.length,2);$(t,'#delete-confirm').checked=true;$(t,'#delete-confirm').onchange({target:$(t,'#delete-confirm')});t.confirm(false);await $(t,'#delete-rehearsal').onclick();assert.equal(JSON.parse(t.w.localStorage.getItem('yuitei.rehearsals.v1')).items.length,2);t.confirm(true);await $(t,'#delete-rehearsal').onclick();assert.equal(JSON.parse(t.w.localStorage.getItem('yuitei.rehearsals.v1')).items.length,1);
  $(t,'#backup').click();const contents=await new Promise(resolve=>{const r=new t.w.FileReader();r.onload=()=>resolve(r.result);r.readAsText(t.blob())});const data=JSON.parse(contents);assert.equal(data.type,'yuyutei-rehearsals');assert.equal(data.items.length,1);

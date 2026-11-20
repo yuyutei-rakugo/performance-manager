@@ -1,29 +1,43 @@
-import {categoryOptions} from './categories.js?v=20261120-audit1';
-import {readRecords,writeRecords} from './record-transfer.js?v=20261120-audit1';
-import {cloud} from './cloud.js?v=20261120-audit1';
+import {categoryOptions} from './categories.js?v=20261120-status1';
+import {readRecords,writeRecords} from './record-transfer.js?v=20261120-status1';
+import {cloud} from './cloud.js?v=20261120-status1';
 export function historyEditor(getData,refresh){
- const section=document.createElement('section');section.className='record-edit-panel';section.innerHTML='<button id="history-add" class="primary" type="button" disabled>＋ 稽古・公演記録を追加</button><p id="history-edit-status">共通保存の設定後、許可された会員が記録を追加・修正できます。</p>';
+ const section=document.createElement('section');section.className='record-edit-panel';section.innerHTML='<button id="history-add" class="primary" type="button" disabled>＋ 稽古・公演記録を追加</button><p id="history-edit-status" role="status">共通保存の接続を確認しています…</p>';
  (document.getElementById('history-tools')||document.querySelector('main')).append(section);
- const syncWarning=document.createElement('p');
- syncWarning.className='sync-warning';syncWarning.setAttribute('role','status');syncWarning.hidden=true;
- section.before(syncWarning);
  const dialog=document.createElement('dialog');dialog.className='record-dialog';document.body.append(dialog);
  const original=structuredClone(getData().records);
  let revision=0,loaded=false,stop,identity='',busy=false;
- let localReady=true;try{readRecords()}catch{localReady=false}const publicIds=new Set(getData().publicIds||[]);const allowed=()=>cloud.state.configured?loaded&&['editor','admin'].includes(cloud.state.role):localReady;
+ let localReady=true;try{readRecords()}catch{localReady=false}const publicIds=new Set(getData().publicIds||[]);const allowed=()=>cloud.state.ready!==false&&!cloud.state.connectionIssue&&(cloud.state.configured?loaded&&['editor','admin'].includes(cloud.state.role):localReady);
  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const feedback=message=>section.querySelector('p').textContent=message;
  function controls(){section.querySelector('button').disabled=!allowed();document.querySelectorAll('[data-record-edit]').forEach(el=>el.hidden=!allowed()||(!cloud.state.configured&&publicIds.has(el.dataset.recordEdit)))}
  cloud.onState(s=>{
-  section.hidden=s.configured&&!['admin','editor'].includes(s.role);
-  const next=`${s.configured?'shared':'local'}:${s.user?.uid||''}:${s.role||''}`;if(next===identity)return;identity=next;stop?.();loaded=false;syncWarning.hidden=true;dialog.close();getData().records=structuredClone(original);refresh();controls();if(!s.configured)feedback(localReady?'転記した記録はこのブラウザに保存します。転記後の内容も修正できます。':'端末内の記録を読み込めないため、端末内の編集を停止しています。');
-  if(s.configured&&!s.role)feedback('会員ログイン後、権限に応じて記録を追加・修正できます。');
-  if(s.configured&&s.role)stop=cloud.watch('history',doc=>{
-   if(doc&&(!Array.isArray(doc.items)||!doc.items.every(valid))){feedback('共通記録の形式を確認してください。');return}
-   revision=doc?.revision||0;loaded=true;syncWarning.hidden=true;
+  const canEditRole=['admin','editor'].includes(s.role);
+  section.querySelector('button').hidden=s.ready!==false&&s.configured&&!canEditRole;
+  const next=JSON.stringify([s.ready!==false,s.connectionIssue,s.configured,s.user?.uid,s.role]);
+  if(next===identity)return;
+  identity=next;stop?.();loaded=false;
+  dialog.close();getData().records=structuredClone(original);refresh();controls();
+  if(s.ready===false){feedback('共通保存の接続を確認しています…');return}
+  if(s.connectionIssue){feedback(s.message);return}
+  if(!s.configured){
+   feedback(localReady?'共通保存は設定されていません。追加・修正した記録はこの端末に保存します。':'端末内の記録を読み込めないため、端末内の編集を停止しています。');
+   return;
+  }
+  if(!s.role){feedback(s.user?'このアカウントには記録の編集権限がありません。':'記録を編集するには会員ログインが必要です。');return}
+  feedback('共通の記録を読み込んでいます…');
+  let received=false;
+  function readFailure(message){
+   loaded=false;
+   feedback(received?'共通記録を更新できませんでした。前回取得した記録を表示しています。':message);
+   controls();
+  }
+  stop=cloud.watch('history',doc=>{
+   if(doc&&(!Array.isArray(doc.items)||!doc.items.every(valid))){readFailure('共通記録の形式を確認してください。');return}
+   revision=doc?.revision||0;loaded=true;received=true;
    getData().records=doc?doc.items:structuredClone(original);refresh();
-   feedback(s.role==='viewer'?'閲覧のみの会員です。':'記録を追加・修正できます。保存すると会員の端末に反映されます。');controls();
-  },message=>{syncWarning.textContent=loaded||!syncWarning.hidden?'共通記録を更新できませんでした。前回の表示を残しています。':message;syncWarning.hidden=false;loaded=false;feedback(message);controls()});
+   feedback(canEditRole?'記録を追加・修正できます。保存すると会員の端末に反映されます。':'記録は閲覧のみです。編集権限がありません。');controls();
+  },message=>readFailure('共通記録を読み込めませんでした。'+message));
  });
  function valid(r){return r&&typeof r.id==='string'&&typeof r.date==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(r.date)&&typeof r.kind==='string'&&typeof r.occasion==='string'&&typeof r.note==='string'&&r.pieces&&typeof r.pieces==='object'&&Object.values(r.pieces).every(v=>typeof v==='string')}
  async function persist(items,expected,form){if(busy)return false;busy=true;const controlsToLock=[...form.querySelectorAll('input,select,textarea,button:not([data-cancel])')];controlsToLock.forEach(control=>control.disabled=true);try{if(cloud.state.configured){const savedRevision=await cloud.save('history',{items},expected);if(revision>savedRevision)return true}else writeRecords(items.filter(r=>!publicIds.has(r.id)));getData().records=items;refresh();controls();return true}catch(e){feedback(e.message);if(form.isConnected&&dialog.open)form.querySelector('[role=alert]').textContent=e.message;return false}finally{controlsToLock.forEach(control=>control.disabled=false);busy=false}}
