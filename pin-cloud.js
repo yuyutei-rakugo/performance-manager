@@ -77,7 +77,7 @@ export function createPinClient(endpoint,state,emit){
   try{sessionStorage.setItem(identityKey,JSON.stringify({token,endpoint,member,checkedAt:Date.now()}))}catch{}
  }
  function clear(){try{sessionStorage.removeItem(identityKey);sessionStorage.removeItem(viewKey)}catch{}views.clear();epoch++;rosterCache=null;rosterRequest=null;for(const entry of streams.values()){stopTimer(entry);entry.closed=true}streams.clear();pending.clear();attendanceWrites.clear()}
- function identity(member){state.user=member?{uid:member.id,email:member.name}:null;state.stageName=member?.name||null;state.role=member?.role||null;state.owner=!!member?.owner;state.ready=true;state.message=member?'共通保存：'+member.name+'（'+({admin:'管理者',editor:'編集可',viewer:'会員'}[member.role])+'）':'登録名と4桁の暗証番号でログインしてください。';emit()}
+ function identity(member){state.connectionIssue=null;state.user=member?{uid:member.id,email:member.name}:null;state.stageName=member?.name||null;state.role=member?.role||null;state.owner=!!member?.owner;state.ready=true;state.message=member?'共通保存：'+member.name+'（'+({admin:'管理者',editor:'編集可',viewer:'会員'}[member.role])+'）':'登録名と4桁の暗証番号でログインしてください。';emit()}
  function signOut(){
   if(readStorage(localStorage)===token)removeStorage(localStorage);
   if(readStorage(sessionStorage)===token)removeStorage(sessionStorage);

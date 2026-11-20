@@ -1,10 +1,10 @@
-import {performerPicker,updatePerformerPickers,readPerformer,showPerformerRoster} from './performer-picker.js?v=20261120-audit1';
-import {mountMemberHome} from './member-home.js?v=20261120-audit1';
-import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261120-audit1';
-import {readCategories,saveCategories,validCategories,categoryOptions,mountCategories} from './categories.js?v=20261120-audit1';
-import {mountScheduleImport} from './schedule-import.js?v=20261120-audit1';
-import {validPerformer,timeline,toRecord,transferRecord,readRecords,mergeRecords,mergedRecords} from './record-transfer.js?v=20261120-audit1';
-import {cloud,startCloud,mountAccount} from './cloud.js?v=20261120-audit1';
+import {performerPicker,updatePerformerPickers,readPerformer,showPerformerRoster} from './performer-picker.js?v=20261120-status1';
+import {mountMemberHome} from './member-home.js?v=20261120-status1';
+import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261120-status1';
+import {readCategories,saveCategories,validCategories,categoryOptions,mountCategories} from './categories.js?v=20261120-status1';
+import {mountScheduleImport} from './schedule-import.js?v=20261120-status1';
+import {validPerformer,timeline,toRecord,transferRecord,readRecords,mergeRecords,mergedRecords} from './record-transfer.js?v=20261120-status1';
+import {cloud,startCloud,mountAccount} from './cloud.js?v=20261120-status1';
 'use strict';
 
 const key = 'yuitei.events.v1';
@@ -371,7 +371,7 @@ $('schedule').onclick = async click => {
   }
 };
 $('list-tab').onclick = () => {tab = 'list'; render();};
-$('calendar-tab').onclick = () => {location.href = 'rehearsals.html?v=20261120-audit1';};
+$('calendar-tab').onclick = () => {location.href = 'rehearsals.html?v=20261120-status1';};
 $('new-event').onclick = () => renderForm();
 $('data-open').onclick = () => $('data-dialog').showModal();
 document.addEventListener('click', click => {
