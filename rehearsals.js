@@ -1,11 +1,11 @@
-import {performerPicker,updatePerformerPickers,readPerformer,showPerformerRoster} from './performer-picker.js?v=20261120-performers1';
-import {mountMemberHome} from './member-home.js?v=20261120-performers1';
-import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261120-performers1';
-import {readCategories,saveCategories} from './categories.js?v=20261120-performers1';
-import {mountScheduleImport} from './schedule-import.js?v=20261120-performers1';
-import {toRecord,transferRecord,rehearsalTitle,readRecords,mergeRecords,validRecord} from './record-transfer.js?v=20261120-performers1';
-import {cloud,startCloud,mountAccount} from './cloud.js?v=20261120-performers1';
-import {statuses,rehearsalNames,validRehearsal,validAttendance,attendanceSummary} from './rehearsal-model.js?v=20261120-performers1';
+import {performerPicker,updatePerformerPickers,readPerformer,showPerformerRoster} from './performer-picker.js?v=20261120-values1';
+import {mountMemberHome} from './member-home.js?v=20261120-values1';
+import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261120-values1';
+import {readCategories,saveCategories,validCategories} from './categories.js?v=20261120-values1';
+import {mountScheduleImport} from './schedule-import.js?v=20261120-values1';
+import {toRecord,transferRecord,rehearsalTitle,readRecords,mergeRecords,validRecord} from './record-transfer.js?v=20261120-values1';
+import {cloud,startCloud,mountAccount} from './cloud.js?v=20261120-values1';
+import {statuses,rehearsalNames,validRehearsal,validAttendance,attendanceSummary} from './rehearsal-model.js?v=20261120-values1';
 const $=id=>document.getElementById(id),esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const key='yuitei.rehearsals.v1';let items=[],attendance={},names=[],revision=0,loaded=false,storageOK=true,stop,stopAttendance,opened=null,detailRevision=0,busy=false;
 let noticeTimer;
@@ -19,7 +19,26 @@ function openRequestedDetail(){if(!requestedDetail||cloud.state.configured&&!loa
 try{await applyConfirmedSchedule()}catch(e){notify(e.message||'予定の自動追加に失敗しました。再読み込みしてください。')}
 try{const raw=JSON.parse(localStorage.getItem(key)||'{"items":[],"attendance":{}}');if(!Array.isArray(raw.items)||!raw.items.every(validRehearsal)||!raw.attendance||!Object.values(raw.attendance).every(validAttendance))throw Error();items=raw.items;attendance=raw.attendance}catch{storageOK=false;notify('保存済みの稽古予定を読み込めません。上書きを停止しています。')}
 let localItems=structuredClone(items),localAttendance=structuredClone(attendance);
-async function save(next,expected=revision,nextAttendance=attendance){if(busy)return false;if(!canEdit()){notify('編集権限が必要です。');return false}busy=true;try{if(cloud.state.configured)await cloud.save('rehearsals',{items:next},expected);else{if(!storageOK)throw Error('保存済みデータを確認してください。');localStorage.setItem(key,JSON.stringify({items:next,attendance:nextAttendance}))}items=next;attendance=nextAttendance;if(!cloud.state.configured){localItems=structuredClone(items);localAttendance=structuredClone(attendance);window.dispatchEvent(new Event('schedule-data-changed'))}render();return true}catch(e){notify(e.message||'保存できませんでした。');return false}finally{busy=false}}
+async function save(next,expected=revision,nextAttendance=attendance){
+ if(busy)return false;
+ if(!canEdit()){notify('編集権限が必要です。');return false}
+ busy=true;
+ try{
+  if(cloud.state.configured){
+   const savedRevision=await cloud.save('rehearsals',{items:next},expected);
+   if(!(revision>savedRevision))items=next;
+  }else{
+   if(!storageOK)throw Error('保存済みデータを確認してください。');
+   localStorage.setItem(key,JSON.stringify({items:next,attendance:nextAttendance}));
+   items=next;attendance=nextAttendance;
+   localItems=structuredClone(items);localAttendance=structuredClone(attendance);
+   window.dispatchEvent(new Event('schedule-data-changed'));
+  }
+  render();return true;
+ }catch(error){notify(error.message||'保存できませんでした。');return false}
+ finally{busy=false}
+}
+
 function render(){
  const upcoming=items.filter(r=>!r.archivedAt&&r.date>=new Date().toLocaleDateString('sv-SE'));if($('stats'))$('stats').innerHTML=[['予定の稽古',upcoming.length],['師匠稽古',upcoming.filter(r=>r.title==='師匠稽古').length],['自主稽古',upcoming.filter(r=>r.title==='自主稽古').length]].map(([label,count])=>`<div class="stat"><span class="stat-icon">▦</span><div><small>${label}</small><strong>${count}</strong><span class="unit">件</span></div></div>`).join('');
  $('add').disabled=!canEdit();$('mode').textContent=cloud.state.configured?(cloud.state.role?'予定ごとに「出欠・詳細」から回答・一覧を確認できます。':'出欠は会員ログイン後に回答できます。'):'現在はこのブラウザに保存します。自分の名前を選んで出欠を入力します。本人認証・端末間の同期はまだ有効ではありません。';
@@ -133,7 +152,27 @@ function validAttendanceMaps(value){return value&&typeof value==='object'&&Objec
 if($('data-open'))$('data-open').onclick=()=>$('data-dialog').showModal();if($('data-close'))$('data-close').onclick=()=>$('data-dialog').close();
 $('add').onclick=()=>form();$('rehearsals').onclick=e=>{const b=e.target.closest('button');if(b?.dataset.detail)detail(b.dataset.detail);if(b?.dataset.edit)form(items.find(x=>x.id===b.dataset.edit))};dialog.onclick=e=>{if(e.target.closest('[data-close]'))dialog.close()};dialog.onclose=()=>{if(!dialog.open){opened=null;stopAttendance?.()}};
 $('backup').onclick=()=>{try{if(cloud.state.configured&&!loaded){notify('会員ログインと読み込みが必要です。');return}const url=URL.createObjectURL(new Blob([JSON.stringify({version:1,type:'yuyutei-rehearsals',categories:readCategories(),records:readRecords(),items,attendance:cloud.state.configured?{}:attendance},null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='yuyutei-rehearsals.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);if(cloud.state.configured)notify('稽古予定を保存しました。会員の出欠は共通保存先に保持されます。')}catch(e){notify(e.message)}};
-$('restore').onchange=async e=>{const file=e.target.files[0];if(!file)return;try{const data=JSON.parse(await file.text());if(data.type!=='yuyutei-rehearsals'||!Array.isArray(data.items)||!data.items.every(validRehearsal)||new Set(data.items.map(x=>x.id)).size!==data.items.length||!data.attendance||!Object.values(data.attendance).every(validAttendance))throw Error('稽古予定用のJSONを選んでください。');if(data.records!==undefined){if(!Array.isArray(data.records)||!data.records.every(validRecord))throw Error('記録の形式を確認してください。');mergeRecords(data.records)}if(data.categories)saveCategories(data.categories);const map=new Map(items.map(x=>[x.id,x]));data.items.forEach(x=>map.set(x.id,x));if(map.size>500)throw Error('稽古予定は500件までです。');if(confirm('稽古予定を取り込みます。同じIDの予定は更新されます。')&&await save([...map.values()],revision,cloud.state.configured?attendance:{...attendance,...data.attendance}))notify('稽古予定を取り込みました。')}catch(err){notify(err.message)}e.target.value=''};
+$('restore').onchange=async e=>{
+ const input=e.target,file=input.files[0];if(!file)return;
+ input.disabled=true;
+ try{
+  const data=JSON.parse(await file.text());
+  if(data.type!=='yuyutei-rehearsals'||!Array.isArray(data.items)||!data.items.every(validRehearsal)||new Set(data.items.map(x=>x.id)).size!==data.items.length||!validAttendanceMaps(data.attendance))throw Error('稽古予定用のJSONを選んでください。');
+  if(data.records!==undefined&&(!Array.isArray(data.records)||!data.records.every(validRecord)))throw Error('記録の形式を確認してください。');
+  if(data.categories!==undefined&&!validCategories(data.categories))throw Error('区分の形式を確認してください。');
+  const map=new Map(items.map(x=>[x.id,x]));data.items.forEach(x=>map.set(x.id,x));
+  if(map.size>500)throw Error('稽古予定は500件までです。');
+  if(!confirm('稽古予定を取り込みます。同じIDの予定は更新されます。'))return;
+  if(!await save([...map.values()],revision,cloud.state.configured?attendance:{...attendance,...data.attendance}))return;
+  try{
+   if(data.records!==undefined)mergeRecords(data.records);
+   if(data.categories!==undefined)saveCategories(data.categories);
+   notify('稽古予定を取り込みました。'+(cloud.state.configured&&data.records?.length?' 同梱の記録はこの端末に取り込みました。':''));
+  }catch(error){notify('稽古予定は保存しました。記録または区分を取り込めませんでした。'+error.message)}
+ }catch(err){notify(err.message)}
+ finally{input.value='';input.disabled=false}
+};
+
 cloud.onState(s=>{
  const generation=++accountGeneration;
  stop?.();stopAttendance?.();opened=null;loaded=false;responding=false;scheduleError='';dialog.close();
