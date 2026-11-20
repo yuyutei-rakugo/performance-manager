@@ -200,12 +200,13 @@ export function createPinClient(endpoint,state,emit){
     }
    }finally{if(version===epoch)attendanceWrites.delete(id)}
   },
-  async roster(){
+  async roster({force=false}={}){
    const key=streamKey('roster',{});
    const cached=views.get(key);
-   if(cached&&Date.now()-cached.time<freshFor)return structuredClone(cached.value);
-   if(rosterCache&&Date.now()-rosterCache.time<freshFor)return structuredClone(rosterCache.members);
+   if(!force&&cached&&Date.now()-cached.time<freshFor)return structuredClone(cached.value);
+   if(!force&&rosterCache&&Date.now()-rosterCache.time<freshFor)return structuredClone(rosterCache.members);
    if(rosterRequest)return rosterRequest;
+   if(force){rosterCache=null;views.delete(key);flushViews()}
    const version=epoch;
    rosterRequest=call('roster').then(result=>{
     if(version===epoch){rosterCache={time:Date.now(),members:result.members};if(state.user)saveView(key,result.members)}

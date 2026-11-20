@@ -1,4 +1,4 @@
-import {loadCloudConfig} from './schedule-bootstrap.js?v=20261120-fast1';
+import {loadCloudConfig} from './schedule-bootstrap.js?v=20261120-performers1';
 // Configuration is enabled only after the Firebase project and access rules are ready.
 const listeners = new Set();
 const state = {ready:false, configured:false, user:null, role:null,stageName:null, message:'共通保存は設定準備中です。現在はこの端末に保存します。'};
@@ -11,7 +11,7 @@ export const cloud={
  async readAttendance(id){if(!pinClient)throw Error('管理者用の共通接続が必要です。');return pinClient.readAttendance(id)},
  async members(){if(!pinClient)throw Error('会員管理の共通接続が必要です。');return pinClient.members()},
  async memberSave(member){if(!pinClient)throw Error('会員管理の共通接続が必要です。');return pinClient.memberSave(member)},
- async roster(){if(!pinClient)return [];return pinClient.roster()},
+ async roster(options){if(!pinClient)return [];return pinClient.roster(options)},
  async archivePast(data){if(!pinClient)throw Error('管理者用の共通接続が必要です。');return pinClient.archivePast(data)},
  async importLocal(data){if(!pinClient)throw Error('管理者用の共通接続が必要です。');return pinClient.importLocal(data)},
  async changePin(pin){if(!pinClient)throw Error('会員管理の共通接続が必要です。');return pinClient.changePin(pin)},
@@ -48,7 +48,7 @@ export async function startCloud(){
   const config=await loadCloudConfig();
   if(!config.enabled){state.ready=true;emit();return}
   state.configured=true;state.provider=config.provider||'firebase';state.message='ログイン状態を確認しています。';emit();
-  if(config.provider==='apps-script'){if(!/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec$/.test(config.endpoint||''))throw Error();const {createPinClient}=await import('./pin-cloud.js?v=20261120-fast1');pinClient=createPinClient(config.endpoint,state,emit);await pinClient.start();return}
+  if(config.provider==='apps-script'){if(!/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec$/.test(config.endpoint||''))throw Error();const {createPinClient}=await import('./pin-cloud.js?v=20261120-performers1');pinClient=createPinClient(config.endpoint,state,emit);await pinClient.start();return}
   const base='https://www.gstatic.com/firebasejs/12.6.0/';
   const [app,authApi,store]=await Promise.all([import(base+'firebase-app.js'),import(base+'firebase-auth.js'),import(base+'firebase-firestore.js')]);
   api={...authApi,...store};const firebase=app.initializeApp(config.firebase);auth=api.getAuth(firebase);db=api.getFirestore(firebase);
@@ -75,7 +75,7 @@ export function mountAccount(){
  <div class="settings-actions">
   <button type="button" class="secondary" data-install>ホーム画面に追加</button>
   <button type="button" class="secondary" data-share>LINEで共有</button>
-  <a class="secondary" id="settings-admin" href="./admin.html?v=20261120-fast1" hidden>管理者ページ</a>
+  <a class="secondary" id="settings-admin" href="./admin.html?v=20261120-performers1" hidden>管理者ページ</a>
   <button type="button" class="secondary" id="cloud-logout" hidden>ログアウト</button>
  </div>
  <details id="settings-pin" hidden><summary>暗証番号を変更</summary><form><label>新しい暗証番号（数字4桁）<input name="pin" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="new-password" required></label><button type="submit" class="secondary">変更する</button><p role="status"></p></form></details></div>`;

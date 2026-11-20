@@ -19,6 +19,11 @@ function respond(action,data){const i=requests.findIndex(r=>r.body.action===acti
  assert.equal(c.length,1,'the existing view is not redrawn');
  stopFresh();
  const rosterA=client.roster(),rosterB=client.roster();assert.equal(calls.filter(c=>c.action==='roster').length,1);respond('roster',{members:[{name:'勇水'}]});await Promise.all([rosterA,rosterB]);await client.roster();assert.equal(calls.filter(c=>c.action==='roster').length,1);
+ const forcedA=client.roster({force:true}),forcedB=client.roster({force:true});
+ assert.equal(calls.filter(c=>c.action==='roster').length,2,'manual refresh bypasses a partial cached roster');
+ respond('roster',{members:[{name:'勇水'},{name:'新規会員'}]});
+ assert.equal((await forcedA).length,2);assert.equal((await forcedB).length,2);
+ assert.equal((await client.roster()).length,2);
  let rows=[],attendanceErrors=[];
  const stopAttendance=client.watchAttendance('p1',value=>rows.push(value),error=>attendanceErrors.push(error));
  const stopDuplicate=client.watchAttendance('p1',()=>{});

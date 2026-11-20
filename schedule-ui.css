@@ -10,3 +10,14 @@
 @media(max-width:650px){.tabs button,.tabs a{min-height:54px;font-size:1.05rem}.event-card .meta{font-size:.98rem;gap:6px}.event-card .meta span:first-child{font-size:1.08rem}.event-card .date-badge{min-height:70px}.event-card .date-badge strong{font-size:1.8rem}.event-card h3{font-size:1.08rem}}
 
 .tabs a,.tabs button{font-size:1.05rem;line-height:1.4}.tabs{width:100%}@media(max-width:650px){.tabs a,.tabs button{font-size:.95rem;padding:12px 4px;min-height:64px}.event-card .meta{font-size:1.1rem}.event-card .meta span:first-child{font-size:1.2rem}}
+
+@media print{
+ body.print-program>:not(#event-dialog){display:none!important}
+ body.print-program #event-dialog{position:static;display:block;width:100%;max-width:none;max-height:none;border:0;box-shadow:none;margin:0;overflow:visible}
+ body.print-program #event-dialog::backdrop{background:transparent}
+ body.print-program #event-dialog .dialog-body{padding:0}
+ body.print-program #event-dialog button,body.print-program #event-dialog section:not(#event-program){display:none!important}
+ body.print-program .program-scroll{overflow:visible}
+ body.print-program .program-table{width:100%;min-width:0}
+ body.print-program .program-table tr{break-inside:avoid}
+}
