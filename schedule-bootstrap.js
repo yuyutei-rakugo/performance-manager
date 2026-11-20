@@ -1,8 +1,16 @@
+let configRequest;
+export function loadCloudConfig(){
+ if(!configRequest)configRequest=fetch('./cloud-config.json',{cache:'no-store'}).then(response=>{
+  if(!response.ok)throw Error('保存設定を確認できません。');
+  return response.json();
+ }).catch(error=>{configRequest=null;throw error});
+ return configRequest;
+}
 // Apply this confirmed schedule once to both browser-local lists.
 export async function applyConfirmedSchedule(){
  const marker='yuitei.confirmed-schedule.20261119';if(localStorage.getItem(marker))return;
- const config=await fetch('./cloud-config.json');if(!config.ok)throw Error('保存設定を確認できません。');if((await config.json()).enabled)return;
- const response=await fetch('./schedule-photo.json?v=20261119-tabs1');if(!response.ok)throw Error('予定を読み込めません。');const seed=await response.json();
+ if((await loadCloudConfig()).enabled)return;
+ const response=await fetch('./schedule-photo.json?v=20261120-notebook2');if(!response.ok)throw Error('予定を読み込めません。');const seed=await response.json();
  const eventKey='yuitei.events.v1',rehearsalKey='yuitei.rehearsals.v1',oldEvents=localStorage.getItem(eventKey),oldRehearsals=localStorage.getItem(rehearsalKey);
  const events=oldEvents===null?[]:JSON.parse(oldEvents),rehearsals=oldRehearsals===null?{items:[],attendance:{}}:JSON.parse(oldRehearsals);
  if(!Array.isArray(events)||!events.every(e=>e&&typeof e.id==='string'&&typeof e.date==='string')||!Array.isArray(rehearsals.items)||!rehearsals.items.every(r=>r&&typeof r.id==='string'&&typeof r.date==='string')||!rehearsals.attendance||typeof rehearsals.attendance!=='object'||Array.isArray(rehearsals.attendance))throw Error('保存済みの予定を確認してください。自動追加を停止しています。');

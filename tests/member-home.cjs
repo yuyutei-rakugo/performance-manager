@@ -2,15 +2,15 @@ const {JSDOM}=require('jsdom'),fs=require('fs'),assert=require('node:assert/stri
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
 const clean=file=>fs.readFileSync(file,'utf8').replace(/^import .*;\n/gm,'').replace(/export /g,'');
 const practice={id:'next-practice',title:'通常稽古',date:'2099-01-02',time:'14:00',venue:'和室',notes:''};
-async function boot(configured=false,page="rehearsals.html"){
+async function boot(configured=false,page="rehearsals.html",deferAttendance=false){
  const w=new JSDOM('<main><nav class="tabs"></nav></main>',{url:'https://example.test/'+page,runScripts:'outside-only'}).window;w.structuredClone=structuredClone;
  w.fetch=async()=>({json:async()=>({names:['勇水','日光','藤本']})});w.localStorage.setItem('yuitei.attendance.person','勇水');
  w.localStorage.setItem('yuitei.events.v1',JSON.stringify([{id:'earlier-event',date:'2099-01-01',time:'12:00',title:'新春寄席',venue:'大広間'},{id:'past',date:'2000-01-01',title:'終了公演'}]));
  w.localStorage.setItem('yuitei.rehearsals.v1',JSON.stringify({items:[practice,{...practice,id:'archived',date:'2098-01-01',archivedAt:'yes'}],attendance:{[practice.id]:{'日光':'欠席'}}}));
- let listener,fail=false,writes=[],watchers={},answer;
- w.cloud={state:configured?{configured:true,provider:'apps-script',role:'viewer',stageName:'勇水'}:{configured:false},onState(fn){listener=fn;fn(this.state)},async roster(){return [{name:'勇水'},{name:'日光'}]},watch(name,fn){watchers[name]=fn;return ()=>delete watchers[name]},watchAttendance(id,fn){answer=fn;fn([]);return ()=>{}},async respondAttendance(id,status){if(fail)throw Error('通信失敗');writes.push({id,status})}};
+ let listener,fail=false,writes=[],watchers={},answer,answerError;
+ w.cloud={state:configured?{configured:true,provider:'apps-script',role:'viewer',stageName:'勇水'}:{configured:false},onState(fn){listener=fn;fn(this.state)},async roster(){return [{name:'勇水'},{name:'日光'}]},watch(name,fn){watchers[name]=fn;return ()=>delete watchers[name]},watchAttendance(id,fn,onError){answer=fn;answerError=onError;if(!deferAttendance)fn([]);return ()=>{}},async respondAttendance(id,status){if(fail)throw Error('通信失敗');writes.push({id,status})}};
  w.eval(clean('record-transfer.js')+'\n'+clean('rehearsal-model.js')+'\n'+clean('member-home.js')+'\nmountMemberHome();');await tick();
- return {w,q:s=>w.document.querySelector(s),fail(v){fail=v},writes,watchers,answer:rows=>answer(rows),emit(s){w.cloud.state=s;listener(s)}};
+ return {w,q:s=>w.document.querySelector(s),fail(v){fail=v},writes,watchers,answer:rows=>answer(rows),answerError:()=>answerError('通信失敗'),emit(s){w.cloud.state=s;listener(s)}};
 }
 (async()=>{
  const home=await boot(false,'index.html');assert.match(home.q('.member-home').textContent,/新春寄席/);assert(!home.q('[data-quick-status]'));assert(!home.q('.member-home').textContent.includes('通常稽古'));home.w.close();const cloudHome=await boot(true,'index.html');assert.deepEqual(Object.keys(cloudHome.watchers),['events']);cloudHome.w.close();const t=await boot();assert.match(t.q('.member-home').textContent,/通常稽古/);assert(!t.q('.member-home').textContent.includes('新春寄席'));assert(!t.q('.member-home').textContent.includes('終了公演'));
@@ -18,5 +18,15 @@ async function boot(configured=false,page="rehearsals.html"){
  const select=t.q('#quick-person');select.value='日光';select.dispatchEvent(new t.w.Event('change'));assert.equal(t.w.localStorage.getItem('yuitei.attendance.person'),'日光');assert.match(t.q('.quick-attendance').textContent,/自分の回答（日光）.*欠席/);
  t.w.localStorage.setItem('yuitei.rehearsals.v1','{bad');await t.q('[data-quick-status=出席]').onclick();assert.equal(t.w.localStorage.getItem('yuitei.rehearsals.v1'),'{bad');assert.match(t.q('.save-feedback').textContent,/保存できませんでした/);
  const c=await boot(true);assert.deepEqual(Object.keys(c.watchers),['rehearsals']);c.watchers.rehearsals({items:[practice]});assert(!c.q('#quick-person'));assert(!c.q('[data-quick-status=出席]').disabled);await c.q('[data-quick-status=出席]').onclick();assert.deepEqual(c.writes,[{id:practice.id,status:'出席'}]);assert.match(c.q('.save-feedback').textContent,/出席で登録しました/);c.fail(true);await c.q('[data-quick-status=欠席]').onclick();assert.match(c.q('.save-feedback').textContent,/保存できませんでした/);assert.equal(c.q('[data-quick-status=出席]').getAttribute('aria-pressed'),'true');assert(!c.q('[data-quick-status=欠席]').disabled);c.emit({configured:true,provider:'apps-script',role:null});assert(!c.q('[data-quick-status]'));c.w.close();t.w.close();
+ const slow=await boot(true,'rehearsals.html',true);slow.watchers.rehearsals({items:[practice]});
+ assert.match(slow.q('.quick-attendance strong').textContent,/確認中/);
+ assert(slow.q('[data-quick-status=出席]').disabled);
+ slow.answerError();
+ assert.match(slow.q('.quick-attendance strong').textContent,/取得できませんでした/);
+ assert(slow.q('[data-quick-status=出席]').disabled);
+ slow.answer([]);
+ assert.equal(slow.q('.quick-attendance strong').textContent,'未登録');
+ assert(!slow.q('[data-quick-status=出席]').disabled);
+ slow.w.close();
  console.log('PASS next cross-type schedule, archived/past exclusion, three quick RSVP buttons, own status only, remembered/switchable identity, truthful success/failure, corrupt-data preservation, cloud identity and logout');
 })().catch(error=>{console.error(error);process.exitCode=1});

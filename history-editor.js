@@ -1,6 +1,6 @@
-import {categoryOptions} from './categories.js?v=20261119-tabs1';
-import {readRecords,writeRecords} from './record-transfer.js?v=20261119-tabs1';
-import {cloud} from './cloud.js?v=20261119-tabs1';
+import {categoryOptions} from './categories.js?v=20261120-notebook2';
+import {readRecords,writeRecords} from './record-transfer.js?v=20261120-notebook2';
+import {cloud} from './cloud.js?v=20261120-notebook2';
 export function historyEditor(getData,refresh){
  const section=document.createElement('section');section.className='record-edit-panel';section.innerHTML='<button id="history-add" class="primary" type="button" disabled>＋ 稽古・公演記録を追加</button><p id="history-edit-status">共通保存の設定後、許可された会員が記録を追加・修正できます。</p>';
  (document.getElementById('history-tools')||document.querySelector('main')).append(section);
@@ -12,6 +12,7 @@ export function historyEditor(getData,refresh){
  const feedback=message=>section.querySelector('p').textContent=message;
  function controls(){section.querySelector('button').disabled=!allowed();document.querySelectorAll('[data-record-edit]').forEach(el=>el.hidden=!allowed()||(!cloud.state.configured&&publicIds.has(el.dataset.recordEdit)))}
  cloud.onState(s=>{
+  section.hidden=s.configured&&!['admin','editor'].includes(s.role);
   const next=`${s.configured?'shared':'local'}:${s.user?.uid||''}:${s.role||''}`;if(next===identity)return;identity=next;stop?.();loaded=false;dialog.close();getData().records=structuredClone(original);refresh();controls();if(!s.configured)feedback('転記した記録はこのブラウザに保存します。転記後の内容も修正できます。');
   if(s.configured&&!s.role)feedback('会員ログイン後、権限に応じて記録を追加・修正できます。');
   if(s.configured&&s.role)stop=cloud.watch('history',doc=>{
@@ -22,7 +23,7 @@ export function historyEditor(getData,refresh){
   },message=>{loaded=false;feedback(message);controls()});
  });
  function valid(r){return r&&typeof r.id==='string'&&typeof r.date==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(r.date)&&typeof r.kind==='string'&&typeof r.occasion==='string'&&typeof r.note==='string'&&r.pieces&&typeof r.pieces==='object'&&Object.values(r.pieces).every(v=>typeof v==='string')}
- async function persist(items,expected){if(busy)return false;busy=true;try{if(cloud.state.configured)await cloud.save('history',{items},expected);else writeRecords(items.filter(r=>!publicIds.has(r.id)));getData().records=items;refresh();controls();return true}catch(e){feedback(e.message);dialog.querySelector('[role=alert]').textContent=e.message;return false}finally{busy=false}}
+ async function persist(items,expected){if(busy)return false;busy=true;try{if(cloud.state.configured)await cloud.save('history',{items},expected);else writeRecords(items.filter(r=>!publicIds.has(r.id)));getData().records=items;refresh();controls();return true}catch(e){if(dialog.open){feedback(e.message);dialog.querySelector('[role=alert]').textContent=e.message}return false}finally{busy=false}}
  function edit(id){
   if(!allowed()||(!cloud.state.configured&&id&&publicIds.has(id)))return;const data=getData(),existing=id?data.records.find(r=>r.id===id):null;if(id&&!existing)return;
   const record=existing||{id:crypto.randomUUID(),date:new Date().toLocaleDateString('sv-SE'),kind:'その他公演',occasion:'',pieces:{},note:''};const expected=revision;
