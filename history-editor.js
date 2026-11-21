@@ -1,28 +1,41 @@
-import {startEditor,finishEditor,leaveEditor,guardEditor,editorState,saveRecovery,recoveryScope,recoveredEditState} from './editor-dialog.js?v=20261121-notes1';
-import {categoryOptions} from './categories.js?v=20261121-notes1';
-import {readRecords,writeRecords} from './record-transfer.js?v=20261121-notes1';
-import {cloud} from './cloud.js?v=20261121-notes1';
+import {startEditor,finishEditor,leaveEditor,guardEditor,editorState,saveRecovery,recoveryScope,recoveredEditState} from './editor-dialog.js?v=20261121-mode1';
+import {categoryOptions} from './categories.js?v=20261121-mode1';
+import {readRecords,writeRecords} from './record-transfer.js?v=20261121-mode1';
+import {cloud} from './cloud.js?v=20261121-mode1';
 export function historyEditor(getData,refresh,refreshRows=()=>{}){
- const section=document.createElement('section');section.className='record-edit-panel';section.innerHTML='<button id="history-add" class="primary" type="button" disabled>＋ 稽古・公演記録を追加</button><p id="history-edit-result" class="save-feedback" role="status"></p><p id="history-edit-status" role="status">共通保存の接続を確認しています…</p>';
+ const section=document.createElement('section');section.className='record-edit-panel';section.innerHTML='<div class="record-edit-actions"><button id="history-edit-mode" class="secondary" type="button" aria-controls="body" hidden>記録を編集する</button><button id="history-add" class="primary" type="button" disabled hidden>＋ 稽古・公演記録を追加</button></div><p id="history-edit-result" class="save-feedback" role="status"></p><p id="history-edit-status" role="status">共通保存の接続を確認しています…</p>';
  (document.getElementById('history-tools')||document.querySelector('main')).append(section);
  const dialog=document.createElement('dialog');dialog.className='record-dialog';document.body.append(dialog);guardEditor(dialog);
  const original=structuredClone(getData().records);
- let revision=0,loaded=false,stop,identity='',busy=false;
+ let revision=0,loaded=false,stop,identity='',busy=false,editMode=false;
  let localReady=true;try{readRecords()}catch{localReady=false}const publicIds=new Set(getData().publicIds||[]);const allowed=()=>cloud.state.ready!==false&&!cloud.state.connectionIssue&&(cloud.state.configured?loaded&&['editor','admin'].includes(cloud.state.role):localReady);
  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const feedback=message=>section.querySelector('#history-edit-status').textContent=message;
  const canEdit=id=>allowed()&&(cloud.state.configured||!publicIds.has(id));
- function controls(){recoveryList.render();section.querySelector('button').disabled=!allowed();refreshRows()}
+ const toggle=section.querySelector('#history-edit-mode'),add=section.querySelector('#history-add');
+ function controls(){
+  const enabled=allowed();
+  if(!enabled)editMode=false;
+  toggle.hidden=!enabled;
+  toggle.textContent=editMode?'編集を終了':'記録を編集する';
+  add.hidden=!enabled||!editMode;
+  add.disabled=!enabled;
+  recoveryList.render();
+  refreshRows();
+ }
+ toggle.onclick=()=>{
+  if(!allowed())return;
+  editMode=!editMode;controls();
+ };
  const recoveryList=saveRecovery('history',()=>recoveryScope(cloud.state),draft=>{
   if(allowed())edit(getData().records.some(r=>r.id===draft.id)?draft.id:null,draft);
  },allowed);
  cloud.onState(s=>{
   recoveryList.render();
   const canEditRole=['admin','editor'].includes(s.role);
-  section.querySelector('button').hidden=s.ready!==false&&s.configured&&!canEditRole;
   const next=JSON.stringify([s.ready!==false,s.connectionIssue,s.configured,s.user?.uid,s.role]);
   if(next===identity)return;
-  identity=next;stop?.();loaded=false;document.getElementById('history-edit-result').textContent='';
+  identity=next;stop?.();loaded=false;editMode=false;document.getElementById('history-edit-result').textContent='';
   dialog.close();getData().records=structuredClone(original);refresh();controls();
   if(s.ready===false){feedback('共通保存の接続を確認しています…');return}
   if(s.connectionIssue){feedback(s.message);return}
@@ -86,6 +99,6 @@ export function historyEditor(getData,refresh,refreshRows=()=>{}){
   if(existing)dialog.querySelector('[data-delete]').onclick=async()=>{if(confirm('この稽古・公演記録を削除しますか？')&&await persist(data.records.filter(r=>r.id!==id),expected,form)&&form.isConnected&&dialog.open)dialog.close()};
   dialog.showModal();
  }
- section.querySelector('button').onclick=()=>edit();
- return {controls,allowed,canEdit,edit};
+ add.onclick=()=>{if(editMode)edit()};
+ return {canSelect:id=>editMode&&canEdit(id),select:id=>{if(editMode&&canEdit(id))edit(id)}};
 }
