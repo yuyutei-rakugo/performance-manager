@@ -212,7 +212,6 @@ async function main(){
     delayedHistory=null;
     releaseRead();
 
-    await page.locator('[data-record-open=history-old]').click();
     await page.locator('[data-record-edit=history-old]').click();
     const history=page.locator('.record-dialog[open] form');
     const note='\n全角「日本語」\n'+ '長い注記 '.repeat(80);
@@ -222,7 +221,6 @@ async function main(){
     await historySave.sent;
     await history.locator('[data-cancel]').click();
     await page.getByRole('button',{name:'保存結果を待たずに閉じる'}).click();
-    await page.locator('[data-close-record]').click();
     await page.locator('#history-add').click();
     await history.locator('[name=occasion]').fill('同名の記録');
     const savedHistoryResponse=page.waitForResponse(response=>response.url()===endpoint&&JSON.parse(response.request().postData()).action==='save');
@@ -252,7 +250,6 @@ async function main(){
       await page.getByRole('dialog',{name:'保存結果はまだ確定していません'}).waitFor();
       await page.getByRole('button',{name:'保存結果を待たずに閉じる'}).click();
       assert(await page.evaluate(()=>!window.dispatchEvent(new Event('beforeunload',{cancelable:true}))));
-      if(collection==='history')await page.locator('[data-close-record]').click();
       failedSave.release('fail');
       await recovery.getByText(/保存できませんでした/).waitFor();
       await recovery.getByRole('button',{name:'入力を復元する'}).click();
@@ -307,7 +304,6 @@ async function main(){
     assert.equal(docs.rehearsals.items[0].notes,'応答が届く前に確定した更新');
 
     await page.goto(new URL('history.html',base).href);
-    await page.locator('[data-record-open=history-old]').click();
     await page.locator('[data-record-edit=history-old]').click();
     await history.locator('[name=note]').fill('記録の復元');
     await failAfterClose('history',history,history.locator('[data-cancel]'),'[name=note]','記録の復元');
@@ -375,32 +371,35 @@ async function main(){
     const longRecordPiece='とても長い演目'.repeat(20);
     docs.history.items.push({id:'custom-event',date:'2026-11-21',kind:'交流寄席',occasion:'独自の公演',pieces:{'試験会員':longRecordPiece+'（3分5秒）／猫と金魚（0分）'},note:'会場：試験会場'});
     await page.reload();
-    await page.locator('[data-record-open=custom-event]').getByText('独自の公演').waitFor();
-    assert.equal(await page.locator('[data-record-open="transferred:rehearsal:today-archive"]').count(),0);
+    await page.locator('[data-record-id=custom-event]').getByText('独自の公演').waitFor();
+    assert.equal(await page.locator('[data-record-id="transferred:rehearsal:today-archive"]').count(),0);
     await page.locator('#query').fill('試験会場');
-    assert.equal(await page.locator('#body [data-record-open]').count(),1);
+    assert.equal(await page.locator('#body [data-record-id]').count(),1);
     await page.locator('#kind').selectOption('交流寄席');
     await page.setViewportSize({width:320,height:720});
-    await page.locator('[data-record-open=custom-event]').click();
-    const detail=page.locator('#record-detail');
-    assert.deepEqual(await detail.locator('td.duration-value').allTextContents(),['3分05秒','0分00秒']);
-    assert(await detail.evaluate(dialog=>dialog.scrollWidth<=dialog.clientWidth));
-    await detail.locator('[data-close-record]').click();
+    const customRow=page.locator('[data-record-id=custom-event]');
+    assert.deepEqual(await customRow.locator('td .duration-value').allTextContents(),['3分05秒','0分00秒']);
+    assert(await customRow.locator('.duration-value').evaluateAll(cells=>cells.every(cell=>getComputedStyle(cell).textAlign==='right')));
+    assert(await page.locator('.scroll').evaluate(container=>{
+      const day=container.querySelector('#body .fixed-date'),name=container.querySelector('#body .fixed-occasion');
+      const before=[day.getBoundingClientRect().left,name.getBoundingClientRect().left];
+      container.scrollLeft=200;
+      return container.scrollLeft>0&&before[0]===day.getBoundingClientRect().left&&before[1]===name.getBoundingClientRect().left&&document.documentElement.scrollWidth<=innerWidth;
+    }));
     await page.locator('#query').fill('');
     await page.locator('[data-record-type=rehearsal]').click();
-    await page.locator('[data-record-open="transferred:rehearsal:today-archive"]').click();
-    assert.deepEqual(await detail.locator('td.duration-value').allTextContents(),['3分05秒','0分00秒','未入力']);
-    await detail.getByText('試験会員 出席',{exact:true}).waitFor();
-    await detail.getByText('当日の連絡事項',{exact:true}).waitFor();
-    await detail.locator('[data-close-record]').click();
+    const rehearsalRow=page.locator('[data-record-id="transferred:rehearsal:today-archive"]');
+    await rehearsalRow.getByText(/当日の連絡事項/).waitFor();
+    await rehearsalRow.getByText('0分00秒',{exact:true}).first().waitFor();
+    await rehearsalRow.getByText('未入力',{exact:true}).first().waitFor();
     await page.evaluate(()=>window.dispatchEvent(new Event('beforeprint')));
     await page.emulateMedia({media:'print'});
-    assert(await page.locator('#record-print .duration-value').getByText('3分05秒',{exact:true}).first().isVisible());
+    assert(await page.locator('#body .duration-value').getByText('3分05秒',{exact:true}).first().isVisible());
     assert((await page.pdf({format:'A4'})).length>1000);
     await page.emulateMedia({media:'screen'});
     await page.locator('[data-record-type=all]').click();
-    assert.equal(await page.locator('[data-record-open="transferred:rehearsal:today-archive"]').count(),1);
-    assert.equal(await page.locator('[data-record-open=custom-event]').count(),1);
+    assert.equal(await page.locator('[data-record-id="transferred:rehearsal:today-archive"]').count(),1);
+    assert.equal(await page.locator('[data-record-id=custom-event]').count(),1);
 
     const sample=docs.events.items[0];
     docs.events={revision:docs.events.revision+1,items:Array.from({length:500},(_,i)=>({...sample,id:'bulk-'+i}))};
