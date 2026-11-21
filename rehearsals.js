@@ -1,11 +1,11 @@
-import {performerPicker,updatePerformerPickers,readPerformer,showPerformerRoster} from './performer-picker.js?v=20261121-sync1';
-import {mountMemberHome} from './member-home.js?v=20261121-sync1';
-import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261121-sync1';
-import {readCategories,saveCategories,validCategories} from './categories.js?v=20261121-sync1';
-import {mountScheduleImport} from './schedule-import.js?v=20261121-sync1';
-import {toRecord,transferRecord,rehearsalTitle,readRecords,mergeRecords,mergedRecords} from './record-transfer.js?v=20261121-sync1';
-import {cloud,startCloud,mountAccount} from './cloud.js?v=20261121-sync1';
-import {statuses,rehearsalNames,validRehearsal,validAttendance,attendanceSummary} from './rehearsal-model.js?v=20261121-sync1';
+import {performerPicker,updatePerformerPickers,readPerformer,showPerformerRoster} from './performer-picker.js?v=20261121-today1';
+import {mountMemberHome} from './member-home.js?v=20261121-today1';
+import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261121-today1';
+import {readCategories,saveCategories,validCategories} from './categories.js?v=20261121-today1';
+import {mountScheduleImport} from './schedule-import.js?v=20261121-today1';
+import {toRecord,transferRecord,rehearsalTitle,readRecords,mergeRecords,mergedRecords} from './record-transfer.js?v=20261121-today1';
+import {cloud,startCloud,mountAccount} from './cloud.js?v=20261121-today1';
+import {statuses,rehearsalNames,validRehearsal,validAttendance,attendanceSummary,japanDate,rehearsalBadge,rehearsalDateTime} from './rehearsal-model.js?v=20261121-today1';
 const $=id=>document.getElementById(id),esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const key='yuitei.rehearsals.v1';let items=[],attendance={},names=[],revision=0,loaded=false,storageOK=true,stop,stopAttendance,opened=null,detailRevision=0,busy=false;
 let noticeTimer;
@@ -41,9 +41,9 @@ async function save(next,expected=revision,nextAttendance=attendance){
 }
 
 function render(){
- const upcoming=items.filter(r=>!r.archivedAt&&r.date>=new Date().toLocaleDateString('sv-SE'));if($('stats'))$('stats').innerHTML=[['予定の稽古',upcoming.length],['師匠稽古',upcoming.filter(r=>r.title==='師匠稽古').length],['自主稽古',upcoming.filter(r=>r.title==='自主稽古').length]].map(([label,count])=>`<div class="stat"><span class="stat-icon">▦</span><div><small>${label}</small><strong>${count}</strong><span class="unit">件</span></div></div>`).join('');
+ const upcoming=items.filter(r=>!r.archivedAt&&r.date>=japanDate());if($('stats'))$('stats').innerHTML=[['予定の稽古',upcoming.length],['師匠稽古',upcoming.filter(r=>r.title==='師匠稽古').length],['自主稽古',upcoming.filter(r=>r.title==='自主稽古').length]].map(([label,count])=>`<div class="stat"><span class="stat-icon">▦</span><div><small>${label}</small><strong>${count}</strong><span class="unit">件</span></div></div>`).join('');
  $('add').disabled=!canEdit();$('mode').textContent=cloud.state.configured?(cloud.state.role?'予定ごとに「出欠・詳細」から回答・一覧を確認できます。':'出欠は会員ログイン後に回答できます。'):'現在はこのブラウザに保存します。自分の名前を選んで出欠を入力します。本人認証・端末間の同期はまだ有効ではありません。';
- $('rehearsals').innerHTML=items.filter(r=>!r.archivedAt).sort((a,b)=>(!!a.archivedAt-!!b.archivedAt)||(a.date+a.time).localeCompare(b.date+b.time)).map(r=>{const s=cloud.state.configured?null:attendanceSummary(names,attendance[r.id]||{});return `<article class="event-card rehearsal-card"><div class="date-badge" aria-hidden="true"><small>${Number(r.date.slice(5,7))}月</small><strong>${Number(r.date.slice(8))}</strong></div><div><h3>${esc(rehearsalTitle(r))}${r.archivedAt?' <small>（記録へ移動済み）</small>':''}</h3><div class="meta"><span>${r.date.replaceAll('-','/')} ${r.time}</span><span>＠ ${esc(r.venue)}</span></div></div>${s?`<div class="progress"><span class="progress-label">出席 ${s.count}人 ／ 未回答 ${s.unanswered}人</span></div>`:''}<div class="event-actions"><button class="secondary" data-detail="${esc(r.id)}">出欠・詳細</button></div></article>`}).join('')||(cloud.state.configured&&!loaded?'<p class="empty">'+(cloud.state.role?esc(scheduleError||'稽古予定を読み込み中…'):'稽古予定を見るには会員ログインしてください。')+'</p>':'<p class="empty">稽古予定はまだありません。</p>');
+ $('rehearsals').innerHTML=items.filter(r=>!r.archivedAt).sort((a,b)=>(!!a.archivedAt-!!b.archivedAt)||(a.date+a.time).localeCompare(b.date+b.time)).map(r=>{const s=cloud.state.configured?null:attendanceSummary(names,attendance[r.id]||{});return `<article class="event-card rehearsal-card"><div class="date-badge" aria-hidden="true"><small>${Number(r.date.slice(5,7))}月</small><strong>${Number(r.date.slice(8))}</strong></div><div><h3>${rehearsalBadge(r,rehearsalTitle(r),esc)}${r.archivedAt?' <small>（記録へ移動済み）</small>':''}</h3><div class="meta"><span>${r.date.replaceAll('-','/')} ${r.time}</span><span>＠ ${esc(r.venue)}</span></div></div>${s?`<div class="progress"><span class="progress-label">出席 ${s.count}人 ／ 未回答 ${s.unanswered}人</span></div>`:''}<div class="event-actions"><button class="secondary" data-detail="${esc(r.id)}">出欠・詳細</button></div></article>`}).join('')||(cloud.state.configured&&!loaded?'<p class="empty">'+(cloud.state.role?esc(scheduleError||'稽古予定を読み込み中…'):'稽古予定を見るには会員ログインしてください。')+'</p>':'<p class="empty">稽古予定はまだありません。</p>');
  if(loaded&&scheduleError)$('rehearsals').insertAdjacentHTML('afterbegin','<p class="sync-warning" role="status">更新できませんでした。前回取得した稽古予定を表示しています。</p>');
  openRequestedDetail();
 }
@@ -78,7 +78,7 @@ function form(existing,onCancel=()=>dialog.close()){if(!canEdit())return;stopAtt
  }
  if(!dialog.open)dialog.showModal();
 }
-function detail(id){const r=items.find(x=>x.id===id);if(!r)return;stopAttendance?.();opened=id;attendanceState=cloud.state.configured?'loading':'ready';detailRevision=revision;dialog.innerHTML=`<div class="dialog-body"><div class="dialog-head"><h2>${esc(rehearsalTitle(r))}</h2><button data-close aria-label="閉じる">×</button></div><p>${r.date} ${r.time}<br>場所：${esc(r.venue)}</p><p class="muted">予定ID：${esc(r.id)}</p><p class="memo">${esc(r.notes)}</p><div class="form-actions"><button type="button" class="primary" id="edit-rehearsal-inside" ${canEdit()?'':'disabled'}>編集する</button></div><section id="attendance"></section><section class="block" id="practice-section"></section><section class="block" hidden><button class="primary" type="button" id="transfer-rehearsal" ${canEdit()?'':'disabled'}>${r.archivedAt?'記録を更新する':'終了して記録へ移す'}</button><p class="muted">終了後、稽古したネタと長さ・出欠・連絡事項を記録へ保存します。元の予定も残ります。</p></section></div>`;$('edit-rehearsal-inside').onclick=()=>form(items.find(x=>x.id===id),()=>{
+function detail(id){const r=items.find(x=>x.id===id);if(!r)return;stopAttendance?.();opened=id;attendanceState=cloud.state.configured?'loading':'ready';detailRevision=revision;dialog.innerHTML=`<div class="dialog-body"><div class="dialog-head"><h2>${rehearsalBadge(r,rehearsalTitle(r),esc)}</h2><button data-close aria-label="閉じる">×</button></div><p>${rehearsalDateTime(r,esc)}<br>場所：${esc(r.venue)}</p><p class="muted">予定ID：${esc(r.id)}</p><p class="memo">${esc(r.notes)}</p><div class="form-actions"><button type="button" class="primary" id="edit-rehearsal-inside" ${canEdit()?'':'disabled'}>編集する</button></div><section id="attendance"></section><section class="block" id="practice-section"></section><section class="block" hidden><button class="primary" type="button" id="transfer-rehearsal" ${canEdit()?'':'disabled'}>${r.archivedAt?'記録を更新する':'終了して記録へ移す'}</button><p class="muted">終了後、稽古したネタと長さ・出欠・連絡事項を記録へ保存します。元の予定も残ります。</p></section></div>`;$('edit-rehearsal-inside').onclick=()=>form(items.find(x=>x.id===id),()=>{
  if(items.some(item=>item.id===id&&!item.archivedAt))detail(id);else dialog.close();
 });practiceView(id);$('transfer-rehearsal').onclick=async()=>{if($('practice-form')?.dataset.dirty==='true'){notify('入力したネタ・時間を保存してから記録へ移してください。');return}if(cloud.state.role!=='admin'||r.date>=new Date().toLocaleDateString('sv-SE')||!confirm('終了した稽古を稽古・公演記録へ移しますか？ネタ・時間は保存した内容を転記します。'))return;try{const current=items.find(x=>x.id===id);await transferRecord(toRecord('rehearsal',current,names,attendance[id]||{}));if(await save(items.map(x=>x.id===id?{...x,archivedAt:new Date().toISOString()}:x),detailRevision)){dialog.close();notify('稽古・公演記録へ移しました。')}else notify('記録には保存しましたが、予定側の転記済み表示を保存できませんでした。再実行しても重複しません。')}catch(e){notify(e.message)}};if(!dialog.open)dialog.showModal();if(cloud.state.configured&&cloud.state.role){watchDetailAttendance(id);if(cloud.state.provider==='apps-script'){loadRoster(true);refreshDetailPractices(id)}}else attendanceView(id)}
 function watchDetailAttendance(id){
@@ -324,7 +324,7 @@ async function respondSelf(id,name,status){
    const next=structuredClone(attendance);next[id]={...next[id],[self]:status};
    if(!await save(items,detailRevision,next))throw Error('保存に失敗しました。');
   }
-  responseMessages.set(id,(status==='未回答'?'未登録':status)+'で登録しました。'+(shared?'':'この端末に保存しました。'));
+  responseMessages.set(id,(status==='未回答'?'回答を未登録に戻しました。':status+'で登録しました。')+(shared?'':'この端末に保存しました。'));
  }catch(error){
   if(generation===accountGeneration)responseMessages.set(id,'保存できませんでした。'+error.message+' もう一度回答してください。');
  }finally{
