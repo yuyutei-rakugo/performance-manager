@@ -59,10 +59,15 @@ for(const type of ['event','rehearsal']){
   },names,{[names[1]]:'出席'});
   entries.forEach((entry,i)=>{
    assert.match(record.pieces[entry.stageName],new RegExp('演目'+i));
-   assert.match(record.note,new RegExp((i+1)+'\\. '+entry.stageName+'｜'+entry.piece));
+   if(type==='event')assert.match(record.note,new RegExp((i+1)+'\\. '+entry.stageName+'｜'+entry.piece));
   });
   assert.equal(record.sourceData[type==='event'?'performers':'practices'].length,kinds.length);
-  if(type==='rehearsal')assert.equal(record.pieces[names[1]],'○');
+  if(type==='rehearsal'){
+   assert.equal(record.pieces[names[1]],'○');
+   assert.equal(record.note,'会場：会場\n開始：14:00');
+   assert.equal(record.attendance[names[1]],'出席');
+   assert.equal(record.sourceData.practices[0].durationSeconds,305);
+  }
  }
 }
 console.log('PASS explicit member/guest input, roster state and retry, late updates preserve guest input, stored names, mixed and repeated performers, ordered transfers');

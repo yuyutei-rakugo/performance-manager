@@ -54,6 +54,7 @@ async function main(){
             assert.equal(request.revisions.history,docs.history.revision);
             assert.equal(transfer.record.attendance['試験会員'],'出席');
             assert.equal(transfer.record.sourceData.notes,'当日の連絡事項');
+            assert.equal(transfer.record.note,'会場：和室\n開始：17:00\n当日の連絡事項');
             assert.equal(transfer.record.sourceData.practices[0].durationSeconds,185);
             docs.history={items:[...docs.history.items,transfer.record],revision:docs.history.revision+1};
             docs.rehearsals={items:docs.rehearsals.items.map(r=>r.id===transfer.id?{...r,archivedAt:'2026-11-21T08:00:00Z'}:r),revision:docs.rehearsals.revision+1};
@@ -367,6 +368,9 @@ async function main(){
     await page.locator('.member-home').getByText('次回の稽古').waitFor();
     await page.locator('[data-open-rehearsal="next-practice"]').waitFor();
     assert.equal(docs.history.items.filter(r=>r.sourceId===todayPractice.id).length,1);
+    const legacyNote='会場：旧会場\n手入力の連絡事項\n1. 試験会員｜時そば（3分5秒）\n2. 別の会員｜注記だけに残っているネタ\n試験会員：出席\n別の会員：欠席';
+    docs.history.items.push({id:'legacy-rehearsal',date:'2026-11-20',kind:'通常稽古',occasion:'旧形式の稽古',
+      pieces:{'試験会員':'時そば（3分05秒）'},attendance:{'試験会員':'出席','別の会員':'欠席'},note:legacyNote});
     await page.goto(new URL('history.html',base).href);
     const longRecordPiece='とても長い演目'.repeat(20);
     docs.history.items.push({id:'custom-event',date:'2026-11-21',kind:'交流寄席',occasion:'独自の公演',pieces:{'試験会員':longRecordPiece+'（3分5秒）／猫と金魚（0分）'},note:'会場：試験会場'});
@@ -392,10 +396,17 @@ async function main(){
     await rehearsalRow.getByText(/当日の連絡事項/).waitFor();
     await rehearsalRow.getByText('0分00秒',{exact:true}).first().waitFor();
     await rehearsalRow.getByText('未入力',{exact:true}).first().waitFor();
+    const legacy=page.locator('[data-record-id=legacy-rehearsal]');
+    const legacyNotes=legacy.locator('td').last();
+    await legacyNotes.getByText(/手入力の連絡事項/).waitFor();
+    assert.equal(await legacyNotes.textContent(),'会場：旧会場\n手入力の連絡事項\n別の会員｜注記だけに残っているネタ');
+    assert.deepEqual(await legacy.locator('.record-attendance').allTextContents(),['出席','欠席']);
+    assert.equal(docs.history.items.find(record=>record.id==='legacy-rehearsal').note,legacyNote);
     await page.evaluate(()=>window.dispatchEvent(new Event('beforeprint')));
     await page.emulateMedia({media:'print'});
     assert(await page.locator('#body .duration-value').getByText('3分05秒',{exact:true}).first().isVisible());
     assert((await page.pdf({format:'A4'})).length>1000);
+    assert.equal(await legacyNotes.textContent(),'会場：旧会場\n手入力の連絡事項\n別の会員｜注記だけに残っているネタ');
     await page.emulateMedia({media:'screen'});
     await page.locator('[data-record-type=all]').click();
     assert.equal(await page.locator('[data-record-id="transferred:rehearsal:today-archive"]').count(),1);

@@ -1,4 +1,4 @@
-import {cloud} from './cloud.js?v=20261121-table1';
+import {cloud} from './cloud.js?v=20261121-notes1';
 export const historyKey='yuitei.history.v1';
 export const validRecord=r=>r&&typeof r.id==='string'&&typeof r.date==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(r.date)&&typeof r.kind==='string'&&typeof r.occasion==='string'&&typeof r.note==='string'&&r.pieces&&typeof r.pieces==='object'&&!Array.isArray(r.pieces)&&Object.values(r.pieces).every(v=>typeof v==='string');
 export function readRecords(){const raw=JSON.parse(localStorage.getItem(historyKey)||'{"version":1,"items":[]}');if(raw.version!==1||!Array.isArray(raw.items)||!raw.items.every(validRecord))throw Error('保存済みの記録を読み込めません。上書きを停止しています。');return raw.items;}
@@ -32,8 +32,6 @@ export function toRecord(type,source,names=[],responses={}){const pieces=Object.
   const practices=source.practices||[];
   practices.forEach(p=>add(p.stageName,p.piece+duration(p.durationSeconds),p.guest));
   for(const n of names)if(responses[n]==='出席'&&!pieces[n])pieces[n]='○';
-  lines=practices.map((p,i)=>`${i+1}. ${p.stageName}｜${p.piece}${duration(p.durationSeconds)}`);
-  lines.push(...Object.entries(responses).map(([n,s])=>`${n}：${s}`));
  }
 
  return {id:`transferred:${type}:${source.id}`,date:source.date,kind:type==='event'?(source.kind||'その他公演'):(source.title==='師匠稽古'?'師匠稽古':source.title==='自主稽古'?'自主稽古':source.title==='通常稽古'?'通常稽古':'その他'),occasion:type==='event'?source.title:rehearsalTitle(source),pieces,note:[`会場：${source.venue}`,`開始：${source.time||'時間未定'}`,source.memo||source.notes||'',...lines].filter(Boolean).join('\n'),sourceType:type,sourceId:source.id,sourceData:structuredClone(source),attendance:type==='rehearsal'?structuredClone(responses):{},transferredAt:new Date().toISOString()};
