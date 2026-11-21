@@ -1,8 +1,8 @@
-import {startEditor,finishEditor,leaveEditor,guardEditor,editorState,saveRecovery,recoveryScope,recoveredEditState} from './editor-dialog.js?v=20261121-duration1';
-import {categoryOptions} from './categories.js?v=20261121-duration1';
-import {readRecords,writeRecords} from './record-transfer.js?v=20261121-duration1';
-import {cloud} from './cloud.js?v=20261121-duration1';
-export function historyEditor(getData,refresh){
+import {startEditor,finishEditor,leaveEditor,guardEditor,editorState,saveRecovery,recoveryScope,recoveredEditState} from './editor-dialog.js?v=20261121-records1';
+import {categoryOptions} from './categories.js?v=20261121-records1';
+import {readRecords,writeRecords} from './record-transfer.js?v=20261121-records1';
+import {cloud} from './cloud.js?v=20261121-records1';
+export function historyEditor(getData,refresh,refreshDetail=()=>{}){
  const section=document.createElement('section');section.className='record-edit-panel';section.innerHTML='<button id="history-add" class="primary" type="button" disabled>＋ 稽古・公演記録を追加</button><p id="history-edit-result" class="save-feedback" role="status"></p><p id="history-edit-status" role="status">共通保存の接続を確認しています…</p>';
  (document.getElementById('history-tools')||document.querySelector('main')).append(section);
  const dialog=document.createElement('dialog');dialog.className='record-dialog';document.body.append(dialog);guardEditor(dialog);
@@ -11,7 +11,8 @@ export function historyEditor(getData,refresh){
  let localReady=true;try{readRecords()}catch{localReady=false}const publicIds=new Set(getData().publicIds||[]);const allowed=()=>cloud.state.ready!==false&&!cloud.state.connectionIssue&&(cloud.state.configured?loaded&&['editor','admin'].includes(cloud.state.role):localReady);
  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const feedback=message=>section.querySelector('#history-edit-status').textContent=message;
- function controls(){recoveryList.render();section.querySelector('button').disabled=!allowed();document.querySelectorAll('[data-record-edit]').forEach(el=>el.hidden=!allowed()||(!cloud.state.configured&&publicIds.has(el.dataset.recordEdit)))}
+ const canEdit=id=>allowed()&&(cloud.state.configured||!publicIds.has(id));
+ function controls(){recoveryList.render();section.querySelector('button').disabled=!allowed();refreshDetail()}
  const recoveryList=saveRecovery('history',()=>recoveryScope(cloud.state),draft=>{
   if(allowed())edit(getData().records.some(r=>r.id===draft.id)?draft.id:null,draft);
  },allowed);
@@ -81,11 +82,10 @@ export function historyEditor(getData,refresh){
   startEditor(dialog,form);
   const canRetry=recoveredEditState(form,recovery,existing);
   dialog.querySelector('[data-cancel]').onclick=()=>leaveEditor(dialog,()=>dialog.close());
-  form.onsubmit=async e=>{e.preventDefault();if(!canRetry)return;const f=new FormData(e.target);const next={...record,date:f.get('date'),kind:f.get('kind'),occasion:f.get('occasion').trim(),note:f.get('note'),pieces:{...record.pieces,...Object.fromEntries([...dialog.querySelectorAll('[data-piece]')].map(el=>[el.dataset.piece,el.value.trim()]))}};if(!next.occasion)return;if(await persist(existing?data.records.map(r=>r.id===id?next:r):[...data.records,next],expected,form,{id:next.id,base:existing,value:next})){if(form.isConnected){if(dialog.open){finishEditor(dialog);dialog.close()}document.getElementById('history-edit-result').textContent='記録を保存しました。'}}};
+  form.onsubmit=async e=>{e.preventDefault();if(!canRetry)return;const f=new FormData(e.target);const next={...record,date:f.get('date'),kind:f.get('kind'),occasion:f.get('occasion').trim(),note:f.get('note'),pieces:{...record.pieces,...Object.fromEntries([...dialog.querySelectorAll('[data-piece]')].map(el=>[el.dataset.piece,el.value.trim()]))}};if(!next.occasion)return;if(await persist(existing?data.records.map(r=>r.id===id?next:r):[...data.records,next],expected,form,{id:next.id,base:existing,value:next})){if(form.isConnected){if(dialog.open){finishEditor(dialog);dialog.close()}document.getElementById('history-edit-result').textContent='記録を保存しました。';const status=document.querySelector('#record-detail[open] [data-detail-status]');if(status)status.textContent='記録を保存しました。'}}};
   if(existing)dialog.querySelector('[data-delete]').onclick=async()=>{if(confirm('この稽古・公演記録を削除しますか？')&&await persist(data.records.filter(r=>r.id!==id),expected,form)&&form.isConnected&&dialog.open)dialog.close()};
   dialog.showModal();
  }
  section.querySelector('button').onclick=()=>edit();
- document.querySelector('#body').addEventListener('click',e=>{const b=e.target.closest('[data-record-edit]');if(b)edit(b.dataset.recordEdit)});
- return {controls,allowed};
+ return {controls,allowed,canEdit,edit};
 }
