@@ -14,11 +14,11 @@ const docs = {
 };
 const attendance=new Map();
 let pending,delayedHistory;
-const hold = collection => {
+const hold = (collection,commitEarly=false) => {
   let release, started;
   const response = new Promise(resolve => {release=resolve});
   const sent = new Promise(resolve => {started=resolve});
-  pending = {collection,response,started};
+  pending = {collection,response,started,commitEarly};
   return {release,sent};
 };
 
@@ -52,8 +52,10 @@ async function main(){
             if(request.revision!==docs[request.name].revision)return answer({ok:false,error:'ほかの端末で更新されています。再読み込みしてください。'});
             if(pending?.collection===request.name){
               const active=pending;pending=null;
+              if(active.commitEarly)docs[request.name]={items:request.items,revision:request.revision+1};
               active.started();
-              await active.response;
+              if(await active.response==='fail')return answer({ok:false,error:'模擬通信失敗'});
+              if(active.commitEarly)return ok({revision:request.revision+1});
             }
             const revision=docs[request.name].revision+1;
             docs[request.name]={items:request.items,revision};
@@ -91,6 +93,7 @@ async function main(){
     await form.getByText('保存中…',{exact:true}).waitFor();
     assert(await form.locator('button[type=submit]').isDisabled());
     await page.locator('#event-dialog [data-close]').click();
+    await page.getByRole('button',{name:'保存結果を待たずに閉じる'}).click();
     await page.locator('#new-event').click();
     await form.locator('[name=title]').fill('次の公演の下書き');
     eventSave.release();
@@ -151,6 +154,7 @@ async function main(){
     await page.locator('#practice-form button[type=submit]').click();
     await rehearsalSave.sent;
     await page.locator('#rehearsal-dialog [data-close]').click();
+    await page.getByRole('button',{name:'保存結果を待たずに閉じる'}).click();
     rehearsalSave.release();
     await page.locator('#notice').getByText('稽古したネタ・時間を保存しました。').waitFor();
     assert.equal(await page.locator('#rehearsal-dialog[open]').count(),0);
@@ -173,6 +177,7 @@ async function main(){
     await history.locator('button[type=submit]').click();
     await historySave.sent;
     await history.locator('[data-cancel]').click();
+    await page.getByRole('button',{name:'保存結果を待たずに閉じる'}).click();
     await page.locator('#history-add').click();
     await history.locator('[name=occasion]').fill('同名の記録');
     historySave.release();
@@ -191,6 +196,75 @@ async function main(){
     await history.locator('button[type=submit]').click();
     await history.waitFor({state:'hidden'});
     assert.equal(docs.history.items.filter(record=>record.occasion==='同名の記録').length,2);
+
+    const recovery=page.locator('.save-recovery > div').filter({hasText:'模擬通信失敗'});
+    async function failAfterClose(collection,editor,close,field,value){
+      const failedSave=hold(collection);
+      await editor.locator('[type=submit],button.primary:not([type=button])').first().click();
+      await failedSave.sent;
+      await close.click();
+      await page.getByRole('dialog',{name:'保存結果はまだ確定していません'}).waitFor();
+      await page.getByRole('button',{name:'保存結果を待たずに閉じる'}).click();
+      assert(await page.evaluate(()=>!window.dispatchEvent(new Event('beforeunload',{cancelable:true}))));
+      failedSave.release('fail');
+      await recovery.getByText(/保存できませんでした/).waitFor();
+      await recovery.getByRole('button',{name:'入力を復元する'}).click();
+      assert.equal(await editor.locator(field).inputValue(),value);
+      await editor.locator('[type=submit],button.primary:not([type=button])').first().click();
+      await recovery.waitFor({state:'hidden'});
+    }
+
+    await page.goto(base.href);
+    await page.locator('[data-event]').click();
+    await page.locator('[data-edit]').click();
+    await form.locator('[name=piece]').fill('番組表の復元');
+    await failAfterClose('events',form,page.locator('#event-dialog [data-close]'),'[name=piece]','番組表の復元');
+    await page.locator('#event-dialog').getByText('番組表の復元').waitFor();
+
+    await page.goto(new URL('rehearsals.html',base).href);
+    await page.locator('[data-detail]').click();
+    await page.locator('#edit-rehearsal-inside').click();
+    await rehearsal.locator('[name=venue]').fill('稽古の復元');
+    await failAfterClose('rehearsals',rehearsal,page.locator('#rehearsal-dialog [data-close]'),'[name=venue]','稽古の復元');
+    await page.locator('#rehearsal-dialog').getByText(/稽古の復元/).waitFor();
+    await page.locator('#edit-practices').click();
+    await page.locator('#practice-form [name=piece]').fill('ネタの復元');
+    await failAfterClose('rehearsals',page.locator('#practice-form'),page.locator('#rehearsal-dialog [data-close]'),'[name=piece]','ネタの復元');
+    await page.locator('#practice-section').getByText(/ネタの復元/).waitFor();
+    await page.locator('#edit-rehearsal-inside').click();
+    await rehearsal.locator('[name=notes]').fill('再読み込み後の復元');
+    const interrupted=hold('rehearsals');
+    await rehearsal.locator('button.primary').click();await interrupted.sent;
+    let warned=false;
+    page.once('dialog',async message=>{warned=message.type()==='beforeunload';await message.accept()});
+    await page.reload();
+    interrupted.release('fail');
+    assert(warned);
+    const uncertain=page.locator('.save-recovery').filter({hasText:/保存結果を確認できませんでした|Failed to fetch/});
+    await uncertain.getByRole('button',{name:'入力を復元する'}).click();
+    assert.equal(await rehearsal.locator('[name=notes]').inputValue(),'再読み込み後の復元');
+    await rehearsal.locator('button.primary').click();
+    await uncertain.waitFor({state:'hidden'});
+    await page.locator('#rehearsal-dialog').getByText('再読み込み後の復元').waitFor();
+
+    await page.locator('#edit-rehearsal-inside').click();
+    await rehearsal.locator('[name=notes]').fill('応答が届く前に確定した更新');
+    const committed=hold('rehearsals',true);
+    await rehearsal.locator('button.primary').click();await committed.sent;
+    page.once('dialog',message=>message.accept());
+    await page.reload();
+    committed.release();
+    await uncertain.getByRole('button',{name:'入力を復元する'}).click();
+    await rehearsal.getByText(/保存先の内容が変わっています/).waitFor();
+    assert(await rehearsal.locator('button.primary').isDisabled());
+    assert.equal(docs.rehearsals.items[0].notes,'応答が届く前に確定した更新');
+
+    await page.goto(new URL('history.html',base).href);
+    await page.locator('[data-record-edit=history-old]').click();
+    await history.locator('[name=note]').fill('記録の復元');
+    await failAfterClose('history',history,history.locator('[data-cancel]'),'[name=note]','記録の復元');
+    await page.locator('#history-edit-result').getByText('記録を保存しました。').waitFor();
+    assert.equal(docs.history.items[0].note,'記録の復元');
 
     const viewer=await session('viewer');
     await viewer.goto(base.href);

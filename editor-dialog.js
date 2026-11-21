@@ -30,7 +30,7 @@ export function finishEditor(dialog){
 
 function hasDraft(dialog){
  const editor=editors.get(dialog);
- return dialog.open&&editor?.form.isConnected&&!editor.pending&&!editor.committed&&editor.dirty();
+ return dialog.open&&editor?.form.isConnected&&!editor.committed&&(editor.pending||editor.dirty());
 }
 
 export function leaveEditor(dialog,leave){
@@ -40,9 +40,15 @@ export function leaveEditor(dialog,leave){
  prompt.className='discard-dialog';
  prompt.setAttribute('aria-label','変更が保存されていません');
  prompt.innerHTML='<div class="dialog-body"><p>変更が保存されていません。</p><div class="form-actions"><button type="button" class="primary" autofocus>編集を続ける</button><button type="button" class="secondary">変更を破棄する</button></div></div>';
+ const pending=editors.get(dialog).pending;
+ if(pending){
+  prompt.querySelector('p').textContent='保存結果はまだ確定していません。閉じた後も、この画面で保存結果と復元用の入力を確認できます。';
+  prompt.setAttribute('aria-label','保存結果はまだ確定していません');
+  prompt.querySelector('.secondary').textContent='保存結果を待たずに閉じる';
+ }
  const [stay,discard]=prompt.querySelectorAll('button');
  stay.onclick=()=>prompt.close();
- discard.onclick=()=>{prompt.close();finishEditor(dialog);leave()};
+ discard.onclick=()=>{prompt.close();if(!pending){editors.get(dialog)?.discardFailedSave?.();finishEditor(dialog)}leave()};
  prompt.addEventListener('close',()=>prompt.remove(),{once:true});
  document.body.append(prompt);
  prompt.showModal();
@@ -60,4 +66,88 @@ export function guardEditor(dialog){
   event.preventDefault();
   event.returnValue='';
  });
+}
+
+// Drafts stay in this browser tab and are visible only to the account that started the save.
+export function saveRecovery(kind,scope,restore,canRestore){
+ const key='yuitei.interrupted-save.'+kind;
+ let entries=[];
+ try{entries=JSON.parse(sessionStorage.getItem(key)||'[]');if(!Array.isArray(entries))entries=[]}catch{}
+ entries=entries.map(entry=>({...entry,pending:false,message:entry.pending?'保存結果を確認できませんでした。最新の内容を確認してから再試行してください。':entry.message}));
+ const panel=document.createElement('section');
+ panel.className='save-recovery';
+ panel.hidden=true;
+ (document.querySelector('main')||document.body).prepend(panel);
+ let rendered;
+ function render(){
+  const owner=scope(),ready=!!canRestore();
+  const state=JSON.stringify([owner,ready,entries]);
+  if(state===rendered)return;
+  rendered=state;
+  panel.replaceChildren();
+  for(const entry of entries.filter(entry=>owner&&entry.owner===owner)){
+   const row=document.createElement('div'),status=document.createElement('p');
+   status.setAttribute('role','status');
+   status.textContent=entry.label+'：'+entry.message;
+   row.append(status);
+   if(!entry.pending){
+    const retry=document.createElement('button'),discard=document.createElement('button');
+    retry.textContent='入力を復元する';discard.textContent='復元用の入力を削除';
+    for(const button of [retry,discard]){button.type='button';button.className='secondary'}
+    retry.disabled=!ready;
+    retry.onclick=()=>restore(entry.data);
+    discard.onclick=()=>{if(confirm('復元用の入力を削除しますか？'))update(entries.filter(item=>item!==entry))};
+    row.append(retry,discard);
+   }
+   panel.append(row);
+  }
+  panel.hidden=!panel.childElementCount;
+ }
+ window.addEventListener('beforeunload',event=>{
+  if(entries.some(entry=>entry.pending&&entry.owner===scope())){
+   event.preventDefault();
+   event.returnValue='';
+  }
+ });
+ function update(next){
+  entries=next;
+  try{sessionStorage.setItem(key,JSON.stringify(entries))}catch{}
+  render();
+ }
+ return {
+  render,
+  begin(form,label,data){
+   const owner=scope();
+   if(!owner)return ()=>{};
+   const entry={owner,label,data,pending:true,message:'保存中…'};
+   update([...entries.filter(item=>item.owner!==owner||item.data.id!==data.id),entry]);
+   const editor=editors.get(form.closest('dialog'));
+   if(editor?.form===form)editor.discardFailedSave=()=>update(entries.filter(item=>item!==entry));
+   return error=>{
+    if(!entries.includes(entry))return;
+    if(error){
+     entry.pending=false;
+     entry.message=/Failed to fetch|NetworkError|Load failed/.test(error)
+      ?'通信が切れたため保存結果を確認できませんでした。最新の内容を確認してから再試行してください。':error;
+     update(entries);
+    }
+    else update(entries.filter(item=>item!==entry));
+   };
+  }
+ };
+}
+
+export function recoveryScope(state){
+ if(state.ready===false)return null;
+ return state.configured?(state.user?.uid&&['admin','editor'].includes(state.role)?'member:'+state.user.uid:null):'device';
+}
+
+export function recoveredEditState(form,recovery,current){
+ if(!recovery)return true;
+ const known=JSON.stringify(current??null);
+ const unchanged=known===JSON.stringify(recovery.base??null);
+ editorState(form,unchanged?'入力を復元しました。内容を確認して保存してください。':
+  '保存先の内容が変わっています。最新の内容を確認し、必要な箇所を入力し直してください。');
+ if(!unchanged)form.querySelector('.editor-bar button:not([type=button])').disabled=true;
+ return unchanged;
 }

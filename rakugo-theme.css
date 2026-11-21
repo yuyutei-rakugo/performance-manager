@@ -46,3 +46,6 @@ footer{border-top:2px solid var(--line)}button:disabled{opacity:.5;cursor:defaul
 dialog:has(.editor-bar) input,dialog:has(.editor-bar) textarea,dialog:has(.editor-bar) select{scroll-margin-top:110px}
 dialog:has(.editor-bar) .dialog-head{position:static}
 #practice-section[data-editing]~section,#rehearsal-dialog:has(#practice-section[data-editing]) #attendance{display:none}
+.save-recovery:not([hidden]){margin-block:12px;padding:12px;border:1px solid var(--line);background:var(--white);border-radius:8px}
+.save-recovery p{margin:0 0 6px;font-weight:700;overflow-wrap:anywhere}
+.save-recovery button{margin:0 8px 6px 0;min-height:44px}
