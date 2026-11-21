@@ -1,7 +1,7 @@
-import {startEditor,finishEditor,leaveEditor,guardEditor,editorState} from './editor-dialog.js?v=20261121-edit1';
-import {categoryOptions} from './categories.js?v=20261121-edit1';
-import {readRecords,writeRecords} from './record-transfer.js?v=20261121-edit1';
-import {cloud} from './cloud.js?v=20261121-edit1';
+import {startEditor,finishEditor,leaveEditor,guardEditor,editorState,saveRecovery,recoveryScope,recoveredEditState} from './editor-dialog.js?v=20261121-retry1';
+import {categoryOptions} from './categories.js?v=20261121-retry1';
+import {readRecords,writeRecords} from './record-transfer.js?v=20261121-retry1';
+import {cloud} from './cloud.js?v=20261121-retry1';
 export function historyEditor(getData,refresh){
  const section=document.createElement('section');section.className='record-edit-panel';section.innerHTML='<button id="history-add" class="primary" type="button" disabled>＋ 稽古・公演記録を追加</button><p id="history-edit-result" class="save-feedback" role="status"></p><p id="history-edit-status" role="status">共通保存の接続を確認しています…</p>';
  (document.getElementById('history-tools')||document.querySelector('main')).append(section);
@@ -11,8 +11,12 @@ export function historyEditor(getData,refresh){
  let localReady=true;try{readRecords()}catch{localReady=false}const publicIds=new Set(getData().publicIds||[]);const allowed=()=>cloud.state.ready!==false&&!cloud.state.connectionIssue&&(cloud.state.configured?loaded&&['editor','admin'].includes(cloud.state.role):localReady);
  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const feedback=message=>section.querySelector('#history-edit-status').textContent=message;
- function controls(){section.querySelector('button').disabled=!allowed();document.querySelectorAll('[data-record-edit]').forEach(el=>el.hidden=!allowed()||(!cloud.state.configured&&publicIds.has(el.dataset.recordEdit)))}
+ function controls(){recoveryList.render();section.querySelector('button').disabled=!allowed();document.querySelectorAll('[data-record-edit]').forEach(el=>el.hidden=!allowed()||(!cloud.state.configured&&publicIds.has(el.dataset.recordEdit)))}
+ const recoveryList=saveRecovery('history',()=>recoveryScope(cloud.state),draft=>{
+  if(allowed())edit(getData().records.some(r=>r.id===draft.id)?draft.id:null,draft);
+ },allowed);
  cloud.onState(s=>{
+  recoveryList.render();
   const canEditRole=['admin','editor'].includes(s.role);
   section.querySelector('button').hidden=s.ready!==false&&s.configured&&!canEditRole;
   const next=JSON.stringify([s.ready!==false,s.connectionIssue,s.configured,s.user?.uid,s.role]);
@@ -41,17 +45,43 @@ export function historyEditor(getData,refresh){
   },message=>readFailure('共通記録を読み込めませんでした。'+message));
  });
  function valid(r){return r&&typeof r.id==='string'&&typeof r.date==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(r.date)&&typeof r.kind==='string'&&typeof r.occasion==='string'&&typeof r.note==='string'&&r.pieces&&typeof r.pieces==='object'&&Object.values(r.pieces).every(v=>typeof v==='string')}
- async function persist(items,expected,form){if(busy)return false;busy=true;editorState(form,'保存中…',true);const controlsToLock=[...form.querySelectorAll('input,select,textarea,button:not([data-cancel])')];controlsToLock.forEach(control=>control.disabled=true);try{if(cloud.state.configured){const savedRevision=await cloud.save('history',{items},expected);if(revision>savedRevision)return true}else writeRecords(items.filter(r=>!publicIds.has(r.id)));getData().records=items;refresh();controls();return true}catch(e){feedback(e.message);if(form.isConnected&&dialog.open)editorState(form,'保存できませんでした。'+e.message+' もう一度保存してください。');return false}finally{controlsToLock.forEach(control=>control.disabled=false);busy=false;if(form.querySelector('[data-editor-status]').textContent==='保存中…')editorState(form,'')}}
- function edit(id){
+ async function persist(items,expected,form,draft){
+  if(busy)return false;
+  busy=true;
+  const done=draft?recoveryList.begin(form,draft.value.occasion,draft):()=>{};
+  editorState(form,'保存中…',true);
+  const controlsToLock=[...form.querySelectorAll('input,select,textarea,button:not([data-cancel])')];
+  controlsToLock.forEach(control=>control.disabled=true);
+  try{
+   if(cloud.state.configured){
+    const savedRevision=await cloud.save('history',{items},expected);
+    done();
+    if(revision>savedRevision)return true;
+   }else{writeRecords(items.filter(r=>!publicIds.has(r.id)));done()}
+   getData().records=items;refresh();controls();return true;
+  }catch(e){
+   const message='保存できませんでした。'+e.message+' もう一度保存してください。';
+   done(message);
+   if(form.isConnected&&dialog.open)editorState(form,message);
+   else if(!draft)feedback(message);
+   return false;
+  }finally{
+   controlsToLock.forEach(control=>control.disabled=false);
+   busy=false;
+   if(form.querySelector('[data-editor-status]').textContent==='保存中…')editorState(form,'');
+  }
+ }
+ function edit(id,recovery){
   if(!allowed()||(!cloud.state.configured&&id&&publicIds.has(id)))return;const data=getData(),existing=id?data.records.find(r=>r.id===id):null;if(id&&!existing)return;
   document.getElementById('history-edit-result').textContent='';
-  const record=existing||{id:crypto.randomUUID(),date:new Date().toLocaleDateString('sv-SE'),kind:'その他公演',occasion:'',pieces:{},note:''};const expected=revision;
+  const record=recovery?.value||existing||{id:crypto.randomUUID(),date:new Date().toLocaleDateString('sv-SE'),kind:'その他公演',occasion:'',pieces:{},note:''};const expected=revision;
   dialog.innerHTML=`<form><h2>${existing?'記録を修正':'稽古・公演記録を追加'}</h2><div class="editor-bar"><div class="form-actions"><button type="submit">保存する</button><button type="button" data-cancel>キャンセル</button></div><p role="alert" data-editor-status hidden></p></div><label>日付<input name="date" type="date" required value="${esc(record.date)}"></label><label>区分<select name="kind">${categoryOptions(record.kind,data.records.map(r=>r.kind))}</select></label><label>公演・稽古名<input name="occasion" required value="${esc(record.occasion)}"></label><p>各演者の演目を入力してください。演目未定の出席は「○」、記録なしは空欄にできます。</p>${data.names.map(n=>`<label>${esc(n)}<input data-piece="${esc(n)}" value="${esc(record.pieces[n]||'')}" placeholder="演目・○・空欄"></label>`).join('')}<label>注記<textarea name="note"></textarea></label>${existing?' <button type="button" data-delete>削除する</button>':''}</form>`;
   const form=dialog.querySelector('form');
   form.querySelector('[name=note]').value=record.note;
   startEditor(dialog,form);
+  const canRetry=recoveredEditState(form,recovery,existing);
   dialog.querySelector('[data-cancel]').onclick=()=>leaveEditor(dialog,()=>dialog.close());
-  form.onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target);const next={...record,date:f.get('date'),kind:f.get('kind'),occasion:f.get('occasion').trim(),note:f.get('note'),pieces:{...record.pieces,...Object.fromEntries([...dialog.querySelectorAll('[data-piece]')].map(el=>[el.dataset.piece,el.value.trim()]))}};if(!next.occasion)return;if(await persist(existing?data.records.map(r=>r.id===id?next:r):[...data.records,next],expected,form)){if(form.isConnected){if(dialog.open){finishEditor(dialog);dialog.close()}document.getElementById('history-edit-result').textContent='記録を保存しました。'}}};
+  form.onsubmit=async e=>{e.preventDefault();if(!canRetry)return;const f=new FormData(e.target);const next={...record,date:f.get('date'),kind:f.get('kind'),occasion:f.get('occasion').trim(),note:f.get('note'),pieces:{...record.pieces,...Object.fromEntries([...dialog.querySelectorAll('[data-piece]')].map(el=>[el.dataset.piece,el.value.trim()]))}};if(!next.occasion)return;if(await persist(existing?data.records.map(r=>r.id===id?next:r):[...data.records,next],expected,form,{id:next.id,base:existing,value:next})){if(form.isConnected){if(dialog.open){finishEditor(dialog);dialog.close()}document.getElementById('history-edit-result').textContent='記録を保存しました。'}}};
   if(existing)dialog.querySelector('[data-delete]').onclick=async()=>{if(confirm('この稽古・公演記録を削除しますか？')&&await persist(data.records.filter(r=>r.id!==id),expected,form)&&form.isConnected&&dialog.open)dialog.close()};
   dialog.showModal();
  }

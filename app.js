@@ -1,11 +1,11 @@
-import {startEditor,finishEditor,leaveEditor,guardEditor,editorState} from './editor-dialog.js?v=20261121-edit1';
-import {performerPicker,updatePerformerPickers,readPerformer,showPerformerRoster} from './performer-picker.js?v=20261121-edit1';
-import {mountMemberHome} from './member-home.js?v=20261121-edit1';
-import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261121-edit1';
-import {readCategories,saveCategories,validCategories,categoryOptions,mountCategories} from './categories.js?v=20261121-edit1';
-import {mountScheduleImport} from './schedule-import.js?v=20261121-edit1';
-import {validPerformer,timeline,toRecord,transferRecord,readRecords,mergeRecords,mergedRecords} from './record-transfer.js?v=20261121-edit1';
-import {cloud,startCloud,mountAccount} from './cloud.js?v=20261121-edit1';
+import {startEditor,finishEditor,leaveEditor,guardEditor,editorState,saveRecovery,recoveryScope,recoveredEditState} from './editor-dialog.js?v=20261121-retry1';
+import {performerPicker,updatePerformerPickers,readPerformer,showPerformerRoster} from './performer-picker.js?v=20261121-retry1';
+import {mountMemberHome} from './member-home.js?v=20261121-retry1';
+import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261121-retry1';
+import {readCategories,saveCategories,validCategories,categoryOptions,mountCategories} from './categories.js?v=20261121-retry1';
+import {mountScheduleImport} from './schedule-import.js?v=20261121-retry1';
+import {validPerformer,timeline,toRecord,transferRecord,readRecords,mergeRecords,mergedRecords} from './record-transfer.js?v=20261121-retry1';
+import {cloud,startCloud,mountAccount} from './cloud.js?v=20261121-retry1';
 'use strict';
 
 const key = 'yuitei.events.v1';
@@ -119,6 +119,7 @@ function card(event) {
   return `<article class="event-card"><div class="date-badge" aria-hidden="true"><small>${Number(mon)}月</small><strong>${Number(day)}</strong></div><div><h3>${esc(event.title)}</h3><div class="meta"><span>${year}/${mon}/${day} ${esc(event.time||'時間未定')}</span><span>＠ ${esc(event.venue)}</span></div></div>${progressMarkup(event)}<div class="event-actions"><button class="secondary" data-event="${esc(event.id)}" aria-label="${esc(event.title)}の詳細">詳細 ›</button></div></article>`;
 }
 function render() {
+  eventRecovery.render();
   $('new-event').disabled=!editable();
   const filter=document.getElementById('event-kind-filter');if(filter){const value=filter.value;filter.innerHTML='<option value="">全区分</option>'+categoryOptions(value,events.map(e=>e.kind));filter.value=value;}
   const scheduled = events.filter(e=>!e.archivedAt&&upcoming(e));
@@ -213,10 +214,14 @@ function performerRow(person) {
   row.querySelector('[data-performer-slot]')?.replaceWith(performerPicker(person,performerNames));
   return row;
 }
-function renderForm(existing) {
+const eventRecovery=saveRecovery('events',()=>recoveryScope(cloud.state),draft=>{
+ if(editable())renderForm(events.find(item=>item.id===draft.id),draft);
+},editable);
+function renderForm(existing,recovery) {
   if(!editable()){notify('編集できる会員でログインしてください。');return}
   const formRevision=cloudRevision;
-  const event = existing || {title:'',date:tab === 'calendar' ? selected : today(),time:'14:00',venue:'',memo:'',performers:[],checklist:copiedTasks()};
+  const submissionId=existing?.id||recovery?.id||(globalThis.crypto.randomUUID?.() ?? 'event-' + Date.now() + '-' + Math.random().toString(36).slice(2));
+  const event = recovery?.value || existing || {title:'',date:tab === 'calendar' ? selected : today(),time:'14:00',venue:'',memo:'',performers:[],checklist:copiedTasks()};
   eventDialog.onchange = null;
   eventDialog.innerHTML = `<div class="dialog-body"><div class="dialog-head"><h2 id="event-heading">${existing ? '公演を編集' : '公演を登録'}</h2><button type="button" data-close="event-dialog" aria-label="閉じる">×</button></div>
     <form id="event-form"><div class="editor-bar"><div class="form-actions"><button class="primary" type="submit">保存する</button><button class="secondary" type="button" id="cancel-edit">キャンセル</button></div><p id="form-feedback" role="status" data-editor-status hidden></p></div><div class="fields"><label class="wide">公演名<input name="title" value="${esc(event.title)}" required></label><label>区分<select name="kind">${categoryOptions(event.kind||'その他公演',events.map(e=>e.kind))}</select></label><label>開催日<input name="date" type="date" value="${event.date}" required></label><label>開始時刻（空欄は時間未定）<input name="time" type="time" value="${esc(event.time)}"></label><label class="wide">会場<input name="venue" value="${esc(event.venue)}" required></label></div>
@@ -278,14 +283,15 @@ function renderForm(existing) {
   $('add-break').onclick=()=>{list.append(performerRow({type:'break',name:'',stageName:'仲入り',piece:'休憩',minutes:10}));renumber()};
   $('cancel-edit').onclick = () => leaveEditor(eventDialog,()=>existing ? renderDetails(existing.id) : eventDialog.close());
   startEditor(eventDialog,$('event-form'));
+  const canRetry=recoveredEditState($('event-form'),recovery,existing);
   $('event-form').onsubmit = async submit => {
     submit.preventDefault();
-    if(saving)return;
+    if(saving||!canRetry)return;
     const form = new FormData(submit.currentTarget);
     const text = field => form.get(field).trim();
     const next = {
       ...existing,
-      id:existing?.id || (globalThis.crypto.randomUUID?.() ?? 'event-' + Date.now() + '-' + Math.random().toString(36).slice(2)),
+      id:submissionId,
       checklistUpdatedAt:new Date().toISOString(),
       kind:text('kind'),title:text('title'),date:text('date'),time:text('time'),venue:text('venue'),memo:form.get('memo'),
       performers:[...list.children].map(row => {
@@ -307,14 +313,17 @@ function renderForm(existing) {
     }
     const updated = existing ? events.map(item => item.id === next.id ? next : item) : [...events,next];
     const activeForm=submit.currentTarget;
+    const done=eventRecovery.begin(activeForm,next.title,{id:next.id,base:existing,value:next});
     editorState(activeForm,'保存中…',true);
     const saved=await save(updated,formRevision,reason=>editorState(activeForm,'保存できませんでした。'+reason+' 入力を確認し、もう一度保存してください。'));
+    const failure=feedback.textContent==='保存中…'?'保存できませんでした。もう一度保存してください。':feedback.textContent;
+    done(saved?null:failure);
     if(!activeForm.isConnected||!eventDialog.open){
       if(saved)notify('公演を保存しました。');
       return;
     }
     if(!saved){
-      editorState(activeForm,feedback.textContent==='保存中…'?'保存できませんでした。もう一度保存してください。':feedback.textContent);
+      editorState(activeForm,failure);
       return;
     }
     if(tab==='calendar'){
@@ -348,7 +357,7 @@ $('schedule').onclick = async click => {
   }
 };
 $('list-tab').onclick = () => {tab = 'list'; render();};
-$('calendar-tab').onclick = () => {location.href = 'rehearsals.html?v=20261121-edit1';};
+$('calendar-tab').onclick = () => {location.href = 'rehearsals.html?v=20261121-retry1';};
 $('new-event').onclick = () => renderForm();
 $('data-open').onclick = () => $('data-dialog').showModal();
 guardEditor(eventDialog);
@@ -407,6 +416,7 @@ render();
 
 mountMemberHome();mountAccount();
 cloud.onState(state=>{
+ eventRecovery.render();
  const identity=state.configured?`${state.user?.uid||''}:${state.role||''}`:'local';
  if(identity===cloudIdentity)return;cloudIdentity=identity;performerNames=[];stopCloud?.();cloudLoaded=false;cloudLoadError='';
  if(state.configured){events=[];eventDialog.close();if($('data-dialog').open)$('data-dialog').close();render();if(state.role){stopCloud=cloud.watch('events',doc=>{if(doc&&(!Array.isArray(doc.items)||!doc.items.every(validEvent))){notify('共通データの形式を確認してください。');return}events=doc?.items||[];cloudRevision=doc?.revision||0;cloudLoaded=true;cloudLoadError='';render()},message=>{cloudLoadError=message;notify(message);render()})}}
