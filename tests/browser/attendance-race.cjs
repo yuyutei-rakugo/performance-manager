@@ -205,14 +205,14 @@ async function main(){
   assert.equal(saved.get(names[1]),'出席');
   await p.locator('#rehearsal-dialog [data-close]').click();
   await show(p);
-  await p.locator('#practice-section li').getByText(/芝浜/).waitFor();
+  await p.locator('#practice-section tbody tr').getByText(/芝浜/).waitFor();
   await p.reload();await show(p);
-  await p.locator('#practice-section li').getByText(/芝浜/).waitFor();
+  await p.locator('#practice-section tbody tr').getByText(/芝浜/).waitFor();
   await p.locator('#edit-practices').click();
   assert.equal(await editor.locator('[name=piece]').last().inputValue(),'芝浜');
   const viewer=await session(names[1]);await show(viewer.p);
   await viewer.p.locator('#practice-section').getByText(/試験ゲスト.*時そば/).waitFor();
-  assert.equal(await viewer.p.locator('#practice-section li').count(),3);
+  assert.equal(await viewer.p.locator('#practice-section tbody tr').count(),3);
   await panel(viewer.p).getByText('出席 1人').waitFor();
   await panel(viewer.p).getByText('欠席 1人').waitFor();
 

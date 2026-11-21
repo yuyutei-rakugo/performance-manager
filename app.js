@@ -1,11 +1,11 @@
-import {startEditor,finishEditor,leaveEditor,guardEditor,editorState,saveRecovery,recoveryScope,recoveredEditState} from './editor-dialog.js?v=20261121-retry1';
-import {performerPicker,updatePerformerPickers,readPerformer,showPerformerRoster} from './performer-picker.js?v=20261121-retry1';
-import {mountMemberHome} from './member-home.js?v=20261121-retry1';
-import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261121-retry1';
-import {readCategories,saveCategories,validCategories,categoryOptions,mountCategories} from './categories.js?v=20261121-retry1';
-import {mountScheduleImport} from './schedule-import.js?v=20261121-retry1';
-import {validPerformer,timeline,toRecord,transferRecord,readRecords,mergeRecords,mergedRecords} from './record-transfer.js?v=20261121-retry1';
-import {cloud,startCloud,mountAccount} from './cloud.js?v=20261121-retry1';
+import {startEditor,finishEditor,leaveEditor,guardEditor,editorState,saveRecovery,recoveryScope,recoveredEditState} from './editor-dialog.js?v=20261121-layout1';
+import {performerPicker,updatePerformerPickers,readPerformer,showPerformerRoster} from './performer-picker.js?v=20261121-layout1';
+import {mountMemberHome} from './member-home.js?v=20261121-layout1';
+import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261121-layout1';
+import {readCategories,saveCategories,validCategories,categoryOptions,mountCategories} from './categories.js?v=20261121-layout1';
+import {mountScheduleImport} from './schedule-import.js?v=20261121-layout1';
+import {validPerformer,timeline,toRecord,transferRecord,readRecords,mergeRecords,mergedRecords} from './record-transfer.js?v=20261121-layout1';
+import {cloud,startCloud,mountAccount} from './cloud.js?v=20261121-layout1';
 'use strict';
 
 const key = 'yuitei.events.v1';
@@ -157,7 +157,7 @@ function renderDetails(id,message='') {
   const event = events.find(item => item.id === id);
   if (!event) {eventDialog.close();return}
   const rows=timeline(event.time,event.performers);
-  const program=rows.length?`<div class="program-scroll"><table class="program-table"><thead><tr><th>順</th><th>演者・仲入り</th><th>ネタ・演し物</th><th>持ち時間</th><th>終了予定</th></tr></thead><tbody>${rows.map((p,i)=>`<tr><td>${i+1}</td><td>${esc(p.type==='break'?'仲入り':p.stageName)}</td><td>${esc(p.piece)}</td><td>${p.minutes}分</td><td>${p.end}</td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">出演者は未登録です。</p>';
+  const program=rows.length?`<div class="program-scroll"><table class="program-table event-program-table"><colgroup><col class="program-order"><col class="program-performer"><col><col class="program-duration"><col class="program-end"></colgroup><thead><tr><th>順</th><th>演者・仲入り</th><th>ネタ・演し物</th><th>持ち時間</th><th>終了予定</th></tr></thead><tbody>${rows.map((p,i)=>`<tr><td>${i+1}</td><td>${esc(p.type==='break'?'仲入り':p.stageName)}</td><td>${esc(p.piece)}</td><td>${durationLabel(Math.round(p.minutes*60))}</td><td>${p.end}</td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">出演者は未登録です。</p>';
 
   eventDialog.innerHTML = `<div class="dialog-body"><div class="dialog-head"><h2 id="event-heading">${esc(event.title)}</h2><button type="button" data-close="event-dialog" aria-label="閉じる">×</button></div>
     <p>${dateLabel(event.date)} ${esc(event.time||'時間未定')}<br>会場　${esc(event.venue)}<br>区分　${esc(event.kind||'その他公演')}</p>${editable()?'<div class="form-actions"><button class="primary" data-edit>編集する</button></div>':''}<p class="save-feedback" role="status">${esc(message)}</p>
@@ -206,11 +206,25 @@ function loadPerformerRoster(form,force=false){
     showPerformerRoster(form,'error',performerNames,retry);
   });
 }
+const durationLabel=seconds=>Math.floor(seconds/60)+'分'+(seconds%60?seconds%60+'秒':'');
+function programMinutes(row){
+  const minutes=row.querySelector('[name=minutes]').valueAsNumber,seconds=row.querySelector('[name=seconds]').valueAsNumber||0;
+  const original=Number(row.dataset.originalMinutes);
+  return minutes*60+seconds===Math.round(original*60)?original:minutes+seconds/60;
+}
+
 function performerRow(person) {
+  const seconds=Math.round(person.minutes*60);
+
   const row = document.createElement('div');
   row.className = 'performer';
+  row.dataset.originalMinutes=person.minutes;
   row.innerHTML = `<div class="performer-head"><strong></strong><button type="button" class="icon-button" data-move="-1" aria-label="出演順を上げる">↑</button><button type="button" class="icon-button" data-move="1" aria-label="出演順を下げる">↓</button><button type="button" class="danger" data-remove>削除</button></div>
-    <div class="fields"><input type="hidden" name="type" value="${person.type||'performance'}">${person.type==='break'?`<input type="hidden" name="stageName" value="${esc(person.stageName)}">`:'<div data-performer-slot></div>'}<label>氏名（任意）<input name="name" value="${esc(person.name)}"></label><label>ネタ・演し物<input name="piece" value="${esc(person.piece)}" required></label><label>持ち時間（分）<input name="minutes" type="number" min="0.1" max="1440" step="0.1" value="${person.minutes}" required></label><label>終了予定時刻（任意）<input name="endTime" type="time" value="${esc(person.endTime||'')}"></label><p class="wide">終了予定（自動計算・指定反映）：<output data-end-time></output></p></div>`;
+    <div class="performance-fields"><input type="hidden" name="type" value="${person.type||'performance'}">
+    ${person.type==='break'?'<p>演者・仲入り<strong class="break-name">仲入り</strong><input type="hidden" name="stageName" value="'+esc(person.stageName)+'"></p>':'<div data-performer-slot></div>'}
+    <label>ネタ・演し物<input name="piece" value="${esc(person.piece)}" required></label>
+    <fieldset class="duration-fields"><legend>持ち時間</legend><label>分<input name="minutes" type="number" inputmode="numeric" min="0" max="1440" step="1" value="${Math.floor(seconds/60)}" required></label><label>秒<input name="seconds" type="number" inputmode="numeric" min="0" max="59" step="1" value="${seconds%60}"></label></fieldset>
+    <label>氏名（任意）<input name="name" value="${esc(person.name)}"></label><label>終了予定時刻（任意）<input name="endTime" type="time" value="${esc(person.endTime||'')}"></label><p class="performance-end">終了予定（自動計算・指定反映） <output data-end-time></output></p></div>`;
   row.querySelector('[data-performer-slot]')?.replaceWith(performerPicker(person,performerNames));
   return row;
 }
@@ -251,11 +265,11 @@ function renderForm(existing,recovery) {
   }
 
   const list = $('performers');
-  function updateTimes(){const people=[...list.children].map(row=>({minutes:Number(row.querySelector('[name=minutes]').value),endTime:row.querySelector('[name=endTime]').value}));timeline($('event-form').elements.time.value,people).forEach((p,i)=>list.children[i].querySelector('[data-end-time]').textContent=p.end)}
+  function updateTimes(){const people=[...list.children].map(row=>({minutes:programMinutes(row),endTime:row.querySelector('[name=endTime]').value}));timeline($('event-form').elements.time.value,people).forEach((p,i)=>list.children[i].querySelector('[data-end-time]').textContent=p.end)}
   list.oninput=updateTimes;$('event-form').elements.time.oninput=updateTimes;
   function renumber() {
     [...list.children].forEach((row,i) => {
-      row.querySelector('strong').textContent = '出演順 ' + (i + 1);
+      row.querySelector('.performer-head strong').textContent = '出演順 ' + (i + 1);
       row.querySelector('[data-move="-1"]').disabled = i === 0;
       row.querySelector('[data-move="1"]').disabled = i === list.children.length - 1;
     });updateTimes();
@@ -271,14 +285,14 @@ function renderForm(existing,recovery) {
     else if (row.nextElementSibling) list.insertBefore(row.nextElementSibling,row);
     renumber();
     if (!button.disabled && button.isConnected) button.focus();
-    else if (row.isConnected) row.querySelector('input').focus();
+    else if (row.isConnected) row.querySelector('select, input:not([type=hidden])').focus();
     else $('add-performer').focus();
   };
   $('add-performer').onclick = () => {
     const row = performerRow({name:'',stageName:'',piece:'',minutes:15});
     list.append(row);
     renumber();
-    row.querySelector('input').focus();
+    row.querySelector('select, input:not([type=hidden])').focus();
   };
   $('add-break').onclick=()=>{list.append(performerRow({type:'break',name:'',stageName:'仲入り',piece:'休憩',minutes:10}));renumber()};
   $('cancel-edit').onclick = () => leaveEditor(eventDialog,()=>existing ? renderDetails(existing.id) : eventDialog.close());
@@ -300,7 +314,7 @@ function renderForm(existing,recovery) {
         return {
           type,...(type==='break'?{stageName:input('stageName').value}:readPerformer(row)),
           name:input('name').value.trim(),piece:input('piece').value.trim(),
-          minutes:input('minutes').valueAsNumber,endTime:input('endTime').value
+          minutes:programMinutes(row),endTime:input('endTime').value
         };
       }),
       checklist:[...taskRows.children].map(row=>({label:row.querySelector('[name="label"]').value.trim(),done:row.querySelector('[data-done]').checked,dueDate:row.querySelector('[data-due]').value,assignees:[...row.querySelectorAll('[data-owner]:checked')].map(el=>el.value)}))
@@ -357,7 +371,7 @@ $('schedule').onclick = async click => {
   }
 };
 $('list-tab').onclick = () => {tab = 'list'; render();};
-$('calendar-tab').onclick = () => {location.href = 'rehearsals.html?v=20261121-retry1';};
+$('calendar-tab').onclick = () => {location.href = 'rehearsals.html?v=20261121-layout1';};
 $('new-event').onclick = () => renderForm();
 $('data-open').onclick = () => $('data-dialog').showModal();
 guardEditor(eventDialog);
