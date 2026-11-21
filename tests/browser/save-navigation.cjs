@@ -213,6 +213,17 @@ async function main(){
     delayedHistory=null;
     releaseRead();
 
+    const historyRow=page.locator('[data-record-id=history-old]');
+    await historyRow.waitFor();
+    assert.equal(await historyRow.locator('[data-record-edit]').count(),0);
+    const readingHeight=(await historyRow.boundingBox()).height;
+    await page.getByRole('button',{name:'記録を編集する',exact:true}).click();
+    assert((await historyRow.boundingBox()).height>readingHeight);
+    await page.getByRole('button',{name:'編集を終了',exact:true}).click();
+    assert.equal(await historyRow.locator('[data-record-edit]').count(),0);
+    assert.equal((await historyRow.boundingBox()).height,readingHeight);
+
+    await page.getByRole('button',{name:'記録を編集する',exact:true}).click();
     await page.locator('[data-record-edit=history-old]').click();
     const history=page.locator('.record-dialog[open] form');
     const note='\n全角「日本語」\n'+ '長い注記 '.repeat(80);
@@ -305,6 +316,7 @@ async function main(){
     assert.equal(docs.rehearsals.items[0].notes,'応答が届く前に確定した更新');
 
     await page.goto(new URL('history.html',base).href);
+    await page.getByRole('button',{name:'記録を編集する',exact:true}).click();
     await page.locator('[data-record-edit=history-old]').click();
     await history.locator('[name=note]').fill('記録の復元');
     await failAfterClose('history',history,history.locator('[data-cancel]'),'[name=note]','記録の復元');
@@ -411,6 +423,15 @@ async function main(){
     await page.locator('[data-record-type=all]').click();
     assert.equal(await page.locator('[data-record-id="transferred:rehearsal:today-archive"]').count(),1);
     assert.equal(await page.locator('[data-record-id=custom-event]').count(),1);
+
+    await viewer.goto(new URL('history.html',base).href);
+    await viewer.locator('[data-record-id=history-old]').waitFor();
+    assert.equal(await viewer.getByRole('button',{name:'記録を編集する',exact:true}).count(),0);
+    assert.equal(await viewer.locator('[data-record-edit]').count(),0);
+    const editorPage=await session('editor');
+    await editorPage.goto(new URL('history.html',base).href);
+    await editorPage.getByRole('button',{name:'記録を編集する',exact:true}).click();
+    await editorPage.locator('[data-record-edit=history-old]').waitFor();
 
     const sample=docs.events.items[0];
     docs.events={revision:docs.events.revision+1,items:Array.from({length:500},(_,i)=>({...sample,id:'bulk-'+i}))};
