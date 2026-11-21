@@ -383,7 +383,8 @@ async function main(){
     assert.equal(docs.history.items.filter(r=>r.sourceId===todayPractice.id).length,1);
     const legacyNote='会場：旧会場\n手入力の連絡事項\n1. 試験会員｜時そば（3分5秒）\n2. 別の会員｜注記だけに残っているネタ\n試験会員：出席\n別の会員：欠席';
     docs.history.items.push({id:'legacy-rehearsal',date:'2026-11-20',kind:'通常稽古',occasion:'旧形式の稽古',
-      pieces:{'試験会員':'時そば（3分05秒）'},attendance:{'試験会員':'出席','別の会員':'欠席'},note:legacyNote});
+      pieces:{'試験会員':'時そば（3分05秒）','旧記録の会員':'○','別の会員':'○'},
+      attendance:{'試験会員':'出席','別の会員':'欠席','出席のみの会員':'出席','未定の会員':'未定','未回答の会員':'未回答'},note:legacyNote});
     await page.goto(new URL('history.html',base).href);
     const longRecordPiece='とても長い演目'.repeat(20);
     docs.history.items.push({id:'custom-event',date:'2026-11-21',kind:'交流寄席',occasion:'独自の公演',pieces:{'試験会員':longRecordPiece+'（3分5秒）／猫と金魚（0分）'},note:'会場：試験会場'});
@@ -413,7 +414,16 @@ async function main(){
     const legacyNotes=legacy.locator('td').last();
     await legacyNotes.getByText(/手入力の連絡事項/).waitFor();
     assert.equal(await legacyNotes.textContent(),'会場：旧会場\n手入力の連絡事項\n別の会員｜注記だけに残っているネタ');
-    assert.deepEqual(await legacy.locator('.record-attendance').allTextContents(),['出席','欠席']);
+    const expectedMemberCells={'試験会員':'時そば3分05秒','別の会員':'','旧記録の会員':'○','出席のみの会員':'○','未定の会員':'','未回答の会員':''};
+    async function assertMemberCells(){
+      const names=await page.locator('#head tr').last().locator('th').allTextContents();
+      const cells=await legacy.locator('td').allTextContents();
+      for(const [name,value] of Object.entries(expectedMemberCells)){
+        assert(names.includes(name));
+        assert.equal(cells[names.indexOf(name)+2],value,name);
+      }
+    }
+    await assertMemberCells();
     assert.equal(docs.history.items.find(record=>record.id==='legacy-rehearsal').note,legacyNote);
     async function downloadRecords(){
       const download=page.waitForEvent('download');
@@ -422,20 +432,24 @@ async function main(){
     }
     await page.locator('#query').fill('旧形式の稽古');
     const csv=await downloadRecords();
-    assert(csv.includes('"出席\n時そば（3分05秒）","欠席"'));
+    assert(csv.includes('"時そば（3分05秒）"'));
+    assert(!/"(?:出席|欠席|未定|未登録|未回答)"/.test(csv));
     assert(csv.includes('"会場：旧会場\n手入力の連絡事項\n別の会員｜注記だけに残っているネタ"'));
     assert(!csv.includes('試験会員：出席'));
     assert(!csv.includes('別の会員：欠席'));
     assert(!csv.includes('1. 試験会員'));
     assert(!csv.includes('3分5秒'));
-    await page.locator('#person').selectOption('別の会員');
-    const attendanceOnly=await downloadRecords();
-    assert(attendanceOnly.includes('"日付","公演・稽古","別の会員","注記"'));
-    assert(attendanceOnly.includes('"旧形式の稽古","欠席",'));
+    for(const [name,value] of Object.entries({...expectedMemberCells,'試験会員':'時そば（3分05秒）'})){
+      await page.locator('#person').selectOption(name);
+      const filtered=await downloadRecords();
+      assert(filtered.includes('"日付","公演・稽古","'+name+'","注記"'));
+      assert(filtered.includes('"旧形式の稽古","'+value+'",'),name);
+    }
     await page.locator('#person').selectOption('');
     await page.locator('#query').fill('');
     await page.evaluate(()=>window.dispatchEvent(new Event('beforeprint')));
     await page.emulateMedia({media:'print'});
+    await assertMemberCells();
     assert(await page.locator('#body .duration-value').getByText('3分05秒',{exact:true}).first().isVisible());
     assert((await page.pdf({format:'A4'})).length>1000);
     assert.equal(await legacyNotes.textContent(),'会場：旧会場\n手入力の連絡事項\n別の会員｜注記だけに残っているネタ');

@@ -19,6 +19,5 @@ td:last-child{white-space:pre-line}
 .record-types button{min-height:44px;padding:8px 14px;border:1px solid var(--line);border-radius:6px;background:var(--white);font:inherit}
 .record-types button[aria-pressed=true]{background:var(--navy);color:white;font-weight:700}
 @media print{.record-types{display:none!important}}
-.record-attendance{display:block;font-weight:700;margin-bottom:.25em}
 .record-edit-actions{display:flex;flex-wrap:wrap;gap:8px}
 .record-edit-actions button{min-height:44px}

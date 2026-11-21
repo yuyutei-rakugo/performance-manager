@@ -70,10 +70,6 @@ function rehearsalNote(record){
   return pieces.some(([title,elapsed])=>title===piece&&elapsed===(time||'未入力'))?[]:[name+'｜'+description];
  }).join('\n');
 }
-function recordAttendance(record,name){
- const status=Object.hasOwn(record.attendance||{},name)?record.attendance[name]:'';
- return status==='未回答'?'未登録':status;
-}
 function sorted(records,order){
  const kinds=readCategories(data.records.map(record=>record.kind));
  return [...records].sort((a,b)=>(order==='kind'?kinds.indexOf(a.kind)-kinds.indexOf(b.kind):0)||a.date.localeCompare(b.date));
@@ -98,28 +94,27 @@ function render(order=$('display-order').value){
 function recordValues(record){
  const rehearsal=typeOf(record)==='rehearsal';
  const members=cols.slice(2,-1).map(name=>{
-  const status=rehearsal?recordAttendance(record,name):'';
-  const value=record.pieces[name];
-  return {status,value:value==='○'&&status==='出席'?'':value};
+  const piece=record.pieces[name];
+  const attendance=rehearsal&&Object.hasOwn(record.attendance||{},name)?record.attendance[name]:undefined;
+  if(attendance===undefined||piece?.trim()&&piece.trim()!=='○')return {value:piece};
+  return {value:attendance==='出席'?'○':''};
  });
  return [{value:record.date},{value:record.occasion},...members,{value:rehearsal?rehearsalNote(record):record.note,notes:true}];
 }
 function renderRows(){
- $('body').innerHTML=shown.map(record=>'<tr data-record-id="'+esc(record.id)+'">'+recordValues(record).map(({value,status,notes},index)=>{
+ $('body').innerHTML=shown.map(record=>'<tr data-record-id="'+esc(record.id)+'">'+recordValues(record).map(({value,notes},index)=>{
   const column=index===0?'fixed-date':index===1?'fixed-occasion':'';
   const edit=index===1&&editor?.canSelect(record.id)?'<br><button type="button" class="edit-record" data-record-edit="'+esc(record.id)+'">編集する</button>':'';
-  const attendance=status?'<span class="record-attendance">'+esc(status)+'</span>':'';
-  return '<td class="'+column+(/要確認|原文/.test(value)?' uncertain':'')+'">'+attendance+(index<2?esc(value):recordCell(recordParts(value,notes),notes))+edit+'</td>';
+  return '<td class="'+column+(/要確認|原文/.test(value)?' uncertain':'')+'">'+(index<2?esc(value):recordCell(recordParts(value,notes),notes))+edit+'</td>';
  }).join('')+'</tr>').join('')||'<tr><td colspan="'+cols.length+'">該当する記録はありません。</td></tr>';
 }
 function csvValues(record){
- return recordValues(record).map(({value,status,notes},index)=>{
+ return recordValues(record).map(({value,notes},index)=>{
   if(index<2)return value;
-  const content=recordParts(value,notes).map(({text,time,end})=>{
+  return recordParts(value,notes).map(({text,time,end})=>{
    if(!time)return text;
    return end?text+'｜'+time+end:text+'（'+time+'）';
   }).join(notes?'\n':'／');
-  return [status,content].filter(Boolean).join('\n');
  });
 }
 $('body').onclick=event=>{
