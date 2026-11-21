@@ -15,13 +15,14 @@ export function createPinClient(endpoint,state,emit){
 
  // This tab may show recent server responses while new authenticated reads are in flight.
  const views=new Map();
+ const cacheable=(action,args)=>action!=='attendanceRead'&&(action!=='read'||args.name!=='rehearsals');
  function readViews(){
   try{
    const saved=JSON.parse(sessionStorage.getItem(viewKey));
    if(saved.token!==token||saved.endpoint!==endpoint||!Array.isArray(saved.entries))return;
    for(const [key,entry] of saved.entries){
     const age=Date.now()-entry.time;
-    if(age>=0&&age<maxViewAge)views.set(key,entry);
+    if(cacheable(...JSON.parse(key))&&age>=0&&age<maxViewAge)views.set(key,entry);
    }
   }catch{}
  }
@@ -39,9 +40,9 @@ export function createPinClient(endpoint,state,emit){
   }catch{}
  }
  const streams=new Map(),pending=new Map(),attendanceWrites=new Set();
- async function call(action,body={}){
+ async function call(action,body={},fresh=false){
   const version=epoch;
-  const read=['session','read','attendanceRead','roster','members'].includes(action),key=JSON.stringify([epoch,action,body]);
+  const read=!fresh&&['session','read','roster','members'].includes(action),key=JSON.stringify([epoch,action,body]);
   if(read&&pending.has(key))return pending.get(key);
   const request=(async()=>{
    const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),30000);
@@ -88,32 +89,35 @@ export function createPinClient(endpoint,state,emit){
   for(const subscriber of [...entry.subscribers]){
    try{
     if(error){subscriber.needsValue=true;subscriber.onError?.(error)}
-    else if(changed||subscriber.needsValue){subscriber.needsValue=false;subscriber.fn(structuredClone(entry.value))}
+    else if(changed||subscriber.needsValue){subscriber.needsValue=false;subscriber.fn(structuredClone(entry.value),entry.updatedAt)}
    }catch{}
   }
  }
  function stopTimer(entry){
   if(entry.timer!==null){clearInterval(entry.timer);entry.timer=null}
  }
- async function load(entry){
-  if(entry.closed||!entry.subscribers.size||entry.inFlight)return;
-  entry.inFlight=true;
+ async function load(entry,supersede=false){
+  if(entry.closed||!entry.subscribers.size||entry.inFlight&&!supersede)return;
+  const request={};
+  entry.inFlight=request;
   const version=entry.version;
   try{
-   const result=await call(entry.action,entry.args);
+   const result=await call(entry.action,entry.args,supersede);
    if(entry.closed||version!==entry.version)return;
    const value=entry.action==='read'?result.doc:result.rows;
    const changed=!entry.hasValue||(entry.action==='read'
     ? value?.revision!==entry.value?.revision
     : JSON.stringify(value)!==JSON.stringify(entry.value));
-   entry.value=value;entry.hasValue=true;entry.updatedAt=Date.now();entry.error='';entry.attendanceRefresh=false;
-   if(state.user)saveView(streamKey(entry.action,entry.args),value,entry.updatedAt);
-   deliver(entry,null,changed);
+   entry.value=value;entry.hasValue=true;entry.updatedAt=Date.now();entry.error='';
+   if(state.user&&cacheable(entry.action,entry.args))saveView(streamKey(entry.action,entry.args),value,entry.updatedAt);
+   deliver(entry,null,changed||entry.action==='attendanceRead');
   }catch(error){
    if(!entry.closed&&version===entry.version){entry.error=error.message;deliver(entry,error.message)}
   }finally{
-   entry.inFlight=false;
-   if(entry.again){entry.again=false;load(entry)}
+   if(entry.inFlight===request){
+    entry.inFlight=false;
+    if(entry.again){entry.again=false;load(entry)}
+   }
   }
  }
  function watch(action,args,fn,onError){
@@ -130,7 +134,7 @@ export function createPinClient(endpoint,state,emit){
   const subscriber={fn,onError,needsValue:true};
   entry.subscribers.add(subscriber);
   if(entry.timer===null)entry.timer=setInterval(()=>{if(document.visibilityState!=='hidden')load(entry)},60000);
-  if(entry.hasValue&&now-entry.updatedAt<maxViewAge){
+  if(action!=='attendanceRead'&&entry.hasValue&&now-entry.updatedAt<maxViewAge){
    queueMicrotask(()=>{
     if(entry.closed||!entry.hasValue||!entry.subscribers.has(subscriber)||!subscriber.needsValue)return;
     subscriber.needsValue=false;
@@ -138,7 +142,9 @@ export function createPinClient(endpoint,state,emit){
     if(entry.error)onError?.(entry.error);
    });
   }
-  if(!entry.hasValue||entry.error||entry.attendanceRefresh||now-entry.updatedAt>=freshFor)load(entry);
+  if(action==='attendanceRead'){
+   if(entry.inFlight){entry.version++;entry.again=true}else load(entry);
+  }else if(!entry.hasValue||entry.error||now-entry.updatedAt>=freshFor)load(entry);
   return()=>{entry.subscribers.delete(subscriber);if(!entry.subscribers.size)stopTimer(entry)};
  }
  function refresh(action,name){
@@ -152,14 +158,14 @@ export function createPinClient(endpoint,state,emit){
  function confirmed(action,args,value){
   const key=streamKey(action,args),entry=streams.get(key);
   if(action==='read'&&(entry?.value?.revision??views.get(key)?.value?.revision)>value.revision)return;
-  const time=action==='read'?Date.now():(entry?.updatedAt??views.get(key)?.time??Date.now());
-  if(state.user)saveView(key,value,time);
+  const time=Date.now();
+  if(state.user&&cacheable(action,args))saveView(key,value,time);
   if(!entry)return;
-  entry.version++;entry.value=value;entry.hasValue=true;entry.updatedAt=time;if(action==='attendanceRead')entry.error='';deliver(entry);
+  entry.version++;entry.value=value;entry.hasValue=true;entry.updatedAt=time;deliver(entry);
  }
  window.addEventListener('storage',event=>{if(event.storageArea===localStorage&&(event.key===sessionKey||event.key===null)&&readStorage(localStorage)!==token&&remember){signOut()}});
  function refreshVisible(){
-  for(const entry of streams.values())if(entry.subscribers.size&&Date.now()-entry.updatedAt>=freshFor)load(entry);
+  for(const entry of streams.values())if(entry.subscribers.size&&(entry.action==='attendanceRead'||Date.now()-entry.updatedAt>=freshFor))load(entry);
  }
  window.addEventListener('focus',refreshVisible);
  window.addEventListener('pageshow',event=>{
@@ -180,7 +186,7 @@ export function createPinClient(endpoint,state,emit){
   },
   async login(name,pin,keep=true){const result=await call('login',{name,pin,remember:keep});clear();token=result.token;remember=keep;persist();rememberMember(result.member);identity(result.member)},
   async logout(){const request=call('logout');signOut();await request},
-  async readShared(name){return (await call('read',{name})).doc},
+  async readShared(name){return (await call('read',{name},true)).doc},
   async readAttendance(id){return (await call('attendanceRead',{id})).rows},
   watch(name,fn,onError){return watch('read',{name},fn,onError)},watchAttendance(id,fn,onError){return watch('attendanceRead',{id},fn,onError)},
   async save(name,payload,revision){
@@ -200,19 +206,10 @@ export function createPinClient(endpoint,state,emit){
    try{
     await call('attendanceSave',{id,status});
     const entry=streams.get(streamKey('attendanceRead',{id}));
-    const previous=entry?.hasValue?entry.value:views.get(streamKey('attendanceRead',{id}))?.value;
-    if(previous){
-     const rows=previous.filter(row=>row.stageName!==state.stageName);
-     rows.push({stageName:state.stageName,status});
-     confirmed('attendanceRead',{id},rows);
-    }else if(entry){
-     entry.version++;
-    }
-    // Reads begun before the acknowledgement are superseded even when the detail is closed.
-    // The new read also picks up answers saved by other members during this write.
+    // Supersede reads started before the acknowledgement. Only server rows are published.
     if(entry){
-     entry.attendanceRefresh=true;
-     if(entry.inFlight)entry.again=true;else load(entry);
+     entry.version++;
+     entry.again=false;load(entry,true);
     }
    }finally{if(version===epoch)attendanceWrites.delete(id)}
   },
