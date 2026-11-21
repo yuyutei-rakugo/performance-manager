@@ -1,39 +1,157 @@
-<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>稽古・公演記録｜結友亭</title><link rel="stylesheet" href="style.css?v=20261121-duration1"><link rel="stylesheet" href="schedule-ui.css?v=20261121-duration1"><link rel="stylesheet" href="records.css?v=20261121-duration1"><link rel="stylesheet" href="rakugo-theme.css?v=20261121-duration1"><link rel="manifest" href="manifest.webmanifest?v=20261121-duration1"><link rel="icon" type="image/png" href="notebook-pixel-any-192-v3.png"><link rel="apple-touch-icon" href="notebook-pixel-maskable-512-v3.png"><meta name="theme-color" content="#071d42"><meta name="apple-mobile-web-app-capable" content="yes"><script src="install.js?v=20261121-duration1" defer></script></head><body class="history-page member-view"><header class="top"><div class="wrap top-inner"><div class="header-actions"><button id="data-open" class="data-button">データ管理</button></div></div></header><main class="wrap"><section class="hero"><img class="hero-logo" src="notebook-art-v2.png" alt="" width="96" height="109"><div><p class="hero-kicker">笑いで友をむすび、落語で地域を結ぶ</p><h1>結友亭の帳面</h1><p>公演の支度も、日々の稽古も。</p></div></section><nav class="tabs" aria-label="画面の切り替え"><a href="./?v=20261121-duration1">公演一覧</a><a href="rehearsals.html?v=20261121-duration1">稽古出欠</a><a href="history.html?v=20261121-duration1" aria-current="page">稽古・公演記録</a></nav><section class="workspace"><div class="section-head"><div><p class="eyebrow">RECORDS</p><h2>稽古・公演記録</h2></div></div><div id="history-tools"></div><nav class="record-filters" aria-label="記録の絞り込みと印刷"><select id="person"><option value="">全演者</option></select><select id="kind"><option value="">全区分</option></select><input id="query" placeholder="演目・会場・日付を検索"><label>表示順<select id="display-order"><option value="date">日付順</option><option value="kind">区分順</option></select></label><button id="download">一覧をCSV保存</button><label>印刷の並び順 <select id="print-order"><option value="date">日付順</option><option value="kind">区分順（区分内は日付順）</option></select></label><button id="print-button">印刷・PDF保存</button></nav><p id="count"></p><div class="table-controls"><div class="table-buttons"><button type="button" id="table-left">← 左へ</button> <button type="button" id="table-right">右の演者へ →</button></div></div><div class="scroll" tabindex="0" aria-label="日付と公演・稽古を固定した演者一覧。ネタの欄を左右にスクロールできます"><table><colgroup id="record-columns"></colgroup><thead id="head"></thead><tbody id="body"></tbody></table></div><p><small>西暦は原本の令和表記から換算。</small></p></section></main><footer class="wrap">結友亭落語研究会 <span>公演管理</span></footer><dialog id="data-dialog"><div class="dialog-body"><div class="dialog-head"><h2>データ管理</h2><button type="button" id="data-close" aria-label="閉じる">×</button></div><p>記録の保存・印刷は、一覧の「CSV保存」「印刷・PDF保存」から利用できます。</p></div></dialog><script type="module">
-import {readCategories,categoryOptions,mountCategories} from './categories.js?v=20261121-duration1';
-import {readRecords,formatDuration} from './record-transfer.js?v=20261121-duration1';
-import {cloud,startCloud,mountAccount} from "./cloud.js?v=20261121-duration1";
-import {historyEditor} from "./history-editor.js?v=20261121-duration1";
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>稽古・公演記録｜結友亭</title><link rel="stylesheet" href="style.css?v=20261121-records1"><link rel="stylesheet" href="schedule-ui.css?v=20261121-records1"><link rel="stylesheet" href="records.css?v=20261121-records1"><link rel="stylesheet" href="rakugo-theme.css?v=20261121-records1"><link rel="manifest" href="manifest.webmanifest?v=20261121-records1"><link rel="icon" type="image/png" href="notebook-pixel-any-192-v3.png"><link rel="apple-touch-icon" href="notebook-pixel-maskable-512-v3.png"><meta name="theme-color" content="#071d42"><meta name="apple-mobile-web-app-capable" content="yes"><script src="install.js?v=20261121-records1" defer></script></head><body class="history-page member-view"><header class="top"><div class="wrap top-inner"><div class="header-actions"><button id="data-open" class="data-button">データ管理</button></div></div></header><main class="wrap"><section class="hero"><img class="hero-logo" src="notebook-art-v2.png" alt="" width="96" height="109"><div><p class="hero-kicker">笑いで友をむすび、落語で地域を結ぶ</p><h1>結友亭の帳面</h1><p>公演の支度も、日々の稽古も。</p></div></section><nav class="tabs" aria-label="画面の切り替え"><a href="./?v=20261121-records1">公演一覧</a><a href="rehearsals.html?v=20261121-records1">稽古出欠</a><a href="history.html?v=20261121-records1" aria-current="page">稽古・公演記録</a></nav><section class="workspace"><div class="section-head"><div><p class="eyebrow">RECORDS</p><h2>稽古・公演記録</h2></div></div><div id="history-tools"></div><div class="record-types" role="group" aria-label="記録の種類"><button type="button" data-record-type="event" aria-pressed="true">公演</button><button type="button" data-record-type="rehearsal" aria-pressed="false">稽古</button><button type="button" data-record-type="all" aria-pressed="false">すべて</button></div><nav class="record-filters" aria-label="記録の絞り込みと印刷"><select id="person"><option value="">全演者</option></select><select id="kind"><option value="">全区分</option></select><input id="query" placeholder="演目・会場・日付を検索"><label>表示順<select id="display-order"><option value="date">日付順</option><option value="kind">区分順</option></select></label><button id="download">一覧をCSV保存</button><label>印刷の並び順 <select id="print-order"><option value="date">日付順</option><option value="kind">区分順（区分内は日付順）</option></select></label><button id="print-button">印刷・PDF保存</button></nav><p id="count"></p><div id="body" class="record-list"></div><section id="record-print" aria-label="印刷用記録"></section><p><small>西暦は原本の令和表記から換算。</small></p></section></main><footer class="wrap">結友亭落語研究会 <span>公演管理</span></footer><dialog id="data-dialog"><div class="dialog-body"><div class="dialog-head"><h2>データ管理</h2><button type="button" id="data-close" aria-label="閉じる">×</button></div><p>記録の保存・印刷は、一覧の「CSV保存」「印刷・PDF保存」から利用できます。</p></div></dialog><dialog id="record-detail" aria-labelledby="record-detail-title"></dialog><script type="module">
+import {readCategories,mountCategories} from './categories.js?v=20261121-records1';
+import {readRecords,formatDuration} from './record-transfer.js?v=20261121-records1';
+import {cloud,startCloud,mountAccount} from "./cloud.js?v=20261121-records1";
+import {historyEditor} from "./history-editor.js?v=20261121-records1";
 document.getElementById('data-open').onclick=()=>document.getElementById('data-dialog').showModal();document.getElementById('data-close').onclick=()=>document.getElementById('data-dialog').close();
 let editor;
 const $=id=>document.getElementById(id);let data,shown,cols,originalNames;const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function updatePerformerColumns(){
- const names=[...new Set([...originalNames,...data.records.flatMap(record=>Object.keys(record.pieces))])];
+ const names=[...new Set([...originalNames,...data.records.flatMap(record=>[...Object.keys(record.pieces),...Object.keys(record.attendance||{})])])];
  if(names.length===data.names.length&&names.every((name,index)=>name===data.names[index])&&$('person').options.length>1)return;
  const selected=$('person').value;
  $('person').replaceChildren(new Option('全演者',''),...names.map(name=>new Option(name,name)));
  $('person').value=names.includes(selected)?selected:'';
  data.names=names;
 }
-function durationText(text){
- if(text==='未入力')return text;
- const match=/^(\d+(?:\.\d+)?)分(?:([0-5]?\d)秒)?$/.exec(text);
- return match?formatDuration(Number(match[1])*60+Number(match[2]||0)):null;
+const rehearsalKinds=new Set(['通常稽古','師匠稽古','自主稽古','その他稽古','稽古']);
+let recordType='event',detailId,detailKey;
+const detail=$('record-detail');
+function typeOf(record){
+ if(['event','rehearsal'].includes(record.sourceType))return record.sourceType;
+ const transferred=/^transferred:(event|rehearsal):/.exec(record.id);
+ if(transferred)return transferred[1];
+ if(Array.isArray(record.sourceData?.practices))return 'rehearsal';
+ if(Array.isArray(record.sourceData?.performers))return 'event';
+ return rehearsalKinds.has(record.kind)?'rehearsal':'event';
 }
-function recordCell(value,notes){
- const parts=String(value??'').split(notes?'\n':'／');
- return parts.map(part=>{
-  const suffix=/^(.*)（([^（）]+)）$/.exec(part);
-  const program=notes?/^(\d+\. .*｜.*)｜([^｜]+)(｜終了予定 .*)$/.exec(part):null;
-  const time=durationText((program||suffix)?.[2]||'');
-  if(!time)return esc(part);
-  return '<span class="record-performance"><span>'+esc((program||suffix)[1])+'</span><span class="duration-value">'+esc(time)+'</span></span>'+(program?esc(program[3].slice(1)):'');
- }).join(notes?'\n':'<wbr>／');
+function field(record,label,property){
+ return record.sourceData?.[property]||record.note.match(new RegExp('^'+label+'[：:]\\s*(.+)$','m'))?.[1]||'';
 }
-function render(order=$('display-order').value){updatePerformerColumns();const previous=$('kind').value;$('kind').innerHTML='<option value="">全区分</option>'+categoryOptions(previous,data.records.map(r=>r.kind));$('kind').value=previous;const kindOrder=readCategories(data.records.map(r=>r.kind));const person=$('person').value,q=$('query').value.trim();shown=data.records.filter(r=>(!$('kind').value||r.kind===$('kind').value)&&(!person||r.pieces[person])&&(!q||JSON.stringify(r).includes(q)));shown.sort((a,b)=>order==='kind'?(kindOrder.indexOf(a.kind)-kindOrder.indexOf(b.kind)||a.date.localeCompare(b.date)):a.date.localeCompare(b.date));cols=['日付','公演・稽古',...(person?[person]:data.names),'注記'];const names=person?[person]:data.names;$('record-columns').innerHTML='<col style="width:var(--date-width)"><col style="width:var(--occasion-width)"><col span="'+names.length+'" style="width:8rem"><col style="width:14rem">';document.querySelector('.scroll table').style.width='calc(var(--date-width) + var(--occasion-width) + '+(names.length*8+14)+'rem)';$('head').innerHTML='<tr><th rowspan="2" class="fixed-date" scope="col">日付</th><th rowspan="2" class="fixed-occasion" scope="col">公演・稽古</th><th colspan="'+names.length+'">ネタ</th><th rowspan="2">注記</th></tr><tr>'+names.map(n=>'<th>'+esc(n)+'</th>').join('')+'</tr>';$('body').innerHTML=shown.map(r=>'<tr>'+values(r).map((v,i)=>'<td class="'+(i===0?'fixed-date ':i===1?'fixed-occasion ':'')+(/要確認|原文/.test(v)?'uncertain':'')+'">'+(i>1?recordCell(v,i===cols.length-1):esc(v))+(i===1?'<br><button type="button" class="edit-record" data-record-edit="'+esc(r.id)+'" '+(editor?.allowed()?'':'hidden')+'>修正</button>':'')+'</td>').join('')+'</tr>').join('');$('count').textContent=shown.length+'行を表示';editor?.controls();}
+function splitPiece(value){
+ const match=/^(.*)（(未入力|\d+(?:\.\d+)?分(?:\d{1,2}秒)?)）$/.exec(value);
+ if(!match||match[2]==='未入力')return {piece:match?.[1]||value,time:'未入力'};
+ const [minutes,seconds='0']=match[2].split('分');
+ return {piece:match[1],time:formatDuration(Number(minutes)*60+Number(seconds.replace('秒','')))};
+}
+function overview(record){
+ const venue=field(record,'会場','venue')||field(record,'場所','venue');
+ return '<time datetime="'+esc(record.date)+'">'+esc(record.date)+'</time><strong>'+esc(record.occasion)+'</strong><span class="record-meta">'+esc([record.kind,venue].filter(Boolean).join(' ／ '))+'</span>';
+}
+function recordDetails(record){
+ const responses={...record.attendance},rows=[],notes=[],program=[];
+ for(const [name,value] of Object.entries(record.pieces)){
+  if(!value)continue;
+  if(value.trim()==='○'){if(!Object.hasOwn(responses,name))responses[name]='出席';continue}
+  for(const part of value.split('／')){
+   const {piece,time}=splitPiece(part);
+   if(piece)rows.push({name,piece,time});
+  }
+ }
+ const venue=field(record,'会場','venue')||field(record,'場所','venue');
+ const start=field(record,'開始','time');
+ for(const line of record.note.split('\n')){
+  if(['会場','場所'].some(label=>line===label+'：'+venue)||line==='開始：'+start)continue;
+  const answer=/^([^：:]+)[：:]\s*(出席|欠席|未定|未回答|未登録)$/.exec(line);
+  if(answer){
+   const [,name,status]=answer;
+   if(!Object.hasOwn(responses,name))responses[name]=status;
+   if(responses[name]===status)continue;
+  }
+  const item=/^\d+\. ([^｜]+)｜(.+)$/.exec(line);
+  if(!item){notes.push(line);continue}
+  const [text,elapsed,end]=item[2].split('｜');
+  const {piece,time}=splitPiece(elapsed?text+'（'+elapsed+'）':text);
+  const row=rows.find(row=>!row.fromProgram&&row.name===item[1]&&row.piece===piece&&row.time===time);
+  if(row){row.fromProgram=true;row.end=end;program.push(row)}
+  else if(!rows.length||item[1]==='仲入り')program.push({name:item[1],piece,time,end});
+  else notes.push(line);
+ }
+ program.push(...rows.filter(row=>!row.fromProgram));
+ const body=program.map(({name,piece,time,end})=>'<tr><td>'+esc(name)+'</td><td>'+esc(piece)+(end?'<small class="record-end">'+esc(end)+'</small>':'')+'</td><td class="duration-value">'+esc(time)+'</td></tr>').join('');
+ return (start?'<p>開始 '+esc(start)+'</p>':'')+
+  '<section><h3>演者・演目・時間</h3>'+(body?'<table class="program-table record-program"><colgroup><col class="program-performer"><col><col class="program-duration"></colgroup><thead><tr><th scope="col">演者</th><th scope="col">演目</th><th scope="col" class="duration-value">時間</th></tr></thead><tbody>'+body+'</tbody></table>':'<p>演目の記録はありません。</p>')+'</section>'+
+  '<section><h3>出欠</h3>'+(Object.keys(responses).length?'<ul>'+Object.entries(responses).map(([name,status])=>'<li>'+esc(name)+' '+esc(status==='未回答'?'未登録':status)+'</li>').join('')+'</ul>':'<p>出欠の記録はありません。</p>')+'</section>'+
+  (notes.join('\n').trim()?'<section><h3>連絡事項・注記</h3><p class="memo">'+esc(notes.join('\n').trim())+'</p></section>':'');
+}
+function renderDetail(){
+ if(!detail.open)return;
+ const record=data.records.find(record=>record.id===detailId);
+ if(!record){detail.close();return}
+ const editable=editor?.canEdit(record.id);
+ const key=JSON.stringify([record,editable]);
+ if(key===detailKey)return;
+ detailKey=key;
+ detail.innerHTML='<div class="dialog-body"><div class="dialog-head"><h2 id="record-detail-title">'+esc(record.occasion)+'</h2><button type="button" data-close-record aria-label="閉じる">×</button></div><p>'+esc(record.date)+' ／ '+esc(record.kind)+'</p>'+
+  (field(record,'会場','venue')||field(record,'場所','venue')?'<p>会場 '+esc(field(record,'会場','venue')||field(record,'場所','venue'))+'</p>':'')+
+  (editable?'<button type="button" class="secondary" data-record-edit="'+esc(record.id)+'">編集する</button>':'')+'<p class="save-feedback" data-detail-status role="status"></p>'+recordDetails(record)+'</div>';
+}
+function sorted(records,order){
+ const kinds=readCategories(data.records.map(record=>record.kind));
+ return [...records].sort((a,b)=>(order==='kind'?kinds.indexOf(a.kind)-kinds.indexOf(b.kind):0)||a.date.localeCompare(b.date));
+}
+function render(){
+ updatePerformerColumns();
+ const previous=$('kind').value;
+ const available=data.records.filter(record=>recordType==='all'||typeOf(record)===recordType);
+ const categories=new Set(available.map(record=>record.kind));
+ $('kind').replaceChildren(new Option('全区分',''),...readCategories([...categories]).filter(kind=>categories.has(kind)).map(kind=>new Option(kind,kind)));
+ $('kind').value=available.some(record=>record.kind===previous)?previous:'';
+ const person=$('person').value,query=$('query').value.trim(),kind=$('kind').value;
+ shown=sorted(available.filter(record=>(!kind||record.kind===kind)&&(!person||record.pieces[person]||Object.hasOwn(record.attendance||{},person))&&(!query||JSON.stringify(record).includes(query))),$('display-order').value);
+ cols=['日付','公演・稽古',...(person?[person]:data.names),'注記'];
+ $('body').innerHTML=shown.map(record=>'<button type="button" class="record-summary" data-record-open="'+esc(record.id)+'">'+overview(record)+'</button>').join('')||'<p>該当する記録はありません。</p>';
+ $('count').textContent=shown.length+'件を表示';
+ renderDetail();
+}
 function values(r){return [r.date,r.occasion,...($('person').value?[r.pieces[$('person').value]]:data.names.map(n=>r.pieces[n])),r.note]}
-$('table-left').onclick=()=>document.querySelector('.scroll').scrollBy({left:-300,behavior:'smooth'});$('table-right').onclick=()=>document.querySelector('.scroll').scrollBy({left:300,behavior:'smooth'});
-const kindOrder=['師匠稽古','定期落語会','飯沼観音寄席','図書館寄席','その他公演','通常稽古','自主稽古','その他'];
-$('print-button').onclick=()=>{if(data)window.print()};window.addEventListener('beforeprint',()=>{if(data)render($('print-order').value)});window.addEventListener('afterprint',()=>{if(data)render()});
+$('body').onclick=event=>{
+ const id=event.target.closest('[data-record-open]')?.dataset.recordOpen;
+ if(!id)return;
+ detailId=id;detailKey=null;detail.showModal();renderDetail();
+};
+detail.onclick=event=>{
+ if(event.target.closest('[data-close-record]'))detail.close();
+ const id=event.target.closest('[data-record-edit]')?.dataset.recordEdit;
+ if(id)editor.edit(id);
+};
+document.querySelector('.record-types').onclick=event=>{
+ const button=event.target.closest('[data-record-type]');
+ if(!button)return;
+ recordType=button.dataset.recordType;
+ for(const option of button.parentElement.querySelectorAll('button'))option.setAttribute('aria-pressed',String(option===button));
+ if(data)render();
+};
+function preparePrint(){
+ if(!data)return;
+ $('record-print').innerHTML=sorted(shown,$('print-order').value).map(record=>'<article><header>'+overview(record)+'</header>'+recordDetails(record)+'</article>').join('');
+}
+$('print-button').onclick=()=>{if(data){preparePrint();window.print()}};
+window.addEventListener('beforeprint',preparePrint);
+window.addEventListener('afterprint',()=>{$('record-print').replaceChildren()});
 mountAccount();startCloud();
-fetch('history-data.json?revision=20261119-edit2').then(r=>{if(!r.ok)throw Error();return r.json()}).then(d=>{d.publicIds=d.records.map(r=>r.id);const map=new Map(d.records.map(r=>[r.id,r]));try{readRecords().forEach(r=>map.set(r.id,r))}catch{/* Local corruption cannot block public or shared records. */}d.records=[...map.values()];originalNames=d.names;data=d;mountCategories($('history-tools'),()=>data.records.map(r=>r.kind));window.addEventListener('categories-changed',()=>render());render();editor=historyEditor(()=>data,()=>render());}).catch(()=>$('count').textContent='記録を読み込めませんでした。再読み込みしてください。');for(const id of ['person','kind','query','display-order'])$(id).oninput=()=>data&&render();$('download').onclick=()=>{if(!data)return;const rows=[cols,...shown.map(values)];const text='\ufeff'+rows.map(r=>r.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join('\r\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type:'text/csv;charset=utf-8'}));a.download='yuyutei-records-draft.csv';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)};
+fetch('history-data.json?revision=20261119-edit2').then(response=>{
+ if(!response.ok)throw Error();
+ return response.json();
+}).then(records=>{
+ records.publicIds=records.records.map(record=>record.id);
+ const merged=new Map(records.records.map(record=>[record.id,record]));
+ try{readRecords().forEach(record=>merged.set(record.id,record))}catch{/* Shared records remain available. */}
+ records.records=[...merged.values()];originalNames=records.names;data=records;
+ mountCategories($('history-tools'),()=>data.records.map(record=>record.kind));
+ window.addEventListener('categories-changed',render);
+ render();
+ editor=historyEditor(()=>data,render,renderDetail);
+ renderDetail();
+}).catch(()=>$('count').textContent='記録を読み込めませんでした。再読み込みしてください。');
+for(const id of ['person','kind','query','display-order'])$(id).oninput=()=>data&&render();
+$('download').onclick=()=>{
+ if(!data)return;
+ const rows=[cols,...shown.map(values)];
+ const text='\ufeff'+rows.map(row=>row.map(value=>'"'+String(value??'').replace(/"/g,'""')+'"').join(',')).join('\r\n');
+ const link=document.createElement('a');
+ link.href=URL.createObjectURL(new Blob([text],{type:'text/csv;charset=utf-8'}));
+ link.download='yuyutei-records-draft.csv';link.click();
+ setTimeout(()=>URL.revokeObjectURL(link.href),1000);
+};
 </script></body></html>
