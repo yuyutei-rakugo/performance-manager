@@ -1,4 +1,5 @@
 const assert = require('node:assert/strict');
+const {readFile}=require('node:fs/promises');
 const { chromium, devices } = require('playwright');
 
 const base = new URL(process.env.AUDIT_URL || 'http://127.0.0.1:8151/');
@@ -414,6 +415,25 @@ async function main(){
     assert.equal(await legacyNotes.textContent(),'会場：旧会場\n手入力の連絡事項\n別の会員｜注記だけに残っているネタ');
     assert.deepEqual(await legacy.locator('.record-attendance').allTextContents(),['出席','欠席']);
     assert.equal(docs.history.items.find(record=>record.id==='legacy-rehearsal').note,legacyNote);
+    async function downloadRecords(){
+      const download=page.waitForEvent('download');
+      await page.locator('#download').click();
+      return readFile(await (await download).path(),'utf8');
+    }
+    await page.locator('#query').fill('旧形式の稽古');
+    const csv=await downloadRecords();
+    assert(csv.includes('"出席\n時そば（3分05秒）","欠席"'));
+    assert(csv.includes('"会場：旧会場\n手入力の連絡事項\n別の会員｜注記だけに残っているネタ"'));
+    assert(!csv.includes('試験会員：出席'));
+    assert(!csv.includes('別の会員：欠席'));
+    assert(!csv.includes('1. 試験会員'));
+    assert(!csv.includes('3分5秒'));
+    await page.locator('#person').selectOption('別の会員');
+    const attendanceOnly=await downloadRecords();
+    assert(attendanceOnly.includes('"日付","公演・稽古","別の会員","注記"'));
+    assert(attendanceOnly.includes('"旧形式の稽古","欠席",'));
+    await page.locator('#person').selectOption('');
+    await page.locator('#query').fill('');
     await page.evaluate(()=>window.dispatchEvent(new Event('beforeprint')));
     await page.emulateMedia({media:'print'});
     assert(await page.locator('#body .duration-value').getByText('3分05秒',{exact:true}).first().isVisible());
