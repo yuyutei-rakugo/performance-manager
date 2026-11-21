@@ -29,15 +29,18 @@ function durationText(text){
  const match=/^(\d+(?:\.\d+)?)分(?:([0-5]?\d)秒)?$/.exec(text);
  return match?formatDuration(Number(match[1])*60+Number(match[2]||0)):null;
 }
-function recordCell(value,notes){
- const parts=String(value??'').split(notes?'\n':'／');
- return parts.map(part=>{
+function recordParts(value,notes){
+ return String(value??'').split(notes?'\n':'／').map(part=>{
   const suffix=/^(.*)（([^（）]+)）$/.exec(part);
   const program=notes?/^(\d+\. .*｜.*)｜([^｜]+)(｜終了予定 .*)$/.exec(part):null;
   const time=durationText((program||suffix)?.[2]||'');
-  if(!time)return esc(part);
-  return '<span class="record-performance"><span>'+esc((program||suffix)[1])+'</span><span class="duration-value">'+esc(time)+'</span></span>'+(program?esc(program[3].slice(1)):'');
- }).join(notes?'\n':'<wbr>／');
+  return time?{text:(program||suffix)[1],time,end:program?.[3]}:{text:part};
+ });
+}
+function recordCell(parts,notes){
+ return parts.map(({text,time,end})=>time
+  ?'<span class="record-performance"><span>'+esc(text)+'</span><span class="duration-value">'+esc(time)+'</span></span>'+(end?esc(end.slice(1)):'')
+  :esc(text)).join(notes?'\n':'<wbr>／');
 }
 function rehearsalNote(record){
  const visiblePieces=new Map(Object.entries(record.pieces).map(([name,value])=>[name,value.split('／').map(part=>{
@@ -92,18 +95,33 @@ function render(order=$('display-order').value){
  renderRows();
  $('count').textContent=shown.length+'件を表示';
 }
+function recordValues(record){
+ const rehearsal=typeOf(record)==='rehearsal';
+ const members=cols.slice(2,-1).map(name=>{
+  const status=rehearsal?recordAttendance(record,name):'';
+  const value=record.pieces[name];
+  return {status,value:value==='○'&&status==='出席'?'':value};
+ });
+ return [{value:record.date},{value:record.occasion},...members,{value:rehearsal?rehearsalNote(record):record.note,notes:true}];
+}
 function renderRows(){
- $('body').innerHTML=shown.map(record=>'<tr data-record-id="'+esc(record.id)+'">'+values(record).map((value,index)=>{
+ $('body').innerHTML=shown.map(record=>'<tr data-record-id="'+esc(record.id)+'">'+recordValues(record).map(({value,status,notes},index)=>{
   const column=index===0?'fixed-date':index===1?'fixed-occasion':'';
   const edit=index===1&&editor?.canSelect(record.id)?'<br><button type="button" class="edit-record" data-record-edit="'+esc(record.id)+'">編集する</button>':'';
-  const note=index===cols.length-1,rehearsal=typeOf(record)==='rehearsal';
-  const displayed=note&&rehearsal?rehearsalNote(record):value;
-  const status=rehearsal&&index>1&&!note?recordAttendance(record,cols[index]):'';
   const attendance=status?'<span class="record-attendance">'+esc(status)+'</span>':'';
-  return '<td class="'+column+(/要確認|原文/.test(displayed)?' uncertain':'')+'">'+attendance+(index<2?esc(value):recordCell(displayed=== '○'&&status==='出席'?'':displayed,note))+edit+'</td>';
+  return '<td class="'+column+(/要確認|原文/.test(value)?' uncertain':'')+'">'+attendance+(index<2?esc(value):recordCell(recordParts(value,notes),notes))+edit+'</td>';
  }).join('')+'</tr>').join('')||'<tr><td colspan="'+cols.length+'">該当する記録はありません。</td></tr>';
 }
-function values(r){return [r.date,r.occasion,...($('person').value?[r.pieces[$('person').value]]:data.names.map(n=>r.pieces[n])),r.note]}
+function csvValues(record){
+ return recordValues(record).map(({value,status,notes},index)=>{
+  if(index<2)return value;
+  const content=recordParts(value,notes).map(({text,time,end})=>{
+   if(!time)return text;
+   return end?text+'｜'+time+end:text+'（'+time+'）';
+  }).join(notes?'\n':'／');
+  return [status,content].filter(Boolean).join('\n');
+ });
+}
 $('body').onclick=event=>{
  const id=event.target.closest('[data-record-edit]')?.dataset.recordEdit;
  if(id)editor.select(id);
@@ -138,7 +156,7 @@ fetch('history-data.json?revision=20261119-edit2').then(response=>{
 for(const id of ['person','kind','query','display-order'])$(id).oninput=()=>data&&render();
 $('download').onclick=()=>{
  if(!data)return;
- const rows=[cols,...shown.map(values)];
+ const rows=[cols,...shown.map(csvValues)];
  const text='\ufeff'+rows.map(row=>row.map(value=>'"'+String(value??'').replace(/"/g,'""')+'"').join(',')).join('\r\n');
  const link=document.createElement('a');
  link.href=URL.createObjectURL(new Blob([text],{type:'text/csv;charset=utf-8'}));
