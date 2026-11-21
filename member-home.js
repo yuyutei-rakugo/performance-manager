@@ -1,6 +1,6 @@
-import {cloud} from './cloud.js?v=20261121-rsvp1';
-import {validRehearsal,validAttendance} from './rehearsal-model.js?v=20261121-rsvp1';
-import {rehearsalTitle} from './record-transfer.js?v=20261121-rsvp1';
+import {cloud} from './cloud.js?v=20261121-sync1';
+import {validRehearsal,validAttendance} from './rehearsal-model.js?v=20261121-sync1';
+import {rehearsalTitle} from './record-transfer.js?v=20261121-sync1';
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const label=s=>s==='未回答'||!s?'未登録':s;
 export function mountMemberHome(){
@@ -20,14 +20,12 @@ export function mountMemberHome(){
   const save=p&&shared?cloud.attendanceFeedback?.(p.id):null;
   const confirmed=p?answers[p.id]?.[self]:undefined;
   const canAnswer=!!self&&(shared?authorized:names.includes(self));
-  const current=shared&&answerState!=='ready'?
-   (confirmed?(label(confirmed)+(answerState==='stale'?'（前回取得分）':'')):answerState==='error'?'取得できませんでした':answerState==='stale'?'未登録（前回取得分）':'確認中…'):
-   label(confirmed);
+  const current=shared&&answerState!=='ready'?(answerState==='error'?'取得できませんでした':'確認中…'):label(confirmed);
   const key=JSON.stringify([p?.id,self,shared,shared?null:names]);
   // Keep the actual buttons connected while polling updates the displayed answer.
   if(key!==renderedKey){
    renderedKey=key;
-   panel.innerHTML=`<h2>${practicePage?'次回の稽古':'次回の公演'}</h2><div data-next-plan></div>${p?`<div class="quick-attendance">${!shared?`<label>自分の名前<select id="quick-person"><option value="">選んでください</option>${names.map(n=>`<option value="${esc(n)}" ${n===self?'selected':''}>${esc(n)}</option>`).join('')}</select></label><p class="muted">名前をこのブラウザに覚えます。共有端末では自分の名前に切り替えてください。現在は端末内保存で、本人認証・端末間の同期は未接続です。</p>`:''}<p>自分の回答${self?'（'+esc(self)+'）':''}：<strong></strong></p><p class="sync-warning" hidden>出欠を更新できませんでした。</p><div class="rsvp-buttons">${['出席','欠席','未定'].map(s=>`<button type="button" class="secondary" data-quick-status="${s}">${s}</button>`).join('')}</div><a data-open-rehearsal="${esc(p.id)}" href="rehearsals.html?v=20261121-rsvp1&detail=${encodeURIComponent(p.id)}">出欠一覧・稽古の詳細を見る</a></div>`:''}<p class="save-feedback" role="status"></p>`;
+   panel.innerHTML=`<h2>${practicePage?'次回の稽古':'次回の公演'}</h2><div data-next-plan></div>${p?`<div class="quick-attendance">${!shared?`<label>自分の名前<select id="quick-person"><option value="">選んでください</option>${names.map(n=>`<option value="${esc(n)}" ${n===self?'selected':''}>${esc(n)}</option>`).join('')}</select></label><p class="muted">名前をこのブラウザに覚えます。共有端末では自分の名前に切り替えてください。現在は端末内保存で、本人認証・端末間の同期は未接続です。</p>`:''}<p>自分の回答${self?'（'+esc(self)+'）':''}：<strong></strong></p><p class="sync-warning" hidden>出欠を更新できませんでした。</p><div class="rsvp-buttons">${['出席','欠席','未定'].map(s=>`<button type="button" class="secondary" data-quick-status="${s}">${s}</button>`).join('')}</div><a data-open-rehearsal="${esc(p.id)}" href="rehearsals.html?v=20261121-sync1&detail=${encodeURIComponent(p.id)}">出欠一覧・稽古の詳細を見る</a></div>`:''}<p class="save-feedback" role="status"></p>`;
   }
   panel.querySelector('[data-next-plan]').innerHTML=!authorized?
    `<p>会員ログインすると、${practicePage?'稽古の予定と自分の出欠':'公演の予定'}を確認できます。</p>`:
@@ -36,7 +34,7 @@ export function mountMemberHome(){
   const quick=panel.querySelector('.quick-attendance');
   if(quick){
    quick.querySelector('strong').textContent=current;
-   quick.querySelector('.sync-warning').hidden=!['stale','error'].includes(answerState);
+   quick.querySelector('.sync-warning').hidden=answerState!=='error';
    for(const button of quick.querySelectorAll('[data-quick-status]')){
     button.disabled=!canAnswer||busy||save?.phase==='pending';
     button.setAttribute('aria-pressed',String(confirmed===button.dataset.quickStatus));
@@ -49,7 +47,7 @@ export function mountMemberHome(){
   if(picker)picker.onchange=event=>{try{localStorage.setItem('yuitei.attendance.person',event.target.value);success='';window.dispatchEvent(new Event('member-person-changed'));render()}catch{error='名前を記憶できませんでした。ブラウザの保存設定を確認してください。';render()}};
   for(const b of panel.querySelectorAll('[data-quick-status]'))b.onclick=async()=>{
    if(busy||!canAnswer||!p||cloud.attendanceFeedback?.(p.id)?.phase==='pending')return;const status=b.dataset.quickStatus,version=generation;busy=true;error='';success='保存しています…';render();
-   try{if(cloud.state.configured){await cloud.respondAttendance(p.id,status);if(version!==generation)return;answers[p.id]={...answers[p.id],[self]:status}}
+   try{if(cloud.state.configured){await cloud.respondAttendance(p.id,status);if(version!==generation)return;if(!cloud.attendanceFeedback)answers[p.id]={...answers[p.id],[self]:status}}
     else{const stored=JSON.parse(localStorage.getItem('yuitei.rehearsals.v1')||'null');if(!stored||!Array.isArray(stored.items)||!stored.items.every(validRehearsal)||!stored.items.some(r=>r.id===p.id&&!r.archivedAt)||!stored.attendance||!Object.values(stored.attendance).every(validAttendance))throw Error('予定が変更されています。再読み込みしてから回答してください。');stored.attendance[p.id]={...stored.attendance[p.id],[self]:status};localStorage.setItem('yuitei.rehearsals.v1',JSON.stringify(stored));answers=stored.attendance;window.dispatchEvent(new Event('schedule-data-changed'))}
     success=status+'で登録しました。'+(cloud.state.configured?'':'この端末に保存しました。');
    }catch(ex){if(version!==generation)return;success='';error='保存できませんでした。'+ex.message+' 回答を選び直してお試しください。'}finally{if(version===generation){busy=false;render()}}
@@ -67,7 +65,7 @@ export function mountMemberHome(){
    answerState='ready';render();
   },()=>{
    if(watching!==id)return;
-   answerState=Object.hasOwn(answers,id)?'stale':'error';render();
+   delete answers[id];answerState='error';render();
   });
  }
  cloud.onState(async s=>{
@@ -100,7 +98,7 @@ export function mountMemberHome(){
  });
  window.addEventListener('attendance-save-state',e=>{
   const id=e.detail.id,save=cloud.attendanceFeedback?.(id);
-  if(save?.phase==='saved')answers[id]={...answers[id],[person()]:save.status};
+  if(save?.phase==='saved'&&cloud.state.provider==='apps-script'&&watching===id){delete answers[id];answerState='loading'}
   if(watching===id)render();
  });
  window.addEventListener('schedule-data-changed',()=>{if(!cloud.state.configured)local()});window.addEventListener('member-person-changed',()=>render());

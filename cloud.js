@@ -1,4 +1,4 @@
-import {loadCloudConfig} from './schedule-bootstrap.js?v=20261121-rsvp1';
+import {loadCloudConfig} from './schedule-bootstrap.js?v=20261121-sync1';
 // Configuration is enabled only after the Firebase project and access rules are ready.
 const listeners = new Set();
 const state = {ready:false, configured:false, connectionIssue:null, user:null, role:null,stageName:null, message:'共通保存は設定準備中です。現在はこの端末に保存します。'};
@@ -37,7 +37,7 @@ export const cloud={
  },
  watchAttendance(id,fn,onError){if(pinClient)return pinClient.watchAttendance(id,fn,onError);
   if(!db||!state.role)throw Error('会員ログインが必要です。');
-  const stop=api.onSnapshot(api.collection(db,'rehearsalAttendance',id,'responses'),snap=>fn(snap.docs.map(d=>d.data())),e=>onError(errorMessage(e)));
+  const stop=api.onSnapshot(api.collection(db,'rehearsalAttendance',id,'responses'),{includeMetadataChanges:true},snap=>{if(!snap.metadata.fromCache&&!snap.metadata.hasPendingWrites)fn(snap.docs.map(d=>d.data()),Date.now())},e=>onError(errorMessage(e)));
   watchers.add(stop);return()=>{watchers.delete(stop);stop()};
  },
  attendanceFeedback(id){return attendanceFeedback.get(id)},
@@ -73,7 +73,7 @@ export async function startCloud(){
   state.configured=true;state.provider=config.provider||'firebase';state.message='ログイン状態を確認しています。';emit();
   if(config.provider==='apps-script'){if(!/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec$/.test(config.endpoint||'')){
    state.connectionIssue='configuration';state.ready=true;state.message='共通保存の接続先設定を確認してください。';emit();return
-  }const {createPinClient}=await import('./pin-cloud.js?v=20261121-rsvp1');pinClient=createPinClient(config.endpoint,state,emit);await pinClient.start();return}
+  }const {createPinClient}=await import('./pin-cloud.js?v=20261121-sync1');pinClient=createPinClient(config.endpoint,state,emit);await pinClient.start();return}
   const base='https://www.gstatic.com/firebasejs/12.6.0/';
   const [app,authApi,store]=await Promise.all([import(base+'firebase-app.js'),import(base+'firebase-auth.js'),import(base+'firebase-firestore.js')]);
   api={...authApi,...store};const firebase=app.initializeApp(config.firebase);auth=api.getAuth(firebase);db=api.getFirestore(firebase);
@@ -101,7 +101,7 @@ export function mountAccount(){
  <div class="settings-actions">
   <button type="button" class="secondary" data-install>ホーム画面に追加</button>
   <button type="button" class="secondary" data-share>LINEで共有</button>
-  <a class="secondary" id="settings-admin" href="./admin.html?v=20261121-rsvp1" hidden>管理者ページ</a>
+  <a class="secondary" id="settings-admin" href="./admin.html?v=20261121-sync1" hidden>管理者ページ</a>
   <button type="button" class="secondary" id="cloud-logout" hidden>ログアウト</button>
  </div>
  <details id="settings-pin" hidden><summary>暗証番号を変更</summary><form><label>新しい暗証番号（数字4桁）<input name="pin" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="new-password" required></label><button type="submit" class="secondary">変更する</button><p role="status"></p></form></details></div>`;
