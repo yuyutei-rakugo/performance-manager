@@ -7,7 +7,7 @@ function initializeOwner(){
  const lock=LockService.getScriptLock();lock.waitLock(20000);
  try{const props=PropertiesService.getScriptProperties();if(props.getProperty('DB_FILE_ID'))throw Error('初期設定済みです。');const pin=props.getProperty('OWNER_PIN')||'1111';checkPin_(pin);const secret=Utilities.getUuid()+Utilities.getUuid();props.setProperty('AUTH_SECRET',secret);const owner={id:'owner',name:'勇水',role:'admin',active:true,epoch:1,salt:Utilities.getUuid(),owner:true};owner.pinHash=hashPin_(owner,pin);const file=Drive.Files.create({name:'結友亭の帳面-共通データ.json',mimeType:'application/json'},Utilities.newBlob(JSON.stringify({version:1,members:[owner],shared:{},attendance:{}}),'application/json'),{fields:'id'});props.setProperty('DB_FILE_ID',file.id);props.deleteProperty('OWNER_PIN');return '勇水を最初の管理者として登録しました。'}finally{lock.releaseLock()}
 }
-function doGet(){return output_({ok:true,service:'yuyutei-members',version:1})}
+function doGet(){return output_({ok:true,service:'yuyutei-members',version:1,attendanceProxy:true})}
 function doPost(event){
  const lock=LockService.getScriptLock();let locked=false;
  try{if(!event||!event.postData||event.postData.contents.length>1500000)throw Error('リクエストを確認してください。');const req=JSON.parse(event.postData.contents);if(!req||typeof req!=='object')throw Error('リクエストを確認してください。');lock.waitLock(20000);locked=true;const db=readDb_();if(req.action==='login')return output_({ok:true,...login_(db,req)});const member=authorize_(db,req.token);let data;
@@ -20,6 +20,20 @@ function doPost(event){
  case 'save':if(!['admin','editor'].includes(member.role))throw Error('編集権限が必要です。');checkCollection_(req.name);validCollection_(req.name,req.items);if(!Array.isArray(req.items)||req.items.length>500)throw Error('データの形式を確認してください。');const current=db.shared[req.name];if(['events','rehearsals'].includes(req.name)){const old=new Map((current?current.items:[]).map(r=>[r.id,r]));for(const r of req.items){if((r.archivedAt||null)!==(old.get(r.id)?.archivedAt||null))throw Error('記録への移動は管理者ページから行ってください。')}for(const r of old.values())if(r.archivedAt&&!req.items.some(n=>n.id===r.id))throw Error('転記済みの予定は保持してください。')}if((current?current.revision:0)!==req.revision)throw Error('ほかの端末で更新されています。再読み込みしてください。');db.shared[req.name]={items:req.items,revision:req.revision+1,updatedBy:member.id,updatedAt:new Date().toISOString()};writeDb_(db);data={revision:req.revision+1};break;
  case 'attendanceRead':checkId_(req.id);data={rows:Object.values(db.attendance[req.id]||{})};break;
  case 'attendanceSave':checkId_(req.id);if(typeof req.id!=='string'||!['出席','欠席','未定','未回答'].includes(req.status))throw Error('出欠を確認してください。');db.attendance[req.id]=db.attendance[req.id]||{};db.attendance[req.id][member.id]={stageName:member.name,status:req.status,updatedAt:new Date().toISOString()};writeDb_(db);data={};break;
+ case 'attendanceProxy':{
+  admin_(member);
+  checkId_(req.id);
+  if(!['出席','欠席','未定'].includes(req.status))throw Error('出欠を確認してください。');
+  if(!db.shared.rehearsals?.items.some(r=>r.id===req.id&&!r.archivedAt))throw Error('有効な稽古予定を確認してください。');
+  const target=db.members.find(m=>m.active&&m.name===req.name);
+  if(!target||target.id===member.id)throw Error('未登録の会員を選択してください。');
+  const rows=db.attendance[req.id]||{};
+  const current=rows[target.id]||Object.values(rows).find(r=>r.stageName===target.name&&r.status!=='未回答');
+  if(current&&current.status!=='未回答'){data={applied:false};break}
+  rows[target.id]={stageName:target.name,status:req.status,delegated:true,updatedAt:new Date().toISOString()};
+  db.attendance[req.id]=rows;
+  writeDb_(db);data={applied:true};break;
+ }
  case 'members':admin_(member);data={members:db.members.map(publicMember_)};break;
  case 'memberSave':admin_(member);data={member:saveMember_(db,member,req.member)};writeDb_(db);break;
  case 'changePin':checkPin_(req.pin);member.salt=Utilities.getUuid();member.pinHash=hashPin_(member,req.pin);member.epoch++;writeDb_(db);data={};break;
@@ -39,7 +53,7 @@ function hashPin_(m,pin){return digest_(m.id+':'+m.salt+':'+pin)}
 function readDb_(){const id=PropertiesService.getScriptProperties().getProperty('DB_FILE_ID');if(!id)throw Error('管理者の初期設定が必要です。');const response=UrlFetchApp.fetch('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(id)+'?alt=media',{headers:{Authorization:'Bearer '+ScriptApp.getOAuthToken()},muteHttpExceptions:true});if(response.getResponseCode()!==200)throw Error('専用データを読み込めません。Googleの接続設定を確認してください。');return JSON.parse(response.getContentText('UTF-8'))}
 function writeDb_(db){const text=JSON.stringify(db);if(text.length>1500000)throw Error('保存量が増えています。バックアップして管理者に確認してください。');Drive.Files.update({},PropertiesService.getScriptProperties().getProperty('DB_FILE_ID'),Utilities.newBlob(text,'application/json'),{fields:'id'})}
 function output_(data){return ContentService.createTextOutput(JSON.stringify(data)).setMimeType(ContentService.MimeType.JSON)}
-function publicMember_(m){return {id:m.id,name:m.name,role:m.role,active:m.active,owner:!!m.owner}}
+function publicMember_(m){return {id:m.id,name:m.name,role:m.role,active:m.active,owner:!!m.owner,...(m.role==='admin'?{attendanceProxy:true}:{})}}
 function login_(db,req){
  const props=PropertiesService.getScriptProperties(),name=String(req.name||'').trim().normalize('NFKC');if(name.length>40)throw Error('登録名または暗証番号が違います。');const known=db.members.some(m=>m.name===name&&m.active),key='ATTEMPT_'+digest_(known?name:'unknown'),attempt=JSON.parse(props.getProperty(key)||'{"count":0,"until":0}'),now=Date.now();
  if(attempt.until>now)throw Error('しばらく待ってからログインしてください。');const member=db.members.find(m=>m.name===name&&m.active);const good=member&&typeof req.pin==='string'&&/^\d{4}$/.test(req.pin)&&hashPin_(member,req.pin)===member.pinHash;

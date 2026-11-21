@@ -78,7 +78,7 @@ export function createPinClient(endpoint,state,emit){
   try{sessionStorage.setItem(identityKey,JSON.stringify({token,endpoint,member,checkedAt:Date.now()}))}catch{}
  }
  function clear(){try{sessionStorage.removeItem(identityKey);sessionStorage.removeItem(viewKey)}catch{}views.clear();epoch++;rosterCache=null;rosterRequest=null;for(const entry of streams.values()){stopTimer(entry);entry.closed=true}streams.clear();pending.clear();attendanceWrites.clear()}
- function identity(member){state.connectionIssue=null;state.user=member?{uid:member.id,email:member.name}:null;state.stageName=member?.name||null;state.role=member?.role||null;state.owner=!!member?.owner;state.ready=true;state.message=member?'共通保存：'+member.name+'（'+({admin:'管理者',editor:'編集可',viewer:'会員'}[member.role])+'）':'登録名と4桁の暗証番号でログインしてください。';emit()}
+ function identity(member){state.connectionIssue=null;state.user=member?{uid:member.id,email:member.name}:null;state.stageName=member?.name||null;state.role=member?.role||null;state.owner=!!member?.owner;state.attendanceProxy=member?.attendanceProxy===true;state.ready=true;state.message=member?'共通保存：'+member.name+'（'+({admin:'管理者',editor:'編集可',viewer:'会員'}[member.role])+'）':'登録名と4桁の暗証番号でログインしてください。';emit()}
  function signOut(){
   if(readStorage(localStorage)===token)removeStorage(localStorage);
   if(readStorage(sessionStorage)===token)removeStorage(sessionStorage);
@@ -163,6 +163,22 @@ export function createPinClient(endpoint,state,emit){
   if(!entry)return;
   entry.version++;entry.value=value;entry.hasValue=true;entry.updatedAt=time;deliver(entry);
  }
+ async function writeAttendance(id,action,fields){
+   if(attendanceWrites.has(id))throw Error('出欠を保存しています。しばらくお待ちください。');
+   const version=epoch;
+   attendanceWrites.add(id);
+   try{
+    const result=await call(action,{id,...fields});
+    if(version!==epoch)throw Error('会員ログインを確認してください。');
+    const entry=streams.get(streamKey('attendanceRead',{id}));
+    // Supersede reads started before the acknowledgement. Only server rows are published.
+    if(entry){
+     entry.version++;
+     entry.again=false;load(entry,true);
+    }
+    return result;
+   }finally{if(version===epoch)attendanceWrites.delete(id)}
+ }
  window.addEventListener('storage',event=>{if(event.storageArea===localStorage&&(event.key===sessionKey||event.key===null)&&readStorage(localStorage)!==token&&remember){signOut()}});
  function refreshVisible(){
   for(const entry of streams.values())if(entry.subscribers.size&&(entry.action==='attendanceRead'||Date.now()-entry.updatedAt>=freshFor))load(entry);
@@ -199,20 +215,8 @@ export function createPinClient(endpoint,state,emit){
     throw error;
    }
   },
-  async respondAttendance(id,status){
-   if(attendanceWrites.has(id))throw Error('出欠を保存しています。しばらくお待ちください。');
-   const version=epoch;
-   attendanceWrites.add(id);
-   try{
-    await call('attendanceSave',{id,status});
-    const entry=streams.get(streamKey('attendanceRead',{id}));
-    // Supersede reads started before the acknowledgement. Only server rows are published.
-    if(entry){
-     entry.version++;
-     entry.again=false;load(entry,true);
-    }
-   }finally{if(version===epoch)attendanceWrites.delete(id)}
-  },
+  async respondAttendance(id,status){await writeAttendance(id,'attendanceSave',{status})},
+  proxyAttendance(id,name,status){return writeAttendance(id,'attendanceProxy',{name,status})},
   async roster({force=false}={}){
    const key=streamKey('roster',{});
    const cached=views.get(key);

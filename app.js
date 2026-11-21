@@ -1,10 +1,11 @@
-import {performerPicker,updatePerformerPickers,readPerformer,showPerformerRoster} from './performer-picker.js?v=20261121-today1';
-import {mountMemberHome} from './member-home.js?v=20261121-today1';
-import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261121-today1';
-import {readCategories,saveCategories,validCategories,categoryOptions,mountCategories} from './categories.js?v=20261121-today1';
-import {mountScheduleImport} from './schedule-import.js?v=20261121-today1';
-import {validPerformer,timeline,toRecord,transferRecord,readRecords,mergeRecords,mergedRecords} from './record-transfer.js?v=20261121-today1';
-import {cloud,startCloud,mountAccount} from './cloud.js?v=20261121-today1';
+import {startEditor,finishEditor,leaveEditor,guardEditor,editorState} from './editor-dialog.js?v=20261121-edit1';
+import {performerPicker,updatePerformerPickers,readPerformer,showPerformerRoster} from './performer-picker.js?v=20261121-edit1';
+import {mountMemberHome} from './member-home.js?v=20261121-edit1';
+import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261121-edit1';
+import {readCategories,saveCategories,validCategories,categoryOptions,mountCategories} from './categories.js?v=20261121-edit1';
+import {mountScheduleImport} from './schedule-import.js?v=20261121-edit1';
+import {validPerformer,timeline,toRecord,transferRecord,readRecords,mergeRecords,mergedRecords} from './record-transfer.js?v=20261121-edit1';
+import {cloud,startCloud,mountAccount} from './cloud.js?v=20261121-edit1';
 'use strict';
 
 const key = 'yuitei.events.v1';
@@ -80,20 +81,20 @@ try {
   notify('保存済みデータを読み込めませんでした。');
 }
 
-async function save(next, expectedRevision=cloudRevision) {
+async function save(next, expectedRevision=cloudRevision,report=notify) {
   if(saving)return false;
   if(cloud.state.configured){
-    if(!editable()){notify('会員ログインと編集権限、共通データの読み込みが必要です。');return false}
-    saving=true;try{const savedRevision=await cloud.save('events',{items:next},expectedRevision);if(!(cloudRevision>savedRevision)){events=next;render()}return true}catch(e){notify(e.message);return false}finally{saving=false}
+    if(!editable()){report('会員ログインと編集権限、共通データの読み込みが必要です。');return false}
+    saving=true;try{const savedRevision=await cloud.save('events',{items:next},expectedRevision);if(!(cloudRevision>savedRevision)){events=next;render()}return true}catch(e){report(e.message);return false}finally{saving=false}
   }
   if (!storageReadable) {
-    notify('保存済みデータを読み込めないため、変更を保存できません。');
+    report('保存済みデータを読み込めないため、変更を保存できません。');
     return false;
   }
   try {
     localStorage.setItem(key, JSON.stringify(next));
   } catch {
-    notify('変更を保存できませんでした。ブラウザの設定や空き容量をご確認ください。');
+    report('変更を保存できませんでした。ブラウザの設定や空き容量をご確認ください。');
     return false;
   }
   events = next;
@@ -151,17 +152,16 @@ function showEvent() {
   if (!eventDialog.open) eventDialog.showModal();
   eventDialog.scrollTop = 0;
 }
-function renderDetails(id) {
+function renderDetails(id,message='') {
   const event = events.find(item => item.id === id);
-  if (!event) return;
-  const displayedRevision=cloudRevision;
+  if (!event) {eventDialog.close();return}
   const rows=timeline(event.time,event.performers);
   const program=rows.length?`<div class="program-scroll"><table class="program-table"><thead><tr><th>順</th><th>演者・仲入り</th><th>ネタ・演し物</th><th>持ち時間</th><th>終了予定</th></tr></thead><tbody>${rows.map((p,i)=>`<tr><td>${i+1}</td><td>${esc(p.type==='break'?'仲入り':p.stageName)}</td><td>${esc(p.piece)}</td><td>${p.minutes}分</td><td>${p.end}</td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">出演者は未登録です。</p>';
 
   eventDialog.innerHTML = `<div class="dialog-body"><div class="dialog-head"><h2 id="event-heading">${esc(event.title)}</h2><button type="button" data-close="event-dialog" aria-label="閉じる">×</button></div>
-    <p>${dateLabel(event.date)} ${esc(event.time||'時間未定')}<br>会場　${esc(event.venue)}<br>区分　${esc(event.kind||'その他公演')}</p><div class="form-actions"><button class="primary" data-edit ${editable()?'':'disabled'}>編集する</button></div>
+    <p>${dateLabel(event.date)} ${esc(event.time||'時間未定')}<br>会場　${esc(event.venue)}<br>区分　${esc(event.kind||'その他公演')}</p>${editable()?'<div class="form-actions"><button class="primary" data-edit>編集する</button></div>':''}<p class="save-feedback" role="status">${esc(message)}</p>
     <section class="block" id="event-program"><h3>出演順・演目</h3>${program}${rows.length?'<button type="button" class="secondary" id="print-program">番組表を印刷</button>':''}</section>
-    <section class="block"><h3>準備チェックリスト</h3>${progressMarkup(event)}${event.checklist.map((item,i) => `<div class="check-row"><label><input type="checkbox" data-check="${i}" ${editable()?'':'disabled'} ${item.done ? 'checked' : ''}>${esc(item.label)}</label><small>担当：${esc((item.assignees||[]).join('・')||'未設定')} ／ 完了予定：${esc(item.dueDate||'未設定')}</small></div>`).join('')}</section>
+    <section class="block"><h3>準備チェックリスト</h3>${progressMarkup(event)}${event.checklist.map(item => `<div class="check-row"><span>${item.done?'完了':'未完了'}</span><strong>${esc(item.label)}</strong><small>担当：${esc((item.assignees||[]).join('・')||'未設定')} ／ 完了予定：${esc(item.dueDate||'未設定')}</small></div>`).join('')}</section>
     <section class="block"><h3>メモ</h3><p class="memo">${esc(event.memo) || 'メモはありません。'}</p></section><section class="block" hidden><button type="button" class="primary" id="transfer-event" ${editable()?'':'disabled'}>${event.archivedAt?'記録を更新する':'終了して記録へ移す'}</button><p class="muted">終了した内容を記録に保存します。元データは転記済みの一覧に残ります。</p>${event.archivedAt?'<button type="button" class="secondary" id="unarchive-event">公演一覧に戻す</button>':''}</section></div>`;
   if($('print-program'))$('print-program').onclick=()=>{
     document.body.classList.add('print-program');
@@ -170,28 +170,7 @@ function renderDetails(id) {
   };
   $('transfer-event').onclick=async()=>{if(cloud.state.role!=='admin'||event.date>=today()||!confirm('終了した公演を稽古・公演記録へ移しますか？同じ公演は重複せず更新されます。'))return;try{await transferRecord(toRecord('event',event,memberNames));if(await save(events.map(e=>e.id===id?{...e,archivedAt:new Date().toISOString()}:e))){eventDialog.close();notify('稽古・公演記録へ移しました。')}else notify('記録への保存は完了しましたが、転記済み表示を保存できませんでした。再実行しても重複しません。')}catch(e){notify(e.message)}};
   if($('unarchive-event'))$('unarchive-event').onclick=async()=>{if(await save(events.map(e=>e.id===id?{...e,archivedAt:null}:e))){eventDialog.close();notify('公演一覧に戻しました。転記した記録は残しています。')}};
-  eventDialog.querySelector('[data-edit]').onclick = () => renderForm(events.find(item => item.id === id));
-  eventDialog.onchange = async change => {
-    if (!change.target.matches('[data-check]')) return;
-    const input=change.target;
-    const index=Number(input.dataset.check);
-    const current=events.find(item=>item.id===id);
-    if(current!==event){
-      input.checked=event.checklist[index].done;
-      if(current)renderDetails(id);else eventDialog.close();
-      notify('準備項目が更新されました。最新の内容を確認してください。');
-      return;
-    }
-    const checks=[...eventDialog.querySelectorAll('[data-check]')];
-    checks.forEach(check=>check.disabled=true);
-    const next=clone(event);
-    next.checklist[index].done=input.checked;
-    try{
-      if(await save(events.map(item=>item.id===id?next:item),displayedRevision)){
-        if(input.isConnected&&eventDialog.open)renderDetails(id);
-      }else input.checked=event.checklist[index].done;
-    }finally{checks.forEach(check=>check.disabled=!editable())}
-  };
+  eventDialog.querySelector('[data-edit]')?.addEventListener('click',()=>renderForm(events.find(item=>item.id===id)));
   showEvent();
 }
 
@@ -240,16 +219,15 @@ function renderForm(existing) {
   const event = existing || {title:'',date:tab === 'calendar' ? selected : today(),time:'14:00',venue:'',memo:'',performers:[],checklist:copiedTasks()};
   eventDialog.onchange = null;
   eventDialog.innerHTML = `<div class="dialog-body"><div class="dialog-head"><h2 id="event-heading">${existing ? '公演を編集' : '公演を登録'}</h2><button type="button" data-close="event-dialog" aria-label="閉じる">×</button></div>
-    <form id="event-form"><div class="fields"><label class="wide">公演名<input name="title" value="${esc(event.title)}" required></label><label>区分<select name="kind">${categoryOptions(event.kind||'その他公演',events.map(e=>e.kind))}</select></label><label>開催日<input name="date" type="date" value="${event.date}" required></label><label>開始時刻（空欄は時間未定）<input name="time" type="time" value="${esc(event.time)}"></label><label class="wide">会場<input name="venue" value="${esc(event.venue)}" required></label></div>
+    <form id="event-form"><div class="editor-bar"><div class="form-actions"><button class="primary" type="submit">保存する</button><button class="secondary" type="button" id="cancel-edit">キャンセル</button></div><p id="form-feedback" role="status" data-editor-status hidden></p></div><div class="fields"><label class="wide">公演名<input name="title" value="${esc(event.title)}" required></label><label>区分<select name="kind">${categoryOptions(event.kind||'その他公演',events.map(e=>e.kind))}</select></label><label>開催日<input name="date" type="date" value="${event.date}" required></label><label>開始時刻（空欄は時間未定）<input name="time" type="time" value="${esc(event.time)}"></label><label class="wide">会場<input name="venue" value="${esc(event.venue)}" required></label></div>
     <section class="block"><h3>出演順・演目</h3><p class="muted">会員を選ぶか、「ゲスト演者を入力」から高座名を入力できます。終了予定は開演時刻と持ち時間から計算します。</p><p class="muted" role="status" data-roster-status></p><button type="button" class="secondary" data-roster-retry hidden>名簿を更新</button><div id="performers"></div><button type="button" class="secondary" id="add-performer">＋ 出演者を追加</button> <button type="button" class="secondary" id="add-break">＋ 仲入りを追加</button></section>
     <section class="block"><h3>準備チェックリスト</h3>${!existing?'<p class="muted">最新のリストの項目をコピーしました。完了・担当者・完了予定日はリセットしています。</p>':''}<div id="task-rows"></div><button type="button" class="secondary" id="add-task">＋ 末尾に項目を追加</button></section>
-    <section class="block"><label>公演メモ<textarea name="memo" rows="4"></textarea></label></section><p class="muted" id="form-feedback" role="alert" hidden></p>
-    <div class="form-actions"><button class="primary" type="submit">保存する</button><button class="secondary" type="button" id="cancel-edit">キャンセル</button></div>${existing?'<section class="delete-zone"><button type="button" class="secondary" id="show-delete" aria-expanded="false" aria-controls="delete-confirmation">この公演を削除する…</button><div id="delete-confirmation" hidden><p>削除すると、この公演の出演者・準備リスト・メモも削除されます。</p><label><input type="checkbox" id="confirm-delete">この公演を削除することを確認しました</label><button type="button" class="danger" id="delete-event" disabled>公演を削除する</button></div></section>':''}</form></div>`;
+    <section class="block"><label>公演メモ<textarea name="memo" rows="4"></textarea></label></section>${existing?'<section class="delete-zone"><button type="button" class="secondary" id="show-delete" aria-expanded="false" aria-controls="delete-confirmation">この公演を削除する…</button><div id="delete-confirmation" hidden><p>削除すると、この公演の出演者・準備リスト・メモも削除されます。</p><label><input type="checkbox" id="confirm-delete">この公演を削除することを確認しました</label><button type="button" class="danger" id="delete-event" disabled>公演を削除する</button></div></section>':''}</form></div>`;
   $('event-form').elements.memo.value = event.memo;
   const taskRows=$('task-rows');
   function addTask(item,before=null) {
-    const row=document.createElement('div');row.className='check-row task-edit-row';row.dataset.done=String(item.done);
-    row.innerHTML=`<label>準備項目<input name="label" value="${esc(item.label)}" required></label>${assigneePicker(item,0)}<label>完了予定日（任意）<input type="date" data-due value="${esc(item.dueDate||'')}"></label><div class="task-row-actions"><button type="button" class="secondary" data-insert-before>＋ 前に挿入</button><button type="button" class="secondary" data-insert-after>＋ 後に挿入</button><button type="button" class="secondary" data-remove-task>項目を外す</button></div>`;
+    const row=document.createElement('div');row.className='check-row task-edit-row';
+    row.innerHTML=`<label>準備項目<input name="label" value="${esc(item.label)}" required></label>${assigneePicker(item,0)}<label>完了予定日（任意）<input type="date" data-due value="${esc(item.dueDate||'')}"></label><label><input type="checkbox" data-done ${item.done?'checked':''}>完了</label><div class="task-row-actions"><button type="button" class="secondary" data-insert-before>＋ 前に挿入</button><button type="button" class="secondary" data-insert-after>＋ 後に挿入</button><button type="button" class="secondary" data-remove-task>項目を外す</button></div>`;
     taskRows.insertBefore(row,before);return row;
   }
   event.checklist.forEach(item=>addTask(item));
@@ -298,7 +276,8 @@ function renderForm(existing) {
     row.querySelector('input').focus();
   };
   $('add-break').onclick=()=>{list.append(performerRow({type:'break',name:'',stageName:'仲入り',piece:'休憩',minutes:10}));renumber()};
-  $('cancel-edit').onclick = () => existing ? renderDetails(existing.id) : eventDialog.close();
+  $('cancel-edit').onclick = () => leaveEditor(eventDialog,()=>existing ? renderDetails(existing.id) : eventDialog.close());
+  startEditor(eventDialog,$('event-form'));
   $('event-form').onsubmit = async submit => {
     submit.preventDefault();
     if(saving)return;
@@ -318,7 +297,7 @@ function renderForm(existing) {
           minutes:input('minutes').valueAsNumber,endTime:input('endTime').value
         };
       }),
-      checklist:[...taskRows.children].map(row=>({label:row.querySelector('[name="label"]').value.trim(),done:row.dataset.done==='true',dueDate:row.querySelector('[data-due]').value,assignees:[...row.querySelectorAll('[data-owner]:checked')].map(el=>el.value)}))
+      checklist:[...taskRows.children].map(row=>({label:row.querySelector('[name="label"]').value.trim(),done:row.querySelector('[data-done]').checked,dueDate:row.querySelector('[data-due]').value,assignees:[...row.querySelectorAll('[data-owner]:checked')].map(el=>el.value)}))
     };
     const feedback = $('form-feedback');
     if (!validEvent(next)) {
@@ -328,23 +307,21 @@ function renderForm(existing) {
     }
     const updated = existing ? events.map(item => item.id === next.id ? next : item) : [...events,next];
     const activeForm=submit.currentTarget;
-    activeForm.inert=true;
-    let saved;
-    try{saved=await save(updated,formRevision)}
-    finally{activeForm.inert=false}
+    editorState(activeForm,'保存中…',true);
+    const saved=await save(updated,formRevision,reason=>editorState(activeForm,'保存できませんでした。'+reason+' 入力を確認し、もう一度保存してください。'));
     if(!activeForm.isConnected||!eventDialog.open){
       if(saved)notify('公演を保存しました。');
       return;
     }
     if(!saved){
-      feedback.textContent='公演を保存できませんでした。';
-      feedback.hidden=false;
+      editorState(activeForm,feedback.textContent==='保存中…'?'保存できませんでした。もう一度保存してください。':feedback.textContent);
       return;
     }
     if(tab==='calendar'){
       selected=next.date;month=next.date.slice(0,7);render();
     }
-    renderDetails(next.id);
+    finishEditor(eventDialog);
+    renderDetails(next.id,'公演を保存しました。');
   };
   showEvent();
   loadPerformerRoster($('event-form'));
@@ -371,12 +348,16 @@ $('schedule').onclick = async click => {
   }
 };
 $('list-tab').onclick = () => {tab = 'list'; render();};
-$('calendar-tab').onclick = () => {location.href = 'rehearsals.html?v=20261121-today1';};
+$('calendar-tab').onclick = () => {location.href = 'rehearsals.html?v=20261121-edit1';};
 $('new-event').onclick = () => renderForm();
 $('data-open').onclick = () => $('data-dialog').showModal();
+guardEditor(eventDialog);
 document.addEventListener('click', click => {
   const button = click.target.closest('[data-close]');
-  if (button) $(button.dataset.close).close();
+  if (!button) return;
+  const dialog=$(button.dataset.close);
+  if(dialog===eventDialog)leaveEditor(dialog,()=>dialog.close());
+  else dialog.close();
 });
 $('export-file').onclick = () => {try{
   const url = URL.createObjectURL(new Blob([JSON.stringify({version:1,categories:readCategories(events.map(e=>e.kind)),events,records:readRecords()},null,2)],{type:'application/json'}));

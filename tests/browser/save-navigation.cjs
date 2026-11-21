@@ -65,7 +65,7 @@ async function main(){
       return page;
     }
 
-    const page=await session('editor');
+    const page=await session('admin');
     await page.goto(base.href);
     await page.getByText('公演がありません。',{exact:false}).waitFor();
     await page.locator('#new-event').click();
@@ -88,6 +88,8 @@ async function main(){
     const eventSave=hold('events');
     await form.locator('button[type=submit]').click();
     await eventSave.sent;
+    await form.getByText('保存中…',{exact:true}).waitFor();
+    assert(await form.locator('button[type=submit]').isDisabled());
     await page.locator('#event-dialog [data-close]').click();
     await page.locator('#new-event').click();
     await form.locator('[name=title]').fill('次の公演の下書き');
@@ -97,6 +99,22 @@ async function main(){
     assert.equal(docs.events.items[0].kind,'定期落語会');
     assert.equal(docs.events.items[0].performers[0].endTime,'00:07');
 
+    await page.keyboard.press('Escape');
+    await page.getByRole('button',{name:'変更を破棄する'}).click();
+    await page.locator('[data-event]').click();
+    assert.equal(await page.locator('#event-dialog input, #event-dialog [data-done]').count(),0);
+    await page.locator('#event-dialog [data-edit]').click();
+    await page.setViewportSize({width:320,height:330});
+    await form.locator('textarea').focus();
+    await form.locator('textarea').scrollIntoViewIfNeeded();
+    const saveBounds=await form.locator('button[type=submit]').boundingBox();
+    assert(saveBounds.y>=0&&saveBounds.y+saveBounds.height<=330,'sticky toolbar is visible in a keyboard-sized viewport');
+    await page.setViewportSize({width:393,height:740});
+    await form.locator('[data-done]').first().check();
+    await form.locator('[type=submit]').click();
+    await page.locator('#event-dialog').getByText('公演を保存しました。').waitFor();
+    assert.equal(docs.events.items[0].checklist[0].done,true);
+    await page.locator('#event-dialog [data-close]').click();
     await page.goto(new URL('rehearsals.html',base).href);
     await page.locator('#add').click();
     const rehearsal=page.locator('#rehearsal-form');
@@ -105,15 +123,24 @@ async function main(){
     await rehearsal.locator('[name=venue]').fill('試験会場');
     await rehearsal.locator('[name=notes]').fill('\n連絡事項');
     await rehearsal.locator('button.primary').click();
-    await page.locator('[data-detail]').click();
+    await page.locator('#rehearsal-dialog').getByText('稽古予定を保存しました。').waitFor();
     const savedRehearsal=JSON.stringify(docs.rehearsals);
     await page.locator('#edit-rehearsal-inside').click();
     await rehearsal.locator('[name=venue]').fill('保存しない会場');
     await rehearsal.getByRole('button',{name:'キャンセル'}).click();
+    await page.getByRole('button',{name:'編集を続ける'}).click();
+    assert.equal(await rehearsal.locator('[name=venue]').inputValue(),'保存しない会場');
+    await rehearsal.getByRole('button',{name:'キャンセル'}).click();
+    await page.getByRole('button',{name:'変更を破棄する'}).click();
     await page.locator('#rehearsal-dialog #attendance').waitFor();
+    await page.locator('#edit-rehearsal-inside').click();
+    await rehearsal.getByRole('button',{name:'キャンセル'}).click();
+    assert.equal(await page.locator('.discard-dialog[open]').count(),0);
     assert.equal(await page.locator('#rehearsal-form').count(),0);
     assert(!await page.locator('#rehearsal-dialog').getByText('保存しない会場').count());
     assert.equal(JSON.stringify(docs.rehearsals),savedRehearsal);
+    assert.equal(await page.locator('#practice-form').count(),0);
+    await page.locator('#edit-practices').click();
     await page.locator('#add-practice').click();
     const practice=page.locator('.practice-row');
     await practice.locator('[name=stageName]').selectOption('guest');
@@ -158,6 +185,7 @@ async function main(){
     await history.locator('[role=alert]').getByText(/更新されています/).waitFor();
     assert.equal(await history.locator('[name=occasion]').inputValue(),'同名の記録');
     await history.locator('[data-cancel]').click();
+    await page.getByRole('button',{name:'変更を破棄する'}).click();
     await page.locator('#history-add').click();
     await history.locator('[name=occasion]').fill('同名の記録');
     await history.locator('button[type=submit]').click();
@@ -170,7 +198,7 @@ async function main(){
     await viewer.locator('[data-event]').click();
     await viewer.locator('.program-table').getByText('翌日 00:07').waitFor();
     assert(!await viewer.locator('#new-event').isVisible());
-    assert(await viewer.locator('[data-check]').first().isDisabled());
+    assert.equal(await viewer.locator('#event-dialog [data-done],#event-dialog input[type=checkbox]').count(),0);
     assert(await viewer.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
     const rehearsalId=docs.rehearsals.items[0].id;
     attendance.set(rehearsalId,[{stageName:'別の会員',status:'出席'}]);
