@@ -1,10 +1,21 @@
-import {loadCloudConfig} from './schedule-bootstrap.js?v=20261120-status1';
+import {loadCloudConfig} from './schedule-bootstrap.js?v=20261121-rsvp1';
 // Configuration is enabled only after the Firebase project and access rules are ready.
 const listeners = new Set();
 const state = {ready:false, configured:false, connectionIssue:null, user:null, role:null,stageName:null, message:'共通保存は設定準備中です。現在はこの端末に保存します。'};
 let api, auth, db, userWatch, roleWatch, pinClient;
 const watchers = new Set();
-const emit=()=>{document.body?.classList.toggle('member-view',!state.ready||(state.configured&&!['admin','editor'].includes(state.role)));listeners.forEach(fn=>fn({...state}));window.dispatchEvent(new CustomEvent('cloud-state',{detail:{...state}}));};
+const attendanceFeedback=new Map();
+let attendanceIdentity='';
+function publishAttendance(id,status,phase,message){
+ const feedback={status,phase,message};
+ attendanceFeedback.set(id,feedback);
+ window.dispatchEvent(new CustomEvent('attendance-save-state',{detail:{id}}));
+ return feedback;
+}
+const emit=()=>{
+ const identity=JSON.stringify([state.user?.uid,state.stageName]);
+ if(identity!==attendanceIdentity){attendanceIdentity=identity;attendanceFeedback.clear()}
+ document.body?.classList.toggle('member-view',!state.ready||(state.configured&&!['admin','editor'].includes(state.role)));listeners.forEach(fn=>fn({...state}));window.dispatchEvent(new CustomEvent('cloud-state',{detail:{...state}}));};
 const errorMessage=e=>e?.code==='permission-denied'?'閲覧・編集の権限がありません。管理者に確認してください。':e?.message==='conflict'?'ほかの端末で更新されています。最新の内容を確認し、もう一度編集してください。':'通信または保存に失敗しました。接続を確認して再度お試しください。';
 export const cloud={
  async readShared(name){if(!pinClient)throw Error('管理者用の共通接続が必要です。');return pinClient.readShared(name)},
@@ -29,10 +40,22 @@ export const cloud={
   const stop=api.onSnapshot(api.collection(db,'rehearsalAttendance',id,'responses'),snap=>fn(snap.docs.map(d=>d.data())),e=>onError(errorMessage(e)));
   watchers.add(stop);return()=>{watchers.delete(stop);stop()};
  },
- async respondAttendance(id,status){if(pinClient)return pinClient.respondAttendance(id,status);
+ attendanceFeedback(id){return attendanceFeedback.get(id)},
+ async respondAttendance(id,status){
   if(!state.role||!state.stageName)throw Error('会員の高座名登録が必要です。');
   if(!['出席','欠席','未定','未回答'].includes(status))throw Error('出欠を選択してください。');
-  try{await api.setDoc(api.doc(db,'rehearsalAttendance',id,'responses',auth.currentUser.uid),{stageName:state.stageName,status,updatedAt:api.serverTimestamp()})}catch(e){throw Error(errorMessage(e))}
+  if(attendanceFeedback.get(id)?.phase==='pending')throw Error('出欠を保存しています。');
+  const pending=publishAttendance(id,status,'pending','保存中…');
+  try{
+   if(pinClient)await pinClient.respondAttendance(id,status);
+   else try{
+    await api.setDoc(api.doc(db,'rehearsalAttendance',id,'responses',auth.currentUser.uid),{stageName:state.stageName,status,updatedAt:api.serverTimestamp()});
+   }catch(error){throw Error(errorMessage(error))}
+   if(attendanceFeedback.get(id)===pending)publishAttendance(id,status,'saved',(status==='未回答'?'未登録':status)+'で登録しました。');
+  }catch(error){
+   if(attendanceFeedback.get(id)===pending)publishAttendance(id,status,'error','保存できませんでした。'+error.message+' もう一度回答してください。');
+   throw error;
+  }
  },
  async save(name,payload,revision){if(pinClient)return pinClient.save(name,payload,revision);
   if(!['admin','editor'].includes(state.role))throw Error('編集を許可された会員のみ保存できます。');
@@ -50,7 +73,7 @@ export async function startCloud(){
   state.configured=true;state.provider=config.provider||'firebase';state.message='ログイン状態を確認しています。';emit();
   if(config.provider==='apps-script'){if(!/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec$/.test(config.endpoint||'')){
    state.connectionIssue='configuration';state.ready=true;state.message='共通保存の接続先設定を確認してください。';emit();return
-  }const {createPinClient}=await import('./pin-cloud.js?v=20261120-status1');pinClient=createPinClient(config.endpoint,state,emit);await pinClient.start();return}
+  }const {createPinClient}=await import('./pin-cloud.js?v=20261121-rsvp1');pinClient=createPinClient(config.endpoint,state,emit);await pinClient.start();return}
   const base='https://www.gstatic.com/firebasejs/12.6.0/';
   const [app,authApi,store]=await Promise.all([import(base+'firebase-app.js'),import(base+'firebase-auth.js'),import(base+'firebase-firestore.js')]);
   api={...authApi,...store};const firebase=app.initializeApp(config.firebase);auth=api.getAuth(firebase);db=api.getFirestore(firebase);
@@ -78,7 +101,7 @@ export function mountAccount(){
  <div class="settings-actions">
   <button type="button" class="secondary" data-install>ホーム画面に追加</button>
   <button type="button" class="secondary" data-share>LINEで共有</button>
-  <a class="secondary" id="settings-admin" href="./admin.html?v=20261120-status1" hidden>管理者ページ</a>
+  <a class="secondary" id="settings-admin" href="./admin.html?v=20261121-rsvp1" hidden>管理者ページ</a>
   <button type="button" class="secondary" id="cloud-logout" hidden>ログアウト</button>
  </div>
  <details id="settings-pin" hidden><summary>暗証番号を変更</summary><form><label>新しい暗証番号（数字4桁）<input name="pin" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="new-password" required></label><button type="submit" class="secondary">変更する</button><p role="status"></p></form></details></div>`;

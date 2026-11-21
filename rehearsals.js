@@ -1,11 +1,11 @@
-import {performerPicker,updatePerformerPickers,readPerformer,showPerformerRoster} from './performer-picker.js?v=20261120-status1';
-import {mountMemberHome} from './member-home.js?v=20261120-status1';
-import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261120-status1';
-import {readCategories,saveCategories,validCategories} from './categories.js?v=20261120-status1';
-import {mountScheduleImport} from './schedule-import.js?v=20261120-status1';
-import {toRecord,transferRecord,rehearsalTitle,readRecords,mergeRecords,mergedRecords} from './record-transfer.js?v=20261120-status1';
-import {cloud,startCloud,mountAccount} from './cloud.js?v=20261120-status1';
-import {statuses,rehearsalNames,validRehearsal,validAttendance,attendanceSummary} from './rehearsal-model.js?v=20261120-status1';
+import {performerPicker,updatePerformerPickers,readPerformer,showPerformerRoster} from './performer-picker.js?v=20261121-rsvp1';
+import {mountMemberHome} from './member-home.js?v=20261121-rsvp1';
+import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261121-rsvp1';
+import {readCategories,saveCategories,validCategories} from './categories.js?v=20261121-rsvp1';
+import {mountScheduleImport} from './schedule-import.js?v=20261121-rsvp1';
+import {toRecord,transferRecord,rehearsalTitle,readRecords,mergeRecords,mergedRecords} from './record-transfer.js?v=20261121-rsvp1';
+import {cloud,startCloud,mountAccount} from './cloud.js?v=20261121-rsvp1';
+import {statuses,rehearsalNames,validRehearsal,validAttendance,attendanceSummary} from './rehearsal-model.js?v=20261121-rsvp1';
 const $=id=>document.getElementById(id),esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const key='yuitei.rehearsals.v1';let items=[],attendance={},names=[],revision=0,loaded=false,storageOK=true,stop,stopAttendance,opened=null,detailRevision=0,busy=false;
 let noticeTimer;
@@ -143,43 +143,92 @@ function practiceView(id){
  }finally{editor.inert=false}};
 }
 
+let responding=false;
+const responseMessages=new Map();
 function attendanceView(id){
  if(opened!==id)return;
- const panel=$('attendance');
- if(cloud.state.configured&&(!cloud.state.role||!['ready','stale'].includes(attendanceState)||rosterState!=='ready')){
-  const failed=attendanceState==='error'||rosterState==='error';
-  panel.innerHTML='<h3>出欠一覧</h3><p role="status">'+(!cloud.state.role?'会員ログインが必要です。':failed?'出欠一覧を取得できませんでした。':'出欠を読み込んでいます。')+'</p>'+(failed?'<button type="button" class="secondary">再読み込み</button>':'');
-  panel.onchange=null;
-  panel.onclick=event=>{
-   if(!event.target.closest('button'))return;
-   if(rosterState==='error')loadRoster(true);
-   if(attendanceState==='error')watchDetailAttendance(id);
-  };
-  return;
+ const panel=$('attendance'),shared=cloud.state.configured;
+ const self=shared?cloud.state.stageName:localStorage.getItem('yuitei.attendance.person')||'';
+ const canAnswer=!!self&&(shared?!!cloud.state.role:names.includes(self));
+ const save=shared?cloud.attendanceFeedback?.(id):null;
+ const responses=attendance[id]||{};
+ const key=JSON.stringify([id,self,canAnswer,shared,shared?null:names]);
+ if(panel.dataset.view!==key){
+  panel.dataset.view=key;
+  panel.innerHTML=`<h3>出欠一覧</h3>
+   ${!shared?`<label>自分の名前<select id="attendance-person"><option value="">選んでください</option>${names.map(n=>`<option value="${esc(n)}" ${n===self?'selected':''}>${esc(n)}</option>`).join('')}</select></label><p class="muted">端末内保存です。この名前選択は本人認証ではありません。</p>`:''}
+   ${canAnswer?`<label>自分の出欠（${esc(self)}）<select data-person="${esc(self)}"><option value="" disabled>確認中…</option>${statuses.map(v=>`<option value="${v}">${v==='未回答'?'未登録':v}</option>`).join('')}</select></label><div class="rsvp-buttons">${['出席','欠席','未定'].map(v=>`<button type="button" class="secondary" data-self-status="${v}">${v}</button>`).join('')}</div>`:'<p>自分の出欠を回答するには、'+(shared?'会員ログインと高座名の登録が必要です。':'自分の名前を選んでください。')+'</p>'}
+   <p class="save-feedback" id="attendance-feedback" role="status"></p>
+   <p class="sync-warning" data-attendance-message role="status" hidden></p>
+   <button type="button" class="secondary" data-retry-attendance hidden>再読み込み</button>
+   <div class="attendance-summary"></div>`;
  }
- const stale=attendanceState==='stale';
- const responses=attendance[id]||{},self=cloud.state.configured?cloud.state.stageName:localStorage.getItem('yuitei.attendance.person')||'';
- const groups=statuses.map(status=>({status,label:status==='未回答'?'未登録':status,people:names.filter(n=>(responses[n]||'未回答')===status)}));
- $('attendance').innerHTML=`<h3>出欠一覧</h3>${stale?'<p class="sync-warning" role="status">更新できませんでした。前回取得した出欠を表示しています。</p><button type="button" class="secondary" data-retry-attendance>再読み込み</button>':''}${!cloud.state.configured?`<label>自分の名前<select id="attendance-person"><option value="">選んでください</option>${names.map(n=>`<option value="${esc(n)}" ${n===self?'selected':''}>${esc(n)}</option>`).join('')}</select></label><p class="muted">端末内保存です。この名前選択は本人認証ではありません。共通保存に接続すると、ログインした本人だけが回答できます。</p>`:''}${self&&names.includes(self)?`<label>自分の出欠（${esc(self)}）<select data-person="${esc(self)}">${statuses.map(v=>`<option value="${v}" ${v===(responses[self]||'未回答')?'selected':''}>${v==='未回答'?'未登録':v}</option>`).join('')}</select></label>`:'<p>自分の出欠を回答するには、'+(cloud.state.configured?'会員ログインと高座名の登録が必要です。':'自分の名前を選んでください。')+'</p>'}<div class="rsvp-buttons">${self&&names.includes(self)?['出席','欠席','未定'].map(v=>`<button type="button" class="secondary" data-self-status="${v}" aria-pressed="${responses[self]===v}">${v}</button>`).join(''):''}</div><p class="save-feedback" id="attendance-feedback" role="status"></p><div class="attendance-summary">${groups.map(g=>`<section><h4>${g.label} ${g.people.length}人</h4><p>${g.people.length?esc(g.people.join('・')):'なし'}</p></section>`).join('')}</div>`;
- if(responding||stale)panel.querySelectorAll('select,[data-self-status]').forEach(el=>el.disabled=true);
- $('attendance').onclick=async e=>{if(e.target.closest('[data-retry-attendance]')){watchDetailAttendance(id);return}const b=e.target.closest('[data-self-status]');if(b)await respondSelf(id,self,b.dataset.selfStatus)};
- $('attendance').onchange=async e=>{
+ const pending=responding||save?.phase==='pending';
+ const own=responses[self]||(!shared||Object.hasOwn(attendance,id)&&['ready','stale'].includes(attendanceState)?'未回答':'');
+ const select=panel.querySelector('[data-person]');
+ if(select){
+  // Keep the native select and buttons in place during polling and roster updates.
+  if(select.dataset.confirmed!==own||pending){
+   select.value=own;select.dataset.confirmed=own;
+  }
+  select.disabled=pending;
+ }
+ for(const button of panel.querySelectorAll('[data-self-status]')){
+  button.disabled=pending;
+  button.setAttribute('aria-pressed',String(own===button.dataset.selfStatus));
+ }
+ $('attendance-feedback').textContent=save?.message||(responseMessages.get(id)||'');
+ const canList=!shared||rosterState==='ready'&&['ready','stale'].includes(attendanceState);
+ const failed=shared&&[rosterState,attendanceState].some(state=>['error','stale'].includes(state));
+ const message=panel.querySelector('[data-attendance-message]');
+ message.textContent=!failed?(canList?'':'出欠を読み込んでいます。'):canList?
+  '更新できませんでした。前回取得した出欠を表示しています。':'出欠一覧を取得できませんでした。';
+ message.hidden=!message.textContent;
+ panel.querySelector('[data-retry-attendance]').hidden=!failed;
+ const groups=canList?statuses.map(status=>({label:status==='未回答'?'未登録':status,people:names.filter(n=>(responses[n]||'未回答')===status)})):[];
+ panel.querySelector('.attendance-summary').innerHTML=groups.map(g=>`<section><h4>${g.label} ${g.people.length}人</h4><p>${g.people.length?esc(g.people.join('・')):'なし'}</p></section>`).join('');
+ panel.onclick=async e=>{
+  if(e.target.closest('[data-retry-attendance]')){
+   if(rosterState==='error')loadRoster(true);
+   if(['error','stale'].includes(attendanceState))watchDetailAttendance(id);
+   return;
+  }
+  const button=e.target.closest('[data-self-status]');
+  if(button)await respondSelf(id,self,button.dataset.selfStatus);
+ };
+ panel.onchange=async e=>{
   if(e.target.id==='attendance-person'){localStorage.setItem('yuitei.attendance.person',e.target.value);attendanceView(id);return}
-  const n=e.target.dataset.person;if(!n||n!==self||!names.includes(n)||!statuses.includes(e.target.value))return;
-  await respondSelf(id,n,e.target.value);
-
+  const name=e.target.dataset.person;
+  if(name===self)await respondSelf(id,name,e.target.value);
  };
 }
-let responding=false;
 async function respondSelf(id,name,status){
- const self=cloud.state.configured?cloud.state.stageName:localStorage.getItem('yuitei.attendance.person');
- if(responding||opened!==id||cloud.state.configured&&(rosterState!=='ready'||attendanceState!=='ready')||!name||name!==self||!names.includes(name)||!statuses.includes(status))return;
- const generation=accountGeneration;responding=true;let message='';document.querySelectorAll('#attendance select,#attendance button').forEach(el=>el.disabled=true);
- try{if(cloud.state.configured){await cloud.respondAttendance(id,status);if(generation!==accountGeneration)return;attendance[id]={...attendance[id],[self]:status}}
- else{const next=structuredClone(attendance);next[id]={...next[id],[self]:status};if(!await save(items,detailRevision,next))throw Error('保存に失敗しました。')}
- message=(status==='未回答'?'未登録':status)+'で登録しました。'+(cloud.state.configured?'':'この端末に保存しました。');notify(message)
- }catch(ex){if(generation===accountGeneration){message='保存できませんでした。'+ex.message+' もう一度回答してください。';notify(message)}}finally{if(generation===accountGeneration){responding=false;if(opened){attendanceView(opened);const feedback=$('attendance-feedback');if(feedback&&opened===id)feedback.textContent=message}}}
+ const shared=cloud.state.configured;
+ const self=shared?cloud.state.stageName:localStorage.getItem('yuitei.attendance.person');
+ if(responding||opened!==id||!name||name!==self||!(shared?cloud.state.role:names.includes(name))||!statuses.includes(status)||cloud.attendanceFeedback?.(id)?.phase==='pending')return;
+ const generation=accountGeneration;
+ responding=true;responseMessages.set(id,'保存中…');attendanceView(id);
+ try{
+  if(shared){
+   await cloud.respondAttendance(id,status);
+   if(generation!==accountGeneration)return;
+   attendance[id]={...attendance[id],[self]:status};
+  }else{
+   const next=structuredClone(attendance);next[id]={...next[id],[self]:status};
+   if(!await save(items,detailRevision,next))throw Error('保存に失敗しました。');
+  }
+  responseMessages.set(id,(status==='未回答'?'未登録':status)+'で登録しました。'+(shared?'':'この端末に保存しました。'));
+ }catch(error){
+  if(generation===accountGeneration)responseMessages.set(id,'保存できませんでした。'+error.message+' もう一度回答してください。');
+ }finally{
+  if(generation===accountGeneration){responding=false;if(opened)attendanceView(opened)}
+ }
 }
+window.addEventListener('attendance-save-state',event=>{
+ const id=event.detail.id,save=cloud.attendanceFeedback?.(id);
+ if(save?.phase==='saved')attendance[id]={...attendance[id],[cloud.state.stageName]:save.status};
+ if(opened===id)attendanceView(id);
+});
 window.addEventListener('member-person-changed',()=>{if(opened)attendanceView(opened)});
 window.addEventListener('schedule-data-changed',()=>{if(cloud.state.configured)return;try{const data=JSON.parse(localStorage.getItem(key));if(data&&Array.isArray(data.items)&&data.items.every(validRehearsal)&&validAttendanceMaps(data.attendance)){items=data.items;attendance=data.attendance;localItems=structuredClone(items);localAttendance=structuredClone(attendance);render();if(opened)attendanceView(opened)}}catch{}});
 function validAttendanceMaps(value){return value&&typeof value==='object'&&Object.values(value).every(validAttendance)}
@@ -209,7 +258,7 @@ $('restore').onchange=async e=>{
 
 cloud.onState(s=>{
  const generation=++accountGeneration;
- stop?.();stopAttendance?.();opened=null;loaded=false;responding=false;scheduleError='';dialog.close();
+ stop?.();stopAttendance?.();opened=null;loaded=false;responding=false;responseMessages.clear();scheduleError='';dialog.close();
  if(s.configured){
   if($('data-dialog').open)$('data-dialog').close();
   items=[];attendance={};names=[];rosterState='loading';

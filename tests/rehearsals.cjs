@@ -51,13 +51,15 @@ async function response(t,name,status){const select=$(t,`[data-person="${name}"]
  const malformed=await boot('{bad');await create(malformed);assert.equal(malformed.w.localStorage.getItem('yuitei.rehearsals.v1'),'{bad');
  const viewer=await boot(undefined,{configured:true,role:'viewer',stageName:'勇水'});viewer.snapshot({items:data.items,revision:1});assert($(viewer,'#add').disabled);$(viewer,'[data-detail]').click();
  assert.match($(viewer,'#attendance').textContent,/読み込んでいます/);
- assert(!$(viewer,'#attendance').textContent.includes('未登録'));
+ assert(!$(viewer,'.attendance-summary').textContent.includes('未登録'));
  viewer.attendanceError();
  assert.match($(viewer,'#attendance').textContent,/取得できませんでした/);
- assert(!$(viewer,'#attendance').textContent.includes('未登録'));
- $(viewer,'#attendance button').click();
+ assert(!$(viewer,'.attendance-summary').textContent.includes('未登録'));
+ $(viewer,'[data-retry-attendance]').click();
  assert.match($(viewer,'#attendance').textContent,/読み込んでいます/);
+ const selectBefore=$(viewer,'[data-person]'),buttonBefore=$(viewer,'[data-self-status]');
  viewer.attendance([{stageName:'日光',status:'欠席'},{stageName:'一悟',status:'未定'}]);
+ assert.equal($(viewer,'[data-person]'),selectBefore);assert.equal($(viewer,'[data-self-status]'),buttonBefore);
  assert.match($(viewer,'#attendance').textContent,/欠席 1人.*日光/);
  assert.match($(viewer,'#attendance').textContent,/未定 1人.*一悟/);assert(!$(viewer,'[data-person="勇水"]').disabled);assert.equal($(viewer,'[data-person="日光"]'),null);await response(viewer,'勇水','出席');assert.equal(viewer.responses.length,1);
  const linked=await boot(saved,{configured:true,role:'viewer',stageName:'勇水'},'http://localhost/rehearsals.html?detail='+encodeURIComponent(data.items[0].id));assert(!$(linked,'#rehearsal-dialog').open);linked.snapshot({items:data.items,revision:1});assert($(linked,'#rehearsal-dialog').open,'deep link waits for shared schedule then opens its detail');linked.attendance([]);assert($(linked,'#attendance'));const direct=await boot(saved);direct.w.dispatchEvent(new direct.w.CustomEvent('rehearsal-detail',{detail:{id:data.items[0].id}}));assert($(direct,'#rehearsal-dialog').open,'same-page link opens details without navigation');

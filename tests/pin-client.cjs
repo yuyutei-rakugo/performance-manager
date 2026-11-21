@@ -40,10 +40,17 @@ function respond(action,data){const i=requests.findIndex(r=>r.body.action===acti
  assert.deepEqual(calls.slice(before).map(c=>c.action),['attendanceSave']);
  respond('attendanceRead',{rows:oldRows});await tick();
  assert.equal(rows.at(-1)[0].status,'出席','a delayed poll cannot overwrite a confirmed answer');
- timers.at(-1)();respond('attendanceRead',{ok:false,error:'読込失敗'});await tick();
+ assert.equal(calls.at(-1).action,'attendanceRead','a fresh read follows a superseded poll');
+ respond('attendanceRead',{ok:false,error:'読込失敗'});await tick();
  assert.deepEqual(attendanceErrors,['読込失敗']);
  timers.at(-1)();respond('attendanceRead',{rows:[{stageName:'勇水',status:'出席'}]});await tick();
  assert.equal(rows.length,3,'recovery redraws even if data is unchanged');
+ const otherSave=client.respondAttendance('p1','出席');
+ respond('attendanceSave',{});await otherSave;
+ assert.equal(calls.at(-1).action,'attendanceRead','a confirmed write refreshes the whole roster');
+ const both=[{stageName:'勇水',status:'出席'},{stageName:'別の会員',status:'欠席'}];
+ respond('attendanceRead',{rows:both});await tick();
+ assert.deepEqual(rows.at(-1),both);
  stopAttendance();stopDuplicate();
  const failure=client.respondAttendance('p1','欠席');const r=requests.find(r=>r.body.action==='attendanceSave');requests.splice(requests.indexOf(r),1);r.resolve({ok:false,error:'通信失敗'});await assert.rejects(failure,/通信失敗/);assert.equal(rows.at(-1)[0].status,'出席','failed write must not publish selected answer');
  const docSave=client.save('rehearsals',{items:[{id:'updated'}]},1);respond('save',{revision:2});assert.equal(await docSave,2);assert.equal(c.at(-1).revision,2);assert.equal(c.at(-1).items[0].id,'updated');
