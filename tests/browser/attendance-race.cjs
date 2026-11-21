@@ -6,7 +6,8 @@ const endpoint='https://script.google.com/macros/s/attendance-fixture/exec';
 const names=['試験会員甲','試験会員乙','試験会員丙'];
 const practice={id:'p1',title:'通常稽古',date:'2099-01-02',time:'14:00',venue:'試験会場',notes:''};
 const saved=new Map([[names[0],'欠席']]);
-const writes=[];
+const writes=[],writeIds=[];
+const secondDaySaved=new Map([[names[0],'未定']]);
 let rehearsalDoc={revision:1,items:[practice]},practiceConflict=false,practiceFailure=false,practiceWrite,failReadback=false,readbackPending=false;
 function gate(){
  let open,started;
@@ -20,7 +21,7 @@ async function main(){
  const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH});
  try{
   async function session(name){
-   const c=await browser.newContext({...devices['Pixel 7'],serviceWorkers:'block'});
+   const c=await browser.newContext({...devices['Pixel 7'],serviceWorkers:'block',timezoneId:'America/Los_Angeles'});
    const p=await c.newPage();p.setDefaultTimeout(10000);
    let readGate,writeGate,fail=false,failRead=false;
    await p.addInitScript(()=>{
@@ -60,16 +61,16 @@ async function main(){
     }
     case 'roster':return json({ok:true,members:names.map(name=>({name}))});
     case 'attendanceRead':{
-     const rows=[...saved].map(([stageName,status])=>({stageName,status}));
+     const rows=[...(req.id==='december'?secondDaySaved:saved)].map(([stageName,status])=>({stageName,status}));
      if(readGate){const gate=readGate;readGate=null;gate.started();await gate.wait}
      if(failRead){failRead=false;return json({ok:false,error:'模擬取得失敗'});}
      return json({ok:true,rows});
     }
     case 'attendanceSave':{
-     writes.push([name,req.status]);
+     writes.push([name,req.status]);writeIds.push(req.id);
      if(writeGate){const gate=writeGate;writeGate=null;gate.started();await gate.wait}
      if(fail){fail=false;return json({ok:false,error:'模擬保存失敗'});}
-     saved.set(name,req.status);
+     (req.id==='december'?secondDaySaved:saved).set(name,req.status);
      return json({ok:true});
     }
     default:throw Error(action);
@@ -209,6 +210,74 @@ async function main(){
   await practiceStatus.getByText(/別の端末でこの稽古のネタが更新/).waitFor();
   assert.equal(await editor.locator('[name=piece]').last().inputValue(),'上書きしない下書き');
   assert.equal(rehearsalDoc.items[0].practices[0].piece,'別の演目');
+  // The same document contains multiple JST dates and multiple times on one day.
+  const today={...practice,date:'2026-11-21',time:'17:00'};
+  const december={...practice,id:'december',date:'2026-12-13',title:'師匠稽古'};
+  rehearsalDoc={revision:rehearsalDoc.revision+1,items:[
+   december,{...today,id:'later',time:'19:00',title:'自主稽古'},today,
+   {...today,id:'archived',time:'09:00',archivedAt:'2026-11-21T01:00:00Z'},
+   {...today,id:'other',time:'20:00',title:'その他稽古',otherContent:'交流会'}
+  ]};
+  const card=p.locator('.member-home');
+  await p.clock.setFixedTime(new Date('2026-11-20T14:59:00Z'));
+  await p.reload();
+  await card.getByRole('heading',{name:'次回の稽古',exact:true}).waitFor();
+  const sameScheduleControl=await card.getByRole('button',{name:'出席',exact:true}).elementHandle();
+  await p.clock.setFixedTime(new Date('2026-11-21T07:59:00Z'));
+  await p.evaluate(()=>window.dispatchEvent(new Event('pageshow')));
+  assert(await sameScheduleControl.evaluate(button=>button.isConnected));
+  await card.getByRole('heading',{name:'今日の稽古',exact:true}).waitFor();
+  assert.equal(await card.locator('[data-open-rehearsal]').getAttribute('data-open-rehearsal'),today.id);
+  await card.getByText('通常稽古',{exact:true}).waitFor();
+  await card.getByText('2026年 11月21日（土） 17:00',{exact:true}).waitFor();
+  assert.equal(await card.locator('.rehearsal-kind').getAttribute('class'),await p.locator('#rehearsals').getByText('通常稽古',{exact:true}).getAttribute('class'));
+  await p.locator('#rehearsals').getByText('自主稽古',{exact:true}).waitFor();
+  await p.locator('#rehearsals').getByText('その他：交流会',{exact:true}).waitFor();
+  await p.clock.setFixedTime(new Date('2026-11-21T08:00:01Z'));
+  await p.evaluate(()=>window.dispatchEvent(new Event('pageshow')));
+  await card.getByRole('heading',{name:'今日の稽古',exact:true}).waitFor();
+  await card.getByRole('button',{name:'出席',exact:true}).click();
+  await quick.getByText('出席で登録しました。').waitFor();
+  assert.equal(writeIds.at(-1),today.id);
+  await show(p);
+  assert.equal(await p.locator('#rehearsal-dialog .rehearsal-kind').getAttribute('class'),await card.locator('.rehearsal-kind').getAttribute('class'));
+  await p.locator('#rehearsal-dialog').getByText('2026年 11月21日（土） 17:00',{exact:true}).waitFor();
+  const reset=a.holdWrite();
+  await panel(p).locator('[data-person]').selectOption('未回答');await reset.sent;
+  await panel(p).getByText('保存中…').waitFor();
+  assert.equal(saved.get(names[0]),'出席');
+  reset.open();
+  await panel(p).getByText('回答を未登録に戻しました。').waitFor();
+  assert.equal(saved.get(names[0]),'未回答');
+  await p.locator('#rehearsal-dialog [data-close]').click();
+
+  await p.clock.install({time:new Date('2026-11-21T14:59:50Z')});
+  await p.evaluate(()=>window.dispatchEvent(new Event('pageshow')));
+  await card.getByRole('heading',{name:'今日の稽古',exact:true}).waitFor();
+  const oldRead=a.holdRead();
+  await a.poll();await oldRead.sent;
+  await p.clock.fastForward(10000);
+  await card.getByRole('heading',{name:'次回の稽古',exact:true}).waitFor();
+  await card.getByText('師匠稽古',{exact:true}).waitFor();
+  assert.equal(await quick.textContent(),'');
+  oldRead.open();
+  await card.locator('.quick-attendance strong').getByText('未定',{exact:true}).waitFor();
+  await card.getByRole('button',{name:'欠席',exact:true}).click();
+  await quick.getByText('欠席で登録しました。').waitFor();
+  assert.equal(writeIds.at(-1),december.id);
+  assert.equal(saved.get(names[0]),'未回答');
+  assert.equal(secondDaySaved.get(names[0]),'欠席');
+  await show(p);
+  await p.locator('#rehearsal-dialog .rehearsal-kind--master').getByText('師匠稽古',{exact:true}).waitFor();
+  // A narrow viewport and enlarged base font must still fit the updated date.
+  await p.setViewportSize({width:320,height:720});
+  const fits=await p.evaluate(()=>{
+   document.documentElement.style.fontSize='200%';
+   return [...document.querySelectorAll('.rehearsal-datetime')].every(time=>
+    time.scrollWidth<=time.clientWidth+1&&time.getBoundingClientRect().width<=time.parentElement.clientWidth);
+  });
+  assert(fits);
+  console.log('PASS JST start and midnight boundaries on a Los Angeles device, earliest active schedule, correct write IDs, stale response and message isolation, type labels, dates at 320px and 200% font, reset feedback');
   console.log('PASS stable pointer controls, pending/confirmed/error feedback, all three save routes, stale-read ordering, double click, detail reopening, independent sessions and concurrent member answers, practice drafts, conflict rebase, readback failure, and persistence');
  }finally{await browser.close()}
 }

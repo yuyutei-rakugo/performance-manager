@@ -31,3 +31,10 @@ footer{border-top:2px solid var(--line)}button:disabled{opacity:.5;cursor:defaul
 .settings-dialog{width:min(430px,calc(100% - 28px))}.settings-actions{display:grid;gap:8px}.settings-actions a{text-decoration:none;text-align:center}.settings-actions .secondary{min-height:44px}.settings-actions [hidden],.header-actions [hidden],.settings-dialog [hidden]{display:none}.settings-dialog details{margin-top:16px}.settings-dialog summary{min-height:44px;padding-block:11px}.settings-dialog form{margin-bottom:8px}.sync-warning{color:#853c19;font-weight:700}
 
 .performer-picker{display:grid;gap:8px}.performer-picker label[hidden]{display:none}
+
+.rehearsal-kind{display:inline-block;max-width:100%;padding:.2em .55em;border-radius:.35em;background:#ece4d7;color:#312b23;line-height:1.5;overflow-wrap:anywhere}
+.rehearsal-kind--regular{background:#17365d;color:#fff}
+.rehearsal-kind--master{background:#792a42;color:#fff}
+.rehearsal-datetime{display:inline-flex;max-width:100%;flex-wrap:wrap;align-items:baseline;column-gap:.6em;color:var(--navy);font-size:1.22rem;font-weight:800;line-height:1.5}
+.rehearsal-date,.rehearsal-time{max-width:100%;overflow-wrap:anywhere}
+.rehearsal-year{font-size:.78em;font-weight:700}

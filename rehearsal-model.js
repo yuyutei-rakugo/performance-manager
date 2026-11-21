@@ -9,3 +9,24 @@ export function validRehearsal(r){
 }
 export function validAttendance(a){return a&&typeof a==='object'&&!Array.isArray(a)&&Object.values(a).every(s=>statuses.includes(s))}
 export function attendanceSummary(names,responses){const present=names.filter(n=>responses[n]==='出席');return {present,count:present.length,unanswered:names.filter(n=>!responses[n]||responses[n]==='未回答').length}}
+
+const japanOffset=9*60*60*1000,dayLength=24*60*60*1000;
+export function japanDate(now=Date.now()){
+ return new Date(now+japanOffset).toISOString().slice(0,10);
+}
+export function untilJapanMidnight(now=Date.now()){
+ return dayLength-(now+japanOffset)%dayLength;
+}
+export function featuredRehearsal(rows,today=japanDate()){
+ return rows.filter(r=>!r.archivedAt&&r.date>=today)
+  .sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time)||a.id.localeCompare(b.id))[0];
+}
+export function rehearsalBadge(r,title,escape){
+ const style=r.title==='通常稽古'?'regular':r.title==='師匠稽古'?'master':'other';
+ return `<span class="rehearsal-kind rehearsal-kind--${style}">${escape(title)}</span>`;
+}
+export function rehearsalDateTime(r,escape){
+ const [year,month,day]=r.date.split('-').map(Number);
+ const weekday='日月火水木金土'[new Date(r.date+'T00:00:00Z').getUTCDay()];
+ return `<time class="rehearsal-datetime" datetime="${escape(r.date)}T${escape(r.time)}+09:00"><span class="rehearsal-date"><span class="rehearsal-year">${year}年</span> ${month}月${day}日（${weekday}）</span> <span class="rehearsal-time">${escape(r.time)}</span></time>`;
+}
