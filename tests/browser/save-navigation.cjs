@@ -85,6 +85,16 @@ async function main(){
     await row.locator('[name=guestStageName]').fill('試験ゲスト');
     await row.locator('[name=piece]').fill('寿限無');
     await row.locator('[name=minutes]').fill('10');
+    await row.locator('[name=seconds]').fill('30');
+    const longName='長い高座名'.repeat(12),longPiece='非常に長い演目'.repeat(16);
+    await row.locator('[name=guestStageName]').fill(longName);
+    await row.locator('[name=piece]').fill(longPiece);
+    await page.setViewportSize({width:320,height:720});
+    assert(await row.evaluate(element=>{
+      const rect=name=>element.querySelector('[name='+name+']').getBoundingClientRect();
+      const performer=rect('stageName'),piece=rect('piece'),minutes=rect('minutes'),seconds=rect('seconds');
+      return performer.x===piece.x&&piece.x===minutes.x&&performer.y<piece.y&&piece.y<minutes.y&&minutes.y===seconds.y&&seconds.x>minutes.x;
+    }));
     await row.locator('[name=endTime]').fill('00:07');
     await row.locator('[data-end-time]').getByText('翌日 00:07').waitFor();
     const eventSave=hold('events');
@@ -101,11 +111,25 @@ async function main(){
     assert.equal(await form.locator('[name=title]').inputValue(),'次の公演の下書き');
     assert.equal(docs.events.items[0].kind,'定期落語会');
     assert.equal(docs.events.items[0].performers[0].endTime,'00:07');
+    assert.equal(docs.events.items[0].performers[0].minutes,10.5);
 
     await page.keyboard.press('Escape');
     await page.getByRole('button',{name:'変更を破棄する'}).click();
     await page.locator('[data-event]').click();
     assert.equal(await page.locator('#event-dialog input, #event-dialog [data-done]').count(),0);
+    const program=page.locator('.event-program-table');
+    await program.getByText(longName,{exact:true}).waitFor();
+    await program.getByText(longPiece,{exact:true}).waitFor();
+    await program.getByText('10分30秒',{exact:true}).waitFor();
+    assert(await program.evaluate(table=>table.scrollWidth<=table.parentElement.clientWidth));
+    await page.evaluate(()=>{window.print=()=>{}});
+    await page.locator('#print-program').click();
+    await page.emulateMedia({media:'print'});
+    assert(await program.isVisible());
+    assert(!await page.locator('main').isVisible());
+    assert((await page.pdf({format:'A4'})).length>1000);
+    await page.emulateMedia({media:'screen'});
+    await page.evaluate(()=>window.dispatchEvent(new Event('afterprint')));
     await page.locator('#event-dialog [data-edit]').click();
     await page.setViewportSize({width:320,height:330});
     await form.locator('textarea').focus();
@@ -113,6 +137,8 @@ async function main(){
     const saveBounds=await form.locator('button[type=submit]').boundingBox();
     assert(saveBounds.y>=0&&saveBounds.y+saveBounds.height<=330,'sticky toolbar is visible in a keyboard-sized viewport');
     await page.setViewportSize({width:393,height:740});
+    assert.equal(await form.locator('[name=minutes]').inputValue(),'10');
+    assert.equal(await form.locator('[name=seconds]').inputValue(),'30');
     await form.locator('[data-done]').first().check();
     await form.locator('[type=submit]').click();
     await page.locator('#event-dialog').getByText('公演を保存しました。').waitFor();
@@ -150,6 +176,11 @@ async function main(){
     await practice.locator('[name=guestStageName]').fill('試験ゲスト');
     await practice.locator('[name=piece]').fill('時そば');
     await practice.locator('[name=seconds]').fill('45');
+    assert(await practice.evaluate(element=>{
+      const rect=name=>element.querySelector('[name='+name+']').getBoundingClientRect();
+      const performer=rect('stageName'),piece=rect('piece'),minutes=rect('minutes'),seconds=rect('seconds');
+      return performer.x===piece.x&&piece.x===minutes.x&&performer.y<piece.y&&piece.y<minutes.y&&minutes.y===seconds.y&&seconds.x>minutes.x;
+    }));
     const rehearsalSave=hold('rehearsals');
     await page.locator('#practice-form button[type=submit]').click();
     await rehearsalSave.sent;

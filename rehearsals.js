@@ -1,12 +1,12 @@
-import {startEditor,finishEditor,leaveEditor,guardEditor,editorState,saveRecovery,recoveryScope,recoveredEditState} from './editor-dialog.js?v=20261121-retry1';
-import {performerPicker,updatePerformerPickers,readPerformer,showPerformerRoster} from './performer-picker.js?v=20261121-retry1';
-import {mountMemberHome} from './member-home.js?v=20261121-retry1';
-import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261121-retry1';
-import {readCategories,saveCategories,validCategories} from './categories.js?v=20261121-retry1';
-import {mountScheduleImport} from './schedule-import.js?v=20261121-retry1';
-import {toRecord,transferRecord,rehearsalTitle,readRecords,mergeRecords,mergedRecords} from './record-transfer.js?v=20261121-retry1';
-import {cloud,startCloud,mountAccount} from './cloud.js?v=20261121-retry1';
-import {statuses,rehearsalNames,validRehearsal,validAttendance,attendanceSummary,japanDate,rehearsalBadge,rehearsalDateTime} from './rehearsal-model.js?v=20261121-retry1';
+import {startEditor,finishEditor,leaveEditor,guardEditor,editorState,saveRecovery,recoveryScope,recoveredEditState} from './editor-dialog.js?v=20261121-layout1';
+import {performerPicker,updatePerformerPickers,readPerformer,showPerformerRoster} from './performer-picker.js?v=20261121-layout1';
+import {mountMemberHome} from './member-home.js?v=20261121-layout1';
+import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261121-layout1';
+import {readCategories,saveCategories,validCategories} from './categories.js?v=20261121-layout1';
+import {mountScheduleImport} from './schedule-import.js?v=20261121-layout1';
+import {toRecord,transferRecord,rehearsalTitle,readRecords,mergeRecords,mergedRecords} from './record-transfer.js?v=20261121-layout1';
+import {cloud,startCloud,mountAccount} from './cloud.js?v=20261121-layout1';
+import {statuses,rehearsalNames,validRehearsal,validAttendance,attendanceSummary,japanDate,rehearsalBadge,rehearsalDateTime} from './rehearsal-model.js?v=20261121-layout1';
 const $=id=>document.getElementById(id),esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const key='yuitei.rehearsals.v1';let items=[],attendance={},names=[],revision=0,loaded=false,storageOK=true,stop,stopAttendance,opened=null,detailRevision=0,busy=false;
 let noticeTimer;
@@ -188,8 +188,8 @@ function practiceView(id,editing=!!$('practice-form'),recovery){
  const r=items.find(x=>x.id===id),section=$('practice-section');
  section.toggleAttribute('data-editing',editing&&canEdit());
  if(!editing||!canEdit()){
-  const entries=(r.practices||[]).map(p=>`<li>${esc(p.stageName)}　${esc(p.piece)}${p.durationSeconds===null?'':'　'+Math.floor(p.durationSeconds/60)+'分'+p.durationSeconds%60+'秒'}</li>`).join('');
-  section.innerHTML='<h3>稽古したネタ・長さ</h3><p class="sync-warning" id="practice-read-warning" role="status" hidden></p><p class="save-feedback" id="practice-save-feedback" role="status"></p>'+(entries?'<ul>'+entries+'</ul>':'<p>ネタの記録はありません。</p>')+(canEdit()?'<button type="button" class="secondary" id="edit-practices">ネタ・時間を編集する</button>':'');
+  const entries=(r.practices||[]).map(p=>`<tr><td>${esc(p.stageName)}</td><td>${esc(p.piece)}</td><td>${p.durationSeconds==null?'—':Math.floor(p.durationSeconds/60)+'分'+p.durationSeconds%60+'秒'}</td></tr>`).join('');
+  section.innerHTML='<h3>稽古したネタ・長さ</h3><p class="sync-warning" id="practice-read-warning" role="status" hidden></p><p class="save-feedback" id="practice-save-feedback" role="status"></p>'+(entries?'<div class="program-scroll"><table class="program-table practice-table"><colgroup><col class="program-performer"><col><col class="program-duration"></colgroup><thead><tr><th scope="col">演者</th><th scope="col">ネタ</th><th scope="col">時間</th></tr></thead><tbody>'+entries+'</tbody></table></div>':'<p>ネタの記録はありません。</p>')+(canEdit()?'<button type="button" class="secondary" id="edit-practices">ネタ・時間を編集する</button>':'');
   showPracticeSave(id);
   $('edit-practices')?.addEventListener('click',()=>{if(practiceSaves.get(id)?.pending)return;practiceSaves.delete(id);practiceView(id,true);section.scrollIntoView?.({block:'start'})});
   return;
@@ -204,7 +204,7 @@ function practiceView(id,editing=!!$('practice-form'),recovery){
  function row(p={stageName:'',piece:'',durationSeconds:null}){
   const el=document.createElement('div');
   el.className='practice-row';
-  el.innerHTML=`<div class="fields"><div data-performer-slot></div><label>稽古したネタ<input name="piece" required value="${esc(p.piece)}"></label><label>長さ（分・任意）<input name="minutes" type="number" min="0" max="1440" step="1" value="${p.durationSeconds===null?'':Math.floor(p.durationSeconds/60)}"></label><label>秒（任意）<input name="seconds" type="number" min="0" max="59" step="1" value="${p.durationSeconds===null?'':p.durationSeconds%60}"></label></div><button type="button" class="secondary" data-remove-practice>このネタを外す</button>`;
+  el.innerHTML=`<div class="performance-fields"><div data-performer-slot></div><label>稽古したネタ<input name="piece" required value="${esc(p.piece)}"></label><fieldset class="duration-fields"><legend>長さ（任意）</legend><label>分<input name="minutes" type="number" inputmode="numeric" min="0" max="1440" step="1" value="${p.durationSeconds===null?'':Math.floor(p.durationSeconds/60)}"></label><label>秒<input name="seconds" type="number" inputmode="numeric" min="0" max="59" step="1" value="${p.durationSeconds===null?'':p.durationSeconds%60}"></label></fieldset></div><button type="button" class="secondary" data-remove-practice>このネタを外す</button>`;
   el.querySelector('[data-performer-slot]').replaceWith(performerPicker(p,names));
   el.querySelector('[data-remove-practice]').onclick=()=>{el.remove();markDirty()};
   list.append(el);
