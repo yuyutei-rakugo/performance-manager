@@ -28,13 +28,13 @@ export function finishEditor(dialog){
  if(editor)editor.committed=true;
 }
 
-function hasDraft(dialog){
+export function hasEditorDraft(dialog){
  const editor=editors.get(dialog);
  return dialog.open&&editor?.form.isConnected&&!editor.committed&&(editor.pending||editor.dirty());
 }
 
 export function leaveEditor(dialog,leave){
- if(!hasDraft(dialog)){leave();return}
+ if(!hasEditorDraft(dialog)){leave();return}
  if(document.querySelector('.discard-dialog[open]'))return;
  const prompt=document.createElement('dialog');
  prompt.className='discard-dialog';
@@ -56,13 +56,13 @@ export function leaveEditor(dialog,leave){
 
 export function guardEditor(dialog){
  dialog.addEventListener('cancel',event=>{
-  if(!hasDraft(dialog))return;
+  if(!hasEditorDraft(dialog))return;
   event.preventDefault();
   leaveEditor(dialog,()=>dialog.close());
  });
  // Also cover reload, history navigation and browser close when supported.
  window.addEventListener('beforeunload',event=>{
-  if(!hasDraft(dialog))return;
+  if(!hasEditorDraft(dialog))return;
   event.preventDefault();
   event.returnValue='';
  });

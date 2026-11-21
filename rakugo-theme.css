@@ -77,3 +77,4 @@ dialog:has(.editor-bar) .dialog-head{position:static}
 }
 .duration-fields label{display:flex;align-items:center;gap:5px}
 .duration-fields label input{order:-1;flex:1}
+.program-table td.duration-value,.program-table th.duration-value,.duration-fields input{text-align:right;font-variant-numeric:tabular-nums}

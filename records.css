@@ -13,3 +13,5 @@ td:last-child{white-space:pre-line}
 .history-page .scroll td.uncertain{background:#fff4d8}
 @media(max-width:480px){.history-page .scroll{--date-width:6.3rem;--occasion-width:6.4rem}.history-page .scroll td,.history-page .scroll th{padding:.6rem .45rem}}
 @media print{.history-page .scroll table{width:100%!important;min-width:0;table-layout:auto;font-size:8px}.history-page .scroll col{width:auto!important}.history-page .scroll .fixed-date,.history-page .scroll .fixed-occasion{position:static;width:auto;min-width:0;max-width:none;box-shadow:none}.history-page .scroll td,.history-page .scroll th{width:auto;padding:5px;overflow-wrap:normal}}
+.record-performance{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.35em;align-items:baseline}
+.record-performance .duration-value{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}

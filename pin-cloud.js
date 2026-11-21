@@ -231,7 +231,7 @@ export function createPinClient(endpoint,state,emit){
    }).finally(()=>{if(version===epoch)rosterRequest=null});
    return rosterRequest;
   },
-  async archivePast(data){const result=await call('archivePast',data);refresh('read');return result},
+  async archivePast(data){const version=epoch,result=await call('archivePast',data);if(version===epoch){if(result.rehearsals)confirmed('read',{name:'rehearsals'},result.rehearsals);refresh('read')}return result},
   async importLocal(data){const result=await call('importLocal',data);refresh();return result},
   async members(){return (await call('members')).members},async memberSave(member){const result=await call('memberSave',{member});rosterCache=null;views.delete(streamKey('roster',{}));flushViews();return result.member},
   async changePin(pin){await call('changePin',{pin});signOut()}
