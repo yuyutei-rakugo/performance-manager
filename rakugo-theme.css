@@ -38,3 +38,11 @@ footer{border-top:2px solid var(--line)}button:disabled{opacity:.5;cursor:defaul
 .rehearsal-datetime{display:inline-flex;max-width:100%;flex-wrap:wrap;align-items:baseline;column-gap:.6em;color:var(--navy);font-size:1.22rem;font-weight:800;line-height:1.5}
 .rehearsal-date,.rehearsal-time{max-width:100%;overflow-wrap:anywhere}
 .rehearsal-year{font-size:.78em;font-weight:700}
+
+.editor-bar{position:sticky;top:0;z-index:2;background:var(--white);border-bottom:1px solid var(--line);padding:8px 0;margin-bottom:12px}
+.editor-bar .form-actions{margin:0}
+.editor-bar [data-editor-status]{margin:.4em 0 0;overflow-wrap:anywhere}
+.editor-bar button{min-height:44px}
+dialog:has(.editor-bar) input,dialog:has(.editor-bar) textarea,dialog:has(.editor-bar) select{scroll-margin-top:110px}
+dialog:has(.editor-bar) .dialog-head{position:static}
+#practice-section[data-editing]~section,#rehearsal-dialog:has(#practice-section[data-editing]) #attendance{display:none}

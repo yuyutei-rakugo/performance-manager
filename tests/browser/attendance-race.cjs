@@ -7,6 +7,7 @@ const names=['試験会員甲','試験会員乙','試験会員丙'];
 const practice={id:'p1',title:'通常稽古',date:'2099-01-02',time:'14:00',venue:'試験会場',notes:''};
 const saved=new Map([[names[0],'欠席']]);
 const writes=[],writeIds=[];
+const delegated=new Set();
 const secondDaySaved=new Map([[names[0],'未定']]);
 let rehearsalDoc={revision:1,items:[practice]},practiceConflict=false,practiceFailure=false,practiceWrite,failReadback=false,readbackPending=false;
 function gate(){
@@ -20,10 +21,10 @@ function gate(){
 async function main(){
  const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH});
  try{
-  async function session(name){
+  async function session(name,admin=false){
    const c=await browser.newContext({...devices['Pixel 7'],serviceWorkers:'block',timezoneId:'America/Los_Angeles'});
    const p=await c.newPage();p.setDefaultTimeout(10000);
-   let readGate,writeGate,fail=false,failRead=false;
+   let readGate,writeGate,proxyGate,fail=false,failRead=false,failProxy=false;
    await p.addInitScript(()=>{
     if(!localStorage.getItem('yuitei.session'))localStorage.setItem('yuitei.session','fixture');
     const schedule=window.setInterval;
@@ -41,7 +42,7 @@ async function main(){
     const req=JSON.parse(r.request().postData()),{action}=req;
     const json=body=>r.fulfill({headers:{'access-control-allow-origin':'*'},json:body});
     switch(action){
-    case 'session':return json({ok:true,member:{id:name,name,role:name===names[0]?'editor':'viewer'}});
+    case 'session':return json({ok:true,member:{id:name,name,role:admin?'admin':name===names[0]?'editor':'viewer',...(admin?{attendanceProxy:true}:{})}});
     case 'read':
      if(readbackPending){readbackPending=false;return json({ok:false,error:'模擬読み戻し失敗'})}
      return json({ok:true,doc:rehearsalDoc});
@@ -61,7 +62,7 @@ async function main(){
     }
     case 'roster':return json({ok:true,members:names.map(name=>({name}))});
     case 'attendanceRead':{
-     const rows=[...(req.id==='december'?secondDaySaved:saved)].map(([stageName,status])=>({stageName,status}));
+     const rows=[...(req.id==='december'?secondDaySaved:saved)].map(([stageName,status])=>({stageName,status,delegated:req.id==='december'&&delegated.has(stageName)}));
      if(readGate){const gate=readGate;readGate=null;gate.started();await gate.wait}
      if(failRead){failRead=false;return json({ok:false,error:'模擬取得失敗'});}
      return json({ok:true,rows});
@@ -71,7 +72,16 @@ async function main(){
      if(writeGate){const gate=writeGate;writeGate=null;gate.started();await gate.wait}
      if(fail){fail=false;return json({ok:false,error:'模擬保存失敗'});}
      (req.id==='december'?secondDaySaved:saved).set(name,req.status);
+     if(req.id==='december')delegated.delete(name);
      return json({ok:true});
+    }
+    case 'attendanceProxy':{
+     assert(admin);assert.equal(req.id,'december');
+     if(proxyGate){const gate=proxyGate;proxyGate=null;gate.started();await gate.wait}
+     if(failProxy){failProxy=false;return json({ok:false,error:'模擬代行保存失敗'})}
+     if(secondDaySaved.has(req.name))return json({ok:true,applied:false});
+     secondDaySaved.set(req.name,req.status);delegated.add(req.name);
+     return json({ok:true,applied:true});
     }
     default:throw Error(action);
     }
@@ -79,7 +89,7 @@ async function main(){
    const open=()=>p.goto(new URL('rehearsals.html',base).href);
    await open();
    await p.locator('.quick-attendance strong').waitFor();
-   return {p,open,holdRead:()=>readGate=gate(),holdWrite:()=>writeGate=gate(),failOnce:()=>{fail=true},failRead:()=>{failRead=true},poll:()=>p.evaluate(()=>{for(const callback of fixturePolls.values())callback()})};
+   return {p,open,holdRead:()=>readGate=gate(),holdWrite:()=>writeGate=gate(),failOnce:()=>{fail=true},failRead:()=>{failRead=true},holdProxy:()=>proxyGate=gate(),failProxy:()=>{failProxy=true},poll:()=>p.evaluate(()=>{for(const callback of fixturePolls.values())callback()})};
   }
   const a=await session(names[0]),b=await session(names[1]),p=a.p;
   const quick=p.locator('.member-home .save-feedback');
@@ -159,6 +169,7 @@ async function main(){
   await panel(other.p).getByText('欠席 2人').waitFor();
   assert(! (await panel(other.p).locator('[data-attendance-time]').textContent()).includes('未取得'));
   await show(p);
+  await p.locator('#edit-practices').click();
   const editor=p.locator('#practice-form');
   const practiceStatus=p.locator('#practice-save-feedback');
   const addPractice=async (name,piece,minutes,guest=false)=>{
@@ -183,7 +194,7 @@ async function main(){
   await editor.locator('button[type=submit]').click();
   await pendingPractice.sent;
   await practiceStatus.getByText('保存中…').waitFor();
-  assert(await editor.evaluate(form=>form.inert));
+  assert(await editor.locator('button[type=submit]').isDisabled());
   await panel(b.p).locator('[data-self-status="出席"]').click();
   await panel(b.p).getByText('出席で登録しました。').waitFor();
   pendingPractice.open();
@@ -194,8 +205,10 @@ async function main(){
   assert.equal(saved.get(names[1]),'出席');
   await p.locator('#rehearsal-dialog [data-close]').click();
   await show(p);
-  assert.equal(await editor.locator('[name=piece]').last().inputValue(),'芝浜');
+  await p.locator('#practice-section li').getByText(/芝浜/).waitFor();
   await p.reload();await show(p);
+  await p.locator('#practice-section li').getByText(/芝浜/).waitFor();
+  await p.locator('#edit-practices').click();
   assert.equal(await editor.locator('[name=piece]').last().inputValue(),'芝浜');
   const viewer=await session(names[1]);await show(viewer.p);
   await viewer.p.locator('#practice-section').getByText(/試験ゲスト.*時そば/).waitFor();
@@ -219,6 +232,8 @@ async function main(){
    {...today,id:'other',time:'20:00',title:'その他稽古',otherContent:'交流会'}
   ]};
   const card=p.locator('.member-home');
+  await p.getByRole('button',{name:'キャンセル',exact:true}).click();
+  await p.getByRole('button',{name:'変更を破棄する'}).click();
   await p.clock.setFixedTime(new Date('2026-11-20T14:59:00Z'));
   await p.reload();
   await card.getByRole('heading',{name:'次回の稽古',exact:true}).waitFor();
@@ -277,6 +292,46 @@ async function main(){
     time.scrollWidth<=time.clientWidth+1&&time.getBoundingClientRect().width<=time.parentElement.clientWidth);
   });
   assert(fits);
+  // Independent administrator and member sessions reading the same attendance.
+  const adm=await session(names[0],true),peer=await session(names[1]);
+  for(const user of [adm,peer]){
+   await user.p.locator('[data-detail="december"]').click();
+   await panel(user.p).getByText('未登録 2人').waitFor();
+  }
+  assert.equal(await panel(peer.p).locator('[data-proxy]').count(),0);
+  const proxy=panel(adm.p).locator('[data-proxy]');
+  await proxy.locator('summary').click();
+  const selectProxy=async (name,status)=>{
+   await proxy.locator('[name=member]').selectOption(name);
+   await proxy.locator('[name=status]').selectOption(status);
+  };
+  const proxyStatus=panel(adm.p).locator('[data-proxy-status]');
+  await selectProxy(names[1],'欠席');
+  adm.failProxy();
+  await proxy.locator('button').click();
+  await proxyStatus.getByText(/模擬代行保存失敗/).waitFor();
+  assert.equal(await proxy.locator('[name=member]').inputValue(),names[1]);
+  const pendingProxy=adm.holdProxy();
+  await proxy.locator('button').click();await pendingProxy.sent;
+  await proxyStatus.getByText('保存中…',{exact:true}).waitFor();
+  assert(await proxy.locator('button').isDisabled());
+  await panel(peer.p).locator('[data-self-status="出席"]').click();
+  await panel(peer.p).getByText('出席で登録しました。').waitFor();
+  pendingProxy.open();
+  await proxyStatus.getByText(/既に登録/).waitFor();
+  await panel(adm.p).getByText('出席 1人').waitFor();
+  await proxy.locator('summary').click();
+  await selectProxy(names[2],'未定');
+  await proxy.locator('button').click();
+  await proxyStatus.getByText(/未定で代行登録/).waitFor();
+  await panel(adm.p).getByText('（管理者代行）',{exact:true}).waitFor();
+  const third=await session(names[2]);
+  await third.p.locator('[data-detail="december"]').click();
+  await panel(third.p).getByText('（管理者代行）',{exact:true}).waitFor();
+  await panel(third.p).locator('[data-self-status="欠席"]').click();
+  await panel(third.p).getByText('欠席 2人').waitFor();
+  assert.equal(await panel(third.p).getByText('（管理者代行）',{exact:true}).count(),0);
+  console.log('PASS independent proxy and self sessions, pending, failure and retry, conflicts and delegated label');
   console.log('PASS JST start and midnight boundaries on a Los Angeles device, earliest active schedule, correct write IDs, stale response and message isolation, type labels, dates at 320px and 200% font, reset feedback');
   console.log('PASS stable pointer controls, pending/confirmed/error feedback, all three save routes, stale-read ordering, double click, detail reopening, independent sessions and concurrent member answers, practice drafts, conflict rebase, readback failure, and persistence');
  }finally{await browser.close()}

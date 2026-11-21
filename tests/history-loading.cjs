@@ -13,7 +13,7 @@ const q=selector=>w.document.querySelector(selector);
 const status=()=>q('#history-edit-status').textContent;
 current={ready:false,configured:false};
 const clean=file=>fs.readFileSync(file,'utf8').replace(/^import .*;\n/gm,'').replace(/export /g,'');
-w.eval(clean('record-transfer.js')+'\n'+clean('history-editor.js')+'\nconst data={records:[]};historyEditor(()=>data,()=>{});');
+w.eval(clean('editor-dialog.js')+'\n'+clean('record-transfer.js')+'\n'+clean('history-editor.js')+'\nconst data={records:[]};historyEditor(()=>data,()=>{});');
 assert.match(status(),/接続を確認/);assert(q('#history-add').disabled);
 emit({ready:false,configured:true});assert.match(status(),/接続を確認/);
 emit({ready:true,configured:false});assert.match(status(),/この端末に保存/);
