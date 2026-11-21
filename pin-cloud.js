@@ -106,7 +106,7 @@ export function createPinClient(endpoint,state,emit){
    const changed=!entry.hasValue||(entry.action==='read'
     ? value?.revision!==entry.value?.revision
     : JSON.stringify(value)!==JSON.stringify(entry.value));
-   entry.value=value;entry.hasValue=true;entry.updatedAt=Date.now();entry.error='';
+   entry.value=value;entry.hasValue=true;entry.updatedAt=Date.now();entry.error='';entry.attendanceRefresh=false;
    if(state.user)saveView(streamKey(entry.action,entry.args),value,entry.updatedAt);
    deliver(entry,null,changed);
   }catch(error){
@@ -119,7 +119,7 @@ export function createPinClient(endpoint,state,emit){
  function watch(action,args,fn,onError){
   const now=Date.now(),key=streamKey(action,args);
   for(const [id,other] of streams){
-   if(!other.subscribers.size&&!other.inFlight&&now-other.updatedAt>60000)streams.delete(id);
+   if(!other.subscribers.size&&!other.inFlight&&!attendanceWrites.has(other.args.id)&&now-other.updatedAt>60000)streams.delete(id);
   }
   let entry=streams.get(key);
   if(!entry){
@@ -138,7 +138,7 @@ export function createPinClient(endpoint,state,emit){
     if(entry.error)onError?.(entry.error);
    });
   }
-  if(!entry.hasValue||entry.error||now-entry.updatedAt>=freshFor)load(entry);
+  if(!entry.hasValue||entry.error||entry.attendanceRefresh||now-entry.updatedAt>=freshFor)load(entry);
   return()=>{entry.subscribers.delete(subscriber);if(!entry.subscribers.size)stopTimer(entry)};
  }
  function refresh(action,name){
@@ -152,10 +152,10 @@ export function createPinClient(endpoint,state,emit){
  function confirmed(action,args,value){
   const key=streamKey(action,args),entry=streams.get(key);
   if(action==='read'&&(entry?.value?.revision??views.get(key)?.value?.revision)>value.revision)return;
-  const time=action==='read'?Date.now():entry.updatedAt;
+  const time=action==='read'?Date.now():(entry?.updatedAt??views.get(key)?.time??Date.now());
   if(state.user)saveView(key,value,time);
   if(!entry)return;
-  entry.version++;entry.value=value;entry.hasValue=true;entry.updatedAt=time;deliver(entry);
+  entry.version++;entry.value=value;entry.hasValue=true;entry.updatedAt=time;if(action==='attendanceRead')entry.error='';deliver(entry);
  }
  window.addEventListener('storage',event=>{if(event.storageArea===localStorage&&(event.key===sessionKey||event.key===null)&&readStorage(localStorage)!==token&&remember){signOut()}});
  function refreshVisible(){
@@ -200,12 +200,18 @@ export function createPinClient(endpoint,state,emit){
    try{
     await call('attendanceSave',{id,status});
     const entry=streams.get(streamKey('attendanceRead',{id}));
-    if(entry?.hasValue){
-     const rows=entry.value.filter(row=>row.stageName!==state.stageName);
+    const previous=entry?.hasValue?entry.value:views.get(streamKey('attendanceRead',{id}))?.value;
+    if(previous){
+     const rows=previous.filter(row=>row.stageName!==state.stageName);
      rows.push({stageName:state.stageName,status});
      confirmed('attendanceRead',{id},rows);
     }else if(entry){
      entry.version++;
+    }
+    // Reads begun before the acknowledgement are superseded even when the detail is closed.
+    // The new read also picks up answers saved by other members during this write.
+    if(entry){
+     entry.attendanceRefresh=true;
      if(entry.inFlight)entry.again=true;else load(entry);
     }
    }finally{if(version===epoch)attendanceWrites.delete(id)}

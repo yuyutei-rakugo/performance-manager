@@ -20,11 +20,13 @@ async function boot(configured=false,page="rehearsals.html",deferAttendance=fals
  const c=await boot(true);assert.deepEqual(Object.keys(c.watchers),['rehearsals']);c.watchers.rehearsals({items:[practice]});assert(!c.q('#quick-person'));assert(!c.q('[data-quick-status=出席]').disabled);await c.q('[data-quick-status=出席]').onclick();assert.deepEqual(c.writes,[{id:practice.id,status:'出席'}]);assert.match(c.q('.save-feedback').textContent,/出席で登録しました/);c.fail(true);await c.q('[data-quick-status=欠席]').onclick();assert.match(c.q('.save-feedback').textContent,/保存できませんでした/);assert.equal(c.q('[data-quick-status=出席]').getAttribute('aria-pressed'),'true');assert(!c.q('[data-quick-status=欠席]').disabled);c.emit({configured:true,provider:'apps-script',role:null});assert(!c.q('[data-quick-status]'));c.w.close();t.w.close();
  const slow=await boot(true,'rehearsals.html',true);slow.watchers.rehearsals({items:[practice]});
  assert.match(slow.q('.quick-attendance strong').textContent,/確認中/);
- assert(slow.q('[data-quick-status=出席]').disabled);
+ assert(!slow.q('[data-quick-status=出席]').disabled);
  slow.answerError();
  assert.match(slow.q('.quick-attendance strong').textContent,/取得できませんでした/);
- assert(slow.q('[data-quick-status=出席]').disabled);
+ assert(!slow.q('[data-quick-status=出席]').disabled);
+ const button=slow.q('[data-quick-status=出席]');
  slow.answer([]);
+ assert.equal(slow.q('[data-quick-status=出席]'),button);
  assert.equal(slow.q('.quick-attendance strong').textContent,'未登録');
  assert(!slow.q('[data-quick-status=出席]').disabled);
  slow.w.close();
