@@ -43,6 +43,23 @@ expectError(call('attendanceProxy',{...proxy,id:'missing'}),/予定/);
 expectError(call('attendanceProxy',{...proxy,status:'未回答'}),/出欠/);
 console.log('PASS admin-only proxy, both write orders, repeat refusal and self-only ownership');
 const event={id:'past-1',date:'2026-11-18',title:'試験寄席',time:'14:00',venue:'和室',memo:'',performers:[],checklist:[{label:'確認',done:false}]};assert(call('save',{token,name:'events',items:[event,{...event,id:'future-1',date:'2026-11-21'}],revision:0}).ok);expectError(call('save',{token,name:'events',items:[],revision:0}),/更新/);const record={id:'transferred:event:past-1',date:event.date,kind:'その他公演',occasion:'試験寄席',note:'テスト',pieces:{'勇水':'寿限無'}};expectError(call('archivePast',{token:member.token,transfers:[]}),/管理者/);const future={type:'event',id:'future-1',record:{...record,id:'transferred:event:future-1',date:'2026-11-21'}};expectError(call('archivePast',{token,revisions:{events:1,history:0},transfers:[future]}),/日付が過ぎた/);assert.equal(call('archivePast',{token:other.token,revisions:{events:1,history:0},transfers:[{type:'event',id:event.id,record}]}).count,1);assert(call('read',{token,name:'events'}).doc.items[0].archivedAt);assert.equal(call('read',{token,name:'history'}).doc.items[0].pieces['勇水'],'寿限無');expectError(call('archivePast',{token,revisions:{events:2,history:1},transfers:[{type:'event',id:event.id,record}]}),/未転記/);
+const sameDay={...rehearsal,id:'archive-today',date:'2026-11-19'};
+const later={...rehearsal,id:'archive-future',date:'2026-11-20'};
+assert(call('save',{token,name:'rehearsals',items:[expanded,sameDay,later],revision:2}).ok);
+assert(call('attendanceSave',{token:member.token,id:sameDay.id,status:'出席'}).ok);
+const detailed=(item,status,actor=token)=>call('archivePast',{
+ token:actor,rehearsalDetail:true,revisions:{rehearsals:3,history:1},
+ transfers:[{type:'rehearsal',id:item.id,record:{...record,id:'transferred:rehearsal:'+item.id,date:item.date,attendance:{ぐう:status},sourceData:item}}]
+});
+expectError(detailed(sameDay,'出席',member.token),/管理者/);
+expectError(detailed(later,'出席'),/当日以前/);
+expectError(detailed(sameDay,'欠席'),/出欠が更新/);
+assert.equal(detailed(sameDay,'出席').count,1);
+assert.equal(detailed(sameDay,'出席').count,0);
+assert(call('read',{token,name:'rehearsals'}).doc.items.find(r=>r.id===sameDay.id).archivedAt);
+assert.equal(call('read',{token,name:'history'}).doc.items.filter(r=>r.id==='transferred:rehearsal:'+sameDay.id).length,1);
+expectError(call('attendanceSave',{token:member.token,id:sameDay.id,status:'欠席'}),/移動済み/);
+console.log('PASS JST same-day detail archive, stale attendance rejected, atomic archival, retry and closed attendance');
 const migration={documents:{events:[{...event,id:'different',title:'同日の置き換えを拒否'}],rehearsals:[],history:[{...record,note:'既存記録を置き換えない'}]},attendance:{'practice-1':{'ぐう':'欠席'}}};
 expectError(call('importLocal',{...migration,token:member.token}),/管理者/);
 assert(call('importLocal',{...migration,token}).ok);

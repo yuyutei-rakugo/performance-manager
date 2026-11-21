@@ -1,11 +1,11 @@
-import {startEditor,finishEditor,leaveEditor,guardEditor,editorState,saveRecovery,recoveryScope,recoveredEditState} from './editor-dialog.js?v=20261121-layout1';
-import {performerPicker,updatePerformerPickers,readPerformer,showPerformerRoster} from './performer-picker.js?v=20261121-layout1';
-import {mountMemberHome} from './member-home.js?v=20261121-layout1';
-import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261121-layout1';
-import {readCategories,saveCategories,validCategories,categoryOptions,mountCategories} from './categories.js?v=20261121-layout1';
-import {mountScheduleImport} from './schedule-import.js?v=20261121-layout1';
-import {validPerformer,timeline,toRecord,transferRecord,readRecords,mergeRecords,mergedRecords} from './record-transfer.js?v=20261121-layout1';
-import {cloud,startCloud,mountAccount} from './cloud.js?v=20261121-layout1';
+import {startEditor,finishEditor,leaveEditor,guardEditor,editorState,saveRecovery,recoveryScope,recoveredEditState} from './editor-dialog.js?v=20261121-duration1';
+import {performerPicker,updatePerformerPickers,readPerformer,showPerformerRoster} from './performer-picker.js?v=20261121-duration1';
+import {mountMemberHome} from './member-home.js?v=20261121-duration1';
+import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261121-duration1';
+import {readCategories,saveCategories,validCategories,categoryOptions,mountCategories} from './categories.js?v=20261121-duration1';
+import {mountScheduleImport} from './schedule-import.js?v=20261121-duration1';
+import {validPerformer,timeline,formatDuration,toRecord,transferRecord,readRecords,mergeRecords,mergedRecords} from './record-transfer.js?v=20261121-duration1';
+import {cloud,startCloud,mountAccount} from './cloud.js?v=20261121-duration1';
 'use strict';
 
 const key = 'yuitei.events.v1';
@@ -157,7 +157,7 @@ function renderDetails(id,message='') {
   const event = events.find(item => item.id === id);
   if (!event) {eventDialog.close();return}
   const rows=timeline(event.time,event.performers);
-  const program=rows.length?`<div class="program-scroll"><table class="program-table event-program-table"><colgroup><col class="program-order"><col class="program-performer"><col><col class="program-duration"><col class="program-end"></colgroup><thead><tr><th>順</th><th>演者・仲入り</th><th>ネタ・演し物</th><th>持ち時間</th><th>終了予定</th></tr></thead><tbody>${rows.map((p,i)=>`<tr><td>${i+1}</td><td>${esc(p.type==='break'?'仲入り':p.stageName)}</td><td>${esc(p.piece)}</td><td>${durationLabel(Math.round(p.minutes*60))}</td><td>${p.end}</td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">出演者は未登録です。</p>';
+  const program=rows.length?`<div class="program-scroll"><table class="program-table event-program-table"><colgroup><col class="program-order"><col class="program-performer"><col><col class="program-duration"><col class="program-end"></colgroup><thead><tr><th>順</th><th>演者・仲入り</th><th>ネタ・演し物</th><th class="duration-value">持ち時間</th><th>終了予定</th></tr></thead><tbody>${rows.map((p,i)=>`<tr><td>${i+1}</td><td>${esc(p.type==='break'?'仲入り':p.stageName)}</td><td>${esc(p.piece)}</td><td class="duration-value">${formatDuration(Number.isFinite(p.minutes)?p.minutes*60:null)}</td><td>${p.end}</td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">出演者は未登録です。</p>';
 
   eventDialog.innerHTML = `<div class="dialog-body"><div class="dialog-head"><h2 id="event-heading">${esc(event.title)}</h2><button type="button" data-close="event-dialog" aria-label="閉じる">×</button></div>
     <p>${dateLabel(event.date)} ${esc(event.time||'時間未定')}<br>会場　${esc(event.venue)}<br>区分　${esc(event.kind||'その他公演')}</p>${editable()?'<div class="form-actions"><button class="primary" data-edit>編集する</button></div>':''}<p class="save-feedback" role="status">${esc(message)}</p>
@@ -206,7 +206,6 @@ function loadPerformerRoster(form,force=false){
     showPerformerRoster(form,'error',performerNames,retry);
   });
 }
-const durationLabel=seconds=>Math.floor(seconds/60)+'分'+(seconds%60?seconds%60+'秒':'');
 function programMinutes(row){
   const minutes=row.querySelector('[name=minutes]').valueAsNumber,seconds=row.querySelector('[name=seconds]').valueAsNumber||0;
   const original=Number(row.dataset.originalMinutes);
@@ -371,7 +370,7 @@ $('schedule').onclick = async click => {
   }
 };
 $('list-tab').onclick = () => {tab = 'list'; render();};
-$('calendar-tab').onclick = () => {location.href = 'rehearsals.html?v=20261121-layout1';};
+$('calendar-tab').onclick = () => {location.href = 'rehearsals.html?v=20261121-duration1';};
 $('new-event').onclick = () => renderForm();
 $('data-open').onclick = () => $('data-dialog').showModal();
 guardEditor(eventDialog);

@@ -47,6 +47,18 @@ async function main(){
             attendance.set(request.id,[...rows.filter(row=>row.stageName!=='試験会員'),{stageName:'試験会員',status:request.status}]);
             return ok({});
           }
+          case 'archivePast':{
+            assert.equal(role,'admin');assert.equal(request.rehearsalDetail,true);
+            const [transfer]=request.transfers;
+            assert.equal(request.revisions.rehearsals,docs.rehearsals.revision);
+            assert.equal(request.revisions.history,docs.history.revision);
+            assert.equal(transfer.record.attendance['試験会員'],'出席');
+            assert.equal(transfer.record.sourceData.notes,'当日の連絡事項');
+            assert.equal(transfer.record.sourceData.practices[0].durationSeconds,185);
+            docs.history={items:[...docs.history.items,transfer.record],revision:docs.history.revision+1};
+            docs.rehearsals={items:docs.rehearsals.items.map(r=>r.id===transfer.id?{...r,archivedAt:'2026-11-21T08:00:00Z'}:r),revision:docs.rehearsals.revision+1};
+            return ok({count:1,rehearsals:docs.rehearsals});
+          }
           case 'save':{
             assert.notEqual(role,'viewer');
             if(request.revision!==docs[request.name].revision)return answer({ok:false,error:'ほかの端末で更新されています。再読み込みしてください。'});
@@ -329,6 +341,38 @@ async function main(){
     assert.equal(docs.rehearsals.items.length,0);
     assert.deepEqual(docs.history,recordsBeforeDelete);
     assert.deepEqual(attendance.get(rehearsalId),[{stageName:'別の会員',status:'出席'},{stageName:'試験会員',status:'未定'}]);
+    const todayPractice={id:'today-archive',title:'通常稽古',date:'2026-11-21',time:'17:00',venue:'和室',notes:'当日の連絡事項',practices:[
+      {stageName:'試験会員',piece:'時そば',durationSeconds:185},
+      {stageName:'試験会員',piece:'猫と金魚',durationSeconds:0},
+      {stageName:'別の会員',piece:'寿限無',durationSeconds:null}
+    ]};
+    docs.rehearsals={revision:docs.rehearsals.revision+1,items:[todayPractice,{...todayPractice,id:'next-practice',title:'師匠稽古',date:'2026-12-13'}]};
+    attendance.set(todayPractice.id,[{stageName:'試験会員',status:'出席'}]);
+    await page.clock.setFixedTime(new Date('2026-11-21T08:01:00Z'));
+    await page.goto(new URL('rehearsals.html',base).href);
+    await page.locator('.member-home').getByText('今日の稽古').waitFor();
+    await page.locator('[data-open-rehearsal]').click();
+    const durations=page.locator('.practice-table td.duration-value');
+    assert.deepEqual(await durations.allTextContents(),['3分05秒','0分00秒','未入力']);
+    assert(await durations.evaluateAll(cells=>cells.every(cell=>getComputedStyle(cell).textAlign==='right')));
+    await page.locator('#edit-rehearsal-inside').click();
+    const archive=page.getByRole('button',{name:'終了して記録へ移す'});
+    await archive.click();
+    const confirmation=page.getByRole('dialog',{name:'稽古の終了を確認'});
+    await confirmation.getByRole('button',{name:'戻る',exact:true}).click();
+    assert.equal(docs.history.items.filter(r=>r.sourceId===todayPractice.id).length,0);
+    await archive.click();
+    await confirmation.getByRole('button',{name:'終了して移す'}).click();
+    await page.locator('.member-home').getByText('次回の稽古').waitFor();
+    await page.locator('[data-open-rehearsal="next-practice"]').waitFor();
+    assert.equal(docs.history.items.filter(r=>r.sourceId===todayPractice.id).length,1);
+    await page.goto(new URL('history.html',base).href);
+    await page.locator('#body .duration-value').getByText('3分05秒',{exact:true}).first().waitFor();
+    await page.emulateMedia({media:'print'});
+    assert(await page.locator('#body .duration-value').getByText('3分05秒',{exact:true}).first().isVisible());
+    assert((await page.pdf({format:'A4'})).length>1000);
+    await page.emulateMedia({media:'screen'});
+
     const sample=docs.events.items[0];
     docs.events={revision:docs.events.revision+1,items:Array.from({length:500},(_,i)=>({...sample,id:'bulk-'+i}))};
     const narrow=await session('viewer');

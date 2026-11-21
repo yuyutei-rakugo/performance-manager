@@ -1,14 +1,14 @@
-import {startEditor,finishEditor,leaveEditor,guardEditor,editorState,saveRecovery,recoveryScope,recoveredEditState} from './editor-dialog.js?v=20261121-layout1';
-import {performerPicker,updatePerformerPickers,readPerformer,showPerformerRoster} from './performer-picker.js?v=20261121-layout1';
-import {mountMemberHome} from './member-home.js?v=20261121-layout1';
-import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261121-layout1';
-import {readCategories,saveCategories,validCategories} from './categories.js?v=20261121-layout1';
-import {mountScheduleImport} from './schedule-import.js?v=20261121-layout1';
-import {toRecord,transferRecord,rehearsalTitle,readRecords,mergeRecords,mergedRecords} from './record-transfer.js?v=20261121-layout1';
-import {cloud,startCloud,mountAccount} from './cloud.js?v=20261121-layout1';
-import {statuses,rehearsalNames,validRehearsal,validAttendance,attendanceSummary,japanDate,rehearsalBadge,rehearsalDateTime} from './rehearsal-model.js?v=20261121-layout1';
+import {startEditor,finishEditor,leaveEditor,guardEditor,editorState,hasEditorDraft,saveRecovery,recoveryScope,recoveredEditState} from './editor-dialog.js?v=20261121-duration1';
+import {performerPicker,updatePerformerPickers,readPerformer,showPerformerRoster} from './performer-picker.js?v=20261121-duration1';
+import {mountMemberHome} from './member-home.js?v=20261121-duration1';
+import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261121-duration1';
+import {readCategories,saveCategories,validCategories} from './categories.js?v=20261121-duration1';
+import {mountScheduleImport} from './schedule-import.js?v=20261121-duration1';
+import {toRecord,formatDuration,rehearsalTitle,readRecords,mergeRecords,mergedRecords} from './record-transfer.js?v=20261121-duration1';
+import {cloud,startCloud,mountAccount} from './cloud.js?v=20261121-duration1';
+import {statuses,rehearsalNames,validRehearsal,validAttendance,attendanceSummary,japanDate,rehearsalBadge,rehearsalDateTime} from './rehearsal-model.js?v=20261121-duration1';
 const $=id=>document.getElementById(id),esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const key='yuitei.rehearsals.v1';let items=[],attendance={},names=[],revision=0,loaded=false,storageOK=true,stop,stopAttendance,opened=null,detailRevision=0,busy=false;
+const key='yuitei.rehearsals.v1';let items=[],attendance={},names=[],revision=0,loaded=false,storageOK=true,stop,stopAttendance,opened=null,detailRevision=0,busy=false,archiving=false;
 let noticeTimer;
 const notify=s=>{clearTimeout(noticeTimer);$('notice').textContent=s;$('notice').hidden=false;noticeTimer=setTimeout(()=>$('notice').hidden=true,6000)};
 const canEdit=()=>!cloud.state.configured||loaded&&['admin','editor'].includes(cloud.state.role);
@@ -80,6 +80,12 @@ function form(existing,onCancel=()=>dialog.close(),recovery){if(!canEdit())retur
     else notify('稽古予定を保存しました。');
    }else done(editor.querySelector('[data-editor-status]').textContent);
  };
+ if(existing&&!existing.archivedAt&&existing.date<=japanDate()&&cloud.state.provider==='apps-script'&&cloud.state.role==='admin'){
+  const archive=document.createElement('button');
+  archive.type='button';archive.className='secondary';archive.textContent='終了して記録へ移す';
+  editor.querySelector('.editor-bar .form-actions').append(archive);
+  archive.onclick=()=>{if(hasEditorDraft(dialog)){editorState(editor,'変更を保存するか、キャンセルしてから記録へ移してください。');return}confirmArchive(existing.id,editor,archive)};
+ }
  if(existing){
   $('delete-confirm').onchange=e=>$('delete-rehearsal').disabled=!e.target.checked;
   $('delete-rehearsal').onclick=async()=>{
@@ -92,9 +98,44 @@ function form(existing,onCancel=()=>dialog.close(),recovery){if(!canEdit())retur
  }
  if(!dialog.open)dialog.showModal();
 }
-function detail(id,message=''){const r=items.find(x=>x.id===id);if(!r)return;stopAttendance?.();opened=id;attendanceState=cloud.state.configured?'loading':'ready';detailRevision=revision;dialog.innerHTML=`<div class="dialog-body"><div class="dialog-head"><h2>${rehearsalBadge(r,rehearsalTitle(r),esc)}</h2><button data-close aria-label="閉じる">×</button></div><p>${rehearsalDateTime(r,esc)}<br>場所：${esc(r.venue)}</p><p class="muted">予定ID：${esc(r.id)}</p><p class="memo">${esc(r.notes)}</p>${canEdit()?'<div class="form-actions"><button type="button" class="primary" id="edit-rehearsal-inside">編集する</button></div>':''}<p class="save-feedback" role="status">${esc(message)}</p><section id="attendance"></section><section class="block" id="practice-section"></section><section class="block" hidden><button class="primary" type="button" id="transfer-rehearsal" ${canEdit()?'':'disabled'}>${r.archivedAt?'記録を更新する':'終了して記録へ移す'}</button><p class="muted">終了後、稽古したネタと長さ・出欠・連絡事項を記録へ保存します。元の予定も残ります。</p></section></div>`;$('edit-rehearsal-inside')?.addEventListener('click',()=>leaveEditor(dialog,()=>form(items.find(x=>x.id===id),()=>{
+function detail(id,message=''){const r=items.find(x=>x.id===id);if(!r)return;stopAttendance?.();opened=id;attendanceState=cloud.state.configured?'loading':'ready';detailRevision=revision;dialog.innerHTML=`<div class="dialog-body"><div class="dialog-head"><h2>${rehearsalBadge(r,rehearsalTitle(r),esc)}</h2><button data-close aria-label="閉じる">×</button></div><p>${rehearsalDateTime(r,esc)}<br>場所：${esc(r.venue)}</p><p class="muted">予定ID：${esc(r.id)}</p><p class="memo">${esc(r.notes)}</p>${canEdit()?'<div class="form-actions"><button type="button" class="primary" id="edit-rehearsal-inside">編集する</button></div>':''}<p class="save-feedback" role="status">${esc(message)}</p><section id="attendance"></section><section class="block" id="practice-section"></section></div>`;$('edit-rehearsal-inside')?.addEventListener('click',()=>leaveEditor(dialog,()=>form(items.find(x=>x.id===id),()=>{
  if(items.some(item=>item.id===id&&!item.archivedAt))detail(id);else dialog.close();
-})));practiceView(id);$('transfer-rehearsal').onclick=async()=>{if($('practice-form')?.dataset.dirty==='true'){notify('入力したネタ・時間を保存してから記録へ移してください。');return}if(cloud.state.role!=='admin'||r.date>=new Date().toLocaleDateString('sv-SE')||!confirm('終了した稽古を稽古・公演記録へ移しますか？ネタ・時間は保存した内容を転記します。'))return;try{const current=items.find(x=>x.id===id);await transferRecord(toRecord('rehearsal',current,names,attendance[id]||{}));if(await save(items.map(x=>x.id===id?{...x,archivedAt:new Date().toISOString()}:x),detailRevision)){dialog.close();notify('稽古・公演記録へ移しました。')}else notify('記録には保存しましたが、予定側の転記済み表示を保存できませんでした。再実行しても重複しません。')}catch(e){notify(e.message)}};if(!dialog.open)dialog.showModal();if(cloud.state.configured&&cloud.state.role){watchDetailAttendance(id);if(cloud.state.provider==='apps-script'){loadRoster(true);refreshDetailPractices(id)}}else attendanceView(id)}
+})));practiceView(id);if(!dialog.open)dialog.showModal();if(cloud.state.configured&&cloud.state.role){watchDetailAttendance(id);if(cloud.state.provider==='apps-script'){loadRoster(true);refreshDetailPractices(id)}}else attendanceView(id)}
+function confirmArchive(id,editor,button){
+ if(archiving||busy||cloud.state.role!=='admin')return;
+ const prompt=document.createElement('dialog');
+ prompt.setAttribute('aria-label','稽古の終了を確認');
+ prompt.innerHTML='<div class="dialog-body"><h2>稽古の終了を確認</h2><p>稽古は終了しましたか？演者・ネタ・所要時間・出欠・連絡事項を記録に移し、今日／次回の稽古から外します。</p><div class="form-actions"><button type="button" class="secondary" autofocus>戻る</button><button type="button" class="primary">終了して移す</button></div></div>';
+ const [back,submit]=prompt.querySelectorAll('button');
+ back.onclick=()=>prompt.close();
+ submit.onclick=()=>{prompt.close();void archiveRehearsal(id,editor,button)};
+ prompt.addEventListener('close',()=>prompt.remove(),{once:true});
+ document.body.append(prompt);prompt.showModal();
+}
+async function archiveRehearsal(id,editor,button){
+ if(archiving||busy||cloud.state.role!=='admin')return;
+ const generation=accountGeneration;
+ archiving=true;button.disabled=true;editorState(editor,'記録へ移しています…',true);
+ try{
+  const [doc,history,rows,roster]=await Promise.all([
+   cloud.readShared('rehearsals'),cloud.readShared('history'),cloud.readAttendance(id),cloud.roster({force:true})
+  ]);
+  if(generation!==accountGeneration)return;
+  const source=doc?.items.find(r=>r.id===id);
+  if(!source||source.date>japanDate())throw Error('対象の稽古を確認してください。');
+  const responses=Object.fromEntries(rows.map(row=>[row.stageName,row.status]));
+  const record=toRecord('rehearsal',source,roster.map(member=>member.name),responses);
+  await cloud.archivePast({rehearsalDetail:true,transfers:[{type:'rehearsal',id,record}],revisions:{rehearsals:doc.revision,history:history?.revision||0}});
+  if(generation!==accountGeneration)return;
+  if(editor.isConnected&&dialog.open){finishEditor(dialog);dialog.close()}
+  notify('稽古・公演記録へ移しました。');
+ }catch(error){
+  if(generation!==accountGeneration)return;
+  const reason=/日付が過ぎた/.test(error.message)?'当日の転記には共通保存サーバーの更新が必要です。':error.message;
+  const message='記録へ移せませんでした。'+reason;
+  if(editor.isConnected&&dialog.open)editorState(editor,message);else notify(message);
+ }finally{archiving=false;button.disabled=false}
+}
 function watchDetailAttendance(id){
  stopAttendance?.();
  attendanceState='loading';delete attendance[id];attendanceView(id);
@@ -188,8 +229,8 @@ function practiceView(id,editing=!!$('practice-form'),recovery){
  const r=items.find(x=>x.id===id),section=$('practice-section');
  section.toggleAttribute('data-editing',editing&&canEdit());
  if(!editing||!canEdit()){
-  const entries=(r.practices||[]).map(p=>`<tr><td>${esc(p.stageName)}</td><td>${esc(p.piece)}</td><td>${p.durationSeconds==null?'—':Math.floor(p.durationSeconds/60)+'分'+p.durationSeconds%60+'秒'}</td></tr>`).join('');
-  section.innerHTML='<h3>稽古したネタ・長さ</h3><p class="sync-warning" id="practice-read-warning" role="status" hidden></p><p class="save-feedback" id="practice-save-feedback" role="status"></p>'+(entries?'<div class="program-scroll"><table class="program-table practice-table"><colgroup><col class="program-performer"><col><col class="program-duration"></colgroup><thead><tr><th scope="col">演者</th><th scope="col">ネタ</th><th scope="col">時間</th></tr></thead><tbody>'+entries+'</tbody></table></div>':'<p>ネタの記録はありません。</p>')+(canEdit()?'<button type="button" class="secondary" id="edit-practices">ネタ・時間を編集する</button>':'');
+  const entries=(r.practices||[]).map(p=>`<tr><td>${esc(p.stageName)}</td><td>${esc(p.piece)}</td><td class="duration-value">${formatDuration(p.durationSeconds)}</td></tr>`).join('');
+  section.innerHTML='<h3>稽古したネタ・長さ</h3><p class="sync-warning" id="practice-read-warning" role="status" hidden></p><p class="save-feedback" id="practice-save-feedback" role="status"></p>'+(entries?'<div class="program-scroll"><table class="program-table practice-table"><colgroup><col class="program-performer"><col><col class="program-duration"></colgroup><thead><tr><th scope="col">演者</th><th scope="col">ネタ</th><th scope="col" class="duration-value">時間</th></tr></thead><tbody>'+entries+'</tbody></table></div>':'<p>ネタの記録はありません。</p>')+(canEdit()?'<button type="button" class="secondary" id="edit-practices">ネタ・時間を編集する</button>':'');
   showPracticeSave(id);
   $('edit-practices')?.addEventListener('click',()=>{if(practiceSaves.get(id)?.pending)return;practiceSaves.delete(id);practiceView(id,true);section.scrollIntoView?.({block:'start'})});
   return;

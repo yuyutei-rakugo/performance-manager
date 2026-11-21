@@ -7,19 +7,19 @@ function initializeOwner(){
  const lock=LockService.getScriptLock();lock.waitLock(20000);
  try{const props=PropertiesService.getScriptProperties();if(props.getProperty('DB_FILE_ID'))throw Error('初期設定済みです。');const pin=props.getProperty('OWNER_PIN')||'1111';checkPin_(pin);const secret=Utilities.getUuid()+Utilities.getUuid();props.setProperty('AUTH_SECRET',secret);const owner={id:'owner',name:'勇水',role:'admin',active:true,epoch:1,salt:Utilities.getUuid(),owner:true};owner.pinHash=hashPin_(owner,pin);const file=Drive.Files.create({name:'結友亭の帳面-共通データ.json',mimeType:'application/json'},Utilities.newBlob(JSON.stringify({version:1,members:[owner],shared:{},attendance:{}}),'application/json'),{fields:'id'});props.setProperty('DB_FILE_ID',file.id);props.deleteProperty('OWNER_PIN');return '勇水を最初の管理者として登録しました。'}finally{lock.releaseLock()}
 }
-function doGet(){return output_({ok:true,service:'yuyutei-members',version:1,attendanceProxy:true})}
+function doGet(){return output_({ok:true,service:'yuyutei-members',version:1,attendanceProxy:true,rehearsalArchiveToday:true})}
 function doPost(event){
  const lock=LockService.getScriptLock();let locked=false;
  try{if(!event||!event.postData||event.postData.contents.length>1500000)throw Error('リクエストを確認してください。');const req=JSON.parse(event.postData.contents);if(!req||typeof req!=='object')throw Error('リクエストを確認してください。');lock.waitLock(20000);locked=true;const db=readDb_();if(req.action==='login')return output_({ok:true,...login_(db,req)});const member=authorize_(db,req.token);let data;
  switch(req.action){
  case 'roster':data={members:db.members.filter(m=>m.active).map(m=>({name:m.name}))};break;
- case 'archivePast':admin_(member);data=archivePast_(db,req,member);writeDb_(db);break;
+ case 'archivePast':admin_(member);data=archivePast_(db,req,member);if(data.count)writeDb_(db);break;
  case 'importLocal':admin_(member);data=importLocal_(db,req,member);writeDb_(db);break;
  case 'session':if(req.remember===true){const props=PropertiesService.getScriptProperties(),key='SESSION_'+digest_(req.token),session=JSON.parse(props.getProperty(key));session.expires=Date.now()+30*24*60*60*1000;props.setProperty(key,JSON.stringify(session))}data={member:publicMember_(member)};break;
  case 'read':checkCollection_(req.name);data={doc:db.shared[req.name]||null};break;
  case 'save':if(!['admin','editor'].includes(member.role))throw Error('編集権限が必要です。');checkCollection_(req.name);validCollection_(req.name,req.items);if(!Array.isArray(req.items)||req.items.length>500)throw Error('データの形式を確認してください。');const current=db.shared[req.name];if(['events','rehearsals'].includes(req.name)){const old=new Map((current?current.items:[]).map(r=>[r.id,r]));for(const r of req.items){if((r.archivedAt||null)!==(old.get(r.id)?.archivedAt||null))throw Error('記録への移動は管理者ページから行ってください。')}for(const r of old.values())if(r.archivedAt&&!req.items.some(n=>n.id===r.id))throw Error('転記済みの予定は保持してください。')}if((current?current.revision:0)!==req.revision)throw Error('ほかの端末で更新されています。再読み込みしてください。');db.shared[req.name]={items:req.items,revision:req.revision+1,updatedBy:member.id,updatedAt:new Date().toISOString()};writeDb_(db);data={revision:req.revision+1};break;
  case 'attendanceRead':checkId_(req.id);data={rows:Object.values(db.attendance[req.id]||{})};break;
- case 'attendanceSave':checkId_(req.id);if(typeof req.id!=='string'||!['出席','欠席','未定','未回答'].includes(req.status))throw Error('出欠を確認してください。');db.attendance[req.id]=db.attendance[req.id]||{};db.attendance[req.id][member.id]={stageName:member.name,status:req.status,updatedAt:new Date().toISOString()};writeDb_(db);data={};break;
+ case 'attendanceSave':checkId_(req.id);if(db.shared.rehearsals?.items.some(r=>r.id===req.id&&r.archivedAt))throw Error('この稽古は記録へ移動済みです。');if(typeof req.id!=='string'||!['出席','欠席','未定','未回答'].includes(req.status))throw Error('出欠を確認してください。');db.attendance[req.id]=db.attendance[req.id]||{};db.attendance[req.id][member.id]={stageName:member.name,status:req.status,updatedAt:new Date().toISOString()};writeDb_(db);data={};break;
  case 'attendanceProxy':{
   admin_(member);
   checkId_(req.id);
@@ -72,9 +72,40 @@ function saveMember_(db,actor,input){
 }
 
 function archivePast_(db,req,actor){
- if(!Array.isArray(req.transfers)||req.transfers.length>500||!req.revisions)throw Error('転記する予定を確認してください。');const today=Utilities.formatDate(new Date(),'Asia/Tokyo','yyyy-MM-dd');const changed={};const history=db.shared.history||{items:[],revision:0};if(history.revision!==req.revisions.history)throw Error('記録が更新されています。再読み込みしてください。');const map=new Map(history.items.map(r=>[r.id,r]));let count=0;
- for(const t of req.transfers){const collection=t.type==='event'?'events':t.type==='rehearsal'?'rehearsals':null;if(!collection)throw Error('予定の種類を確認してください。');const doc=db.shared[collection];if(!doc||doc.revision!==req.revisions[collection])throw Error('予定が更新されています。再読み込みしてください。');const source=doc.items.find(r=>r.id===t.id);if(!source||source.archivedAt||source.date>=today)throw Error('日付が過ぎた未転記の予定だけを選択してください。');if(!t.record||t.record.id!=='transferred:'+t.type+':'+source.id||t.record.date!==source.date||typeof t.record.kind!=='string'||typeof t.record.note!=='string'||!t.record.pieces)throw Error('転記内容を確認してください。');validCollection_('history',[t.record]);map.set(t.record.id,t.record);source.archivedAt=new Date().toISOString();changed[collection]=true;count++}
- if(map.size>500)throw Error('記録は500件までです。');if(count){db.shared.history={items:Array.from(map.values()),revision:history.revision+1,updatedBy:actor.id,updatedAt:new Date().toISOString()};for(const name in changed){db.shared[name].revision++;db.shared[name].updatedBy=actor.id;db.shared[name].updatedAt=new Date().toISOString()}}return {count};
+ if(!Array.isArray(req.transfers)||req.transfers.length>500||!req.revisions)throw Error('転記する予定を確認してください。');
+ const detail=req.rehearsalDetail===true;
+ if(detail&&(req.transfers.length!==1||req.transfers[0]?.type!=='rehearsal'))throw Error('稽古を1件選択してください。');
+ const today=Utilities.formatDate(new Date(),'Asia/Tokyo','yyyy-MM-dd'),changed={};
+ const history=db.shared.history||{items:[],revision:0},rehearsals=db.shared.rehearsals;
+ const map=new Map(history.items.map(r=>[r.id,r]));
+ if(detail){
+  const id=req.transfers[0].id;checkId_(id);
+  if(rehearsals?.items.some(r=>r.id===id&&r.archivedAt)&&map.has('transferred:rehearsal:'+id))return {count:0,rehearsals};
+ }
+ if(history.revision!==req.revisions.history)throw Error('記録が更新されています。再読み込みしてください。');
+ let count=0;
+ for(const t of req.transfers){
+  const collection=t.type==='event'?'events':t.type==='rehearsal'?'rehearsals':null;
+  if(!collection)throw Error('予定の種類を確認してください。');
+  const doc=db.shared[collection];
+  if(!doc||doc.revision!==req.revisions[collection])throw Error('予定が更新されています。再読み込みしてください。');
+  const source=doc.items.find(r=>r.id===t.id);
+  if(!source||source.archivedAt||(detail?source.date>today:source.date>=today))throw Error(detail?'当日以前の未転記の稽古を選択してください。':'日付が過ぎた未転記の予定だけを選択してください。');
+  if(!t.record||t.record.id!=='transferred:'+t.type+':'+source.id||t.record.date!==source.date||typeof t.record.kind!=='string'||typeof t.record.note!=='string'||!t.record.pieces)throw Error('転記内容を確認してください。');
+  if(detail){
+   const actual=Object.fromEntries(Object.values(db.attendance[source.id]||{}).map(row=>[row.stageName,row.status]));
+   const snapshot=t.record.attendance||{};
+   if(Object.keys(actual).length!==Object.keys(snapshot).length||Object.keys(actual).some(name=>actual[name]!==snapshot[name]))throw Error('出欠が更新されました。もう一度お試しください。');
+  }
+  validCollection_('history',[t.record]);map.set(t.record.id,t.record);
+  source.archivedAt=new Date().toISOString();changed[collection]=true;count++;
+ }
+ if(map.size>500)throw Error('記録は500件までです。');
+ if(count){
+  db.shared.history={items:Array.from(map.values()),revision:history.revision+1,updatedBy:actor.id,updatedAt:new Date().toISOString()};
+  for(const name in changed){db.shared[name].revision++;db.shared[name].updatedBy=actor.id;db.shared[name].updatedAt=new Date().toISOString()}
+ }
+ return detail?{count,rehearsals}:{count};
 }
 function importLocal_(db,req,actor){
  if(!req.documents||!req.attendance||typeof req.attendance!=='object')throw Error('移行データを確認してください。');for(const name of ['events','rehearsals','history']){const incoming=req.documents[name];validCollection_(name,incoming);if(!Array.isArray(incoming)||!incoming.every(r=>r&&typeof r.id==='string'&&typeof r.date==='string'))throw Error('予定・記録の形式を確認してください。');const current=db.shared[name]||{items:[],revision:0};const merged=new Map(current.items.map(r=>[r.id,r]));incoming.forEach(r=>{if(!merged.has(r.id)&&!(name!=='history'&&current.items.some(old=>old.date===r.date)))merged.set(r.id,r)});if(merged.size>500)throw Error('各一覧は500件までです。');db.shared[name]={items:Array.from(merged.values()),revision:current.revision+1,updatedBy:actor.id,updatedAt:new Date().toISOString()}}
