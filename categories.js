@@ -9,12 +9,12 @@ export function mountCategories(host,extra=()=>[]){const button=document.createE
 // Add a category without leaving the editor or submitting its form.
 export function mountCategoryAdder(select,extra=()=>[]){
  const box=document.createElement('div');box.className='category-adder';
- box.innerHTML='<button type="button" class="secondary" data-open>＋ 区分を追加</button><div data-entry hidden><label>新しい区分<input type="text" maxlength="80" placeholder="例：来らっせ寄席"></label><button type="button" data-add>追加して選択</button><button type="button" data-cancel>キャンセル</button></div><p role="status"></p>';
+ box.innerHTML='<button type="button" class="secondary" data-open>＋ 区分を追加</button><div data-entry hidden><label>新しい区分<input type="text" maxlength="80" placeholder="例：来らっせ寄席"></label><button type="button" data-add>追加して選択</button><button type="button" data-cancel-category>キャンセル</button></div><p role="status"></p>';
  select.closest('label').after(box);
  const entry=box.querySelector('[data-entry]'),input=box.querySelector('input'),message=box.querySelector('[role=status]');
  const close=()=>{entry.hidden=true;input.value='';message.textContent=''};
  box.querySelector('[data-open]').onclick=()=>{entry.hidden=false;input.focus()};
- box.querySelector('[data-cancel]').onclick=close;
+ box.querySelector('[data-cancel-category]').onclick=close;
  const add=()=>{
   const name=input.value.trim();if(!name){message.textContent='区分名を入力してください。';input.focus();return}
   try{

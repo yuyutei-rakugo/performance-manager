@@ -1,11 +1,11 @@
-import {startEditor,finishEditor,leaveEditor,guardEditor,editorState,saveRecovery,recoveryScope,recoveredEditState} from './editor-dialog.js?v=20261122-checklist1';
-import {performerPicker,updatePerformerPickers,readPerformer,showPerformerRoster} from './performer-picker.js?v=20261122-checklist1';
-import {mountMemberHome} from './member-home.js?v=20261122-checklist1';
-import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261122-checklist1';
-import {readCategories,saveCategories,validCategories,categoryOptions,mountCategories,mountCategoryAdder} from './categories.js?v=20261122-checklist1';
-import {mountScheduleImport} from './schedule-import.js?v=20261122-checklist1';
-import {duplicateSchedule,copyScheduleInvite,validPerformer,timeline,formatDuration,toRecord,transferRecord,readRecords,mergeRecords,mergedRecords} from './record-transfer.js?v=20261122-checklist1';
-import {cloud,startCloud,mountAccount} from './cloud.js?v=20261122-checklist1';
+import {startEditor,finishEditor,leaveEditor,guardEditor,editorState,saveRecovery,recoveryScope,recoveredEditState} from './editor-dialog.js?v=20261122-checklist2';
+import {performerPicker,updatePerformerPickers,readPerformer,showPerformerRoster} from './performer-picker.js?v=20261122-checklist2';
+import {mountMemberHome} from './member-home.js?v=20261122-checklist2';
+import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261122-checklist2';
+import {readCategories,saveCategories,validCategories,categoryOptions,mountCategories,mountCategoryAdder} from './categories.js?v=20261122-checklist2';
+import {mountScheduleImport} from './schedule-import.js?v=20261122-checklist2';
+import {draftTask,duplicateSchedule,copyScheduleInvite,validPerformer,timeline,formatDuration,toRecord,transferRecord,readRecords,mergeRecords,mergedRecords} from './record-transfer.js?v=20261122-checklist2';
+import {cloud,startCloud,mountAccount} from './cloud.js?v=20261122-checklist2';
 'use strict';
 
 const key = 'yuitei.events.v1';
@@ -17,18 +17,21 @@ const clone = value => JSON.parse(JSON.stringify(value));
 const localDate = date => [date.getFullYear(), date.getMonth() + 1, date.getDate()].map((part, i) => String(part).padStart(i ? 2 : 4, '0')).join('-');
 const today = () => localDate(new Date());
 const dateLabel = value => new Intl.DateTimeFormat('ja-JP', {year:'numeric',month:'long',day:'numeric',weekday:'short'}).format(new Date(value + 'T00:00:00'));
-const newTasks = () => tasks.map(label => ({label, done:false,assignees:[],dueDate:''}));
+const newTasks = () => tasks.map(draftTask);
 let cloudLoadError='';
 let memberNames=['勇水','小薔薇','懐古','華詩','世喜音','やすゑ','一悟','日光'],cloudRevision=0,cloudLoaded=false,stopCloud,cloudIdentity='',saving=false;
 fetch('./history-data.json').then(r=>r.json()).then(d=>{memberNames=d.names.filter(n=>n!=='藤本')}).catch(()=>{});
 const editable=()=>!cloud.state.configured||(['admin','editor'].includes(cloud.state.role)&&cloudLoaded);
 function assigneePicker(item,i){return `<fieldset class="assignee-picker"><legend>担当者（任意・複数選択可）</legend>${[...new Set([...memberNames,...(item.assignees||[])])].map(n=>`<label><input type="checkbox" data-owner="${i}" value="${esc(n)}" ${(item.assignees||[]).includes(n)?'checked':''}>${esc(n)}</label>`).join('')}</fieldset>`}
-const progress = event => event.checklist.filter(item => item.done).length;
+function progress(event){
+ const applicable=event.checklist.filter(item=>!item.excluded);
+ return {done:applicable.filter(item=>item.done).length,total:applicable.length,excluded:event.checklist.length-applicable.length};
+}
 
 function copiedTasks() {
   const edited=events.filter(event=>typeof event.checklistUpdatedAt==='string');
   const latest=[...(edited.length?edited:events)].sort((a,b)=>(b.checklistUpdatedAt||b.date+'T'+b.time).localeCompare(a.checklistUpdatedAt||a.date+'T'+a.time))[0];
-  return latest?latest.checklist.map(item=>({label:item.label,done:false,assignees:[],dueDate:''})):newTasks();
+  return latest?latest.checklist.map(item=>draftTask(item.label)):newTasks();
 }
 
 function samples() {
@@ -50,7 +53,7 @@ function validEvent(event) {
   if (!event.id.trim() || !event.title.trim() || !event.venue.trim()) return false;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(event.date) || localDate(new Date(event.date + 'T00:00:00')) !== event.date || (event.time!==''&&!/^([01]\d|2[0-3]):[0-5]\d$/.test(event.time))) return false;
   return Array.isArray(event.performers) && event.performers.length<=200 && event.performers.every(validPerformer)
-    && Array.isArray(event.checklist) && event.checklist.length > 0 && event.checklist.length <= 200 && event.checklist.every(item => item && isText(item.label) && item.label.trim() && typeof item.done === 'boolean' && (item.dueDate===undefined||item.dueDate===''||(isText(item.dueDate)&&/^\d{4}-\d{2}-\d{2}$/.test(item.dueDate)&&localDate(new Date(item.dueDate+'T00:00:00'))===item.dueDate)) && (item.assignees === undefined || (Array.isArray(item.assignees)&&item.assignees.every(isText))));
+    && Array.isArray(event.checklist) && event.checklist.length > 0 && event.checklist.length <= 200 && event.checklist.every(item => item && isText(item.label) && item.label.trim() && typeof item.done === 'boolean' && (item.excluded===undefined||typeof item.excluded==='boolean'&&!(item.excluded&&item.done)) && (item.dueDate===undefined||item.dueDate===''||(isText(item.dueDate)&&/^\d{4}-\d{2}-\d{2}$/.test(item.dueDate)&&localDate(new Date(item.dueDate+'T00:00:00'))===item.dueDate)) && (item.assignees === undefined || (Array.isArray(item.assignees)&&item.assignees.every(isText))));
 }
 
 let events = [];
@@ -85,7 +88,13 @@ async function save(next, expectedRevision=cloudRevision,report=notify) {
   if(saving)return false;
   if(cloud.state.configured){
     if(!editable()){report('会員ログインと編集権限、共通データの読み込みが必要です。');return false}
-    saving=true;try{const savedRevision=await cloud.save('events',{items:next},expectedRevision);if(!(cloudRevision>savedRevision)){events=next;render()}return true}catch(e){report(e.message);return false}finally{saving=false}
+    saving=true;
+    let savedRevision;
+    try{savedRevision=await cloud.save('events',{items:next},expectedRevision)}
+    catch(e){report(e.message);return false}
+    finally{saving=false}
+    if(cloudRevision<=savedRevision){events=next;cloudRevision=savedRevision;renderSavedList()}
+    return true;
   }
   if (!storageReadable) {
     report('保存済みデータを読み込めないため、変更を保存できません。');
@@ -99,8 +108,13 @@ async function save(next, expectedRevision=cloudRevision,report=notify) {
   }
   events = next;
   window.dispatchEvent(new Event('schedule-data-changed'));
-  render();
+  renderSavedList();
   return true;
+}
+
+function renderSavedList(){
+ try{render()}
+ catch{notify('保存しました。一覧を更新できませんでした。再読み込みして確認してください。')}
 }
 
 function upcoming(event) {
@@ -111,8 +125,9 @@ function sortedEvents(list) {
   return [...list].sort((a,b) => (a.date + a.time).localeCompare(b.date + b.time));
 }
 function progressMarkup(event) {
-  const done = progress(event);
-  return `<div class="progress"><div class="progress-label"><span>準備進捗</span><span>${done} / ${event.checklist.length}</span></div><progress aria-label="準備進捗" value="${done}" max="${event.checklist.length}"></progress></div>`;
+  const {done,total,excluded}=progress(event);
+  const label=total?done+'／'+total+'件 完了':'対象作業なし';
+  return `<div class="progress"><div class="progress-label"><span>${label}</span>${excluded?`<small>対象外 ${excluded}件</small>`:''}</div>${total?`<progress aria-label="準備進捗" value="${done}" max="${total}"></progress>`:''}</div>`;
 }
 function card(event) {
   const [year, mon, day] = event.date.split('-');
@@ -129,7 +144,7 @@ function render() {
   $('new-event').disabled=!editable();
   const filter=document.getElementById('event-kind-filter');if(filter){const value=filter.value;filter.innerHTML='<option value="">全区分</option>'+categoryOptions(value,events.map(e=>e.kind));filter.value=value;}
   const scheduled = events.filter(e=>!e.archivedAt&&upcoming(e));
-  const stats = [['▦','予定の公演',scheduled.length],['◷','準備未完了',scheduled.filter(event => progress(event) < event.checklist.length).length],['✓','準備完了',scheduled.filter(event => progress(event) === event.checklist.length).length]];
+  const stats = [['▦','予定の公演',scheduled.length],['◷','準備未完了',scheduled.filter(event=>{const {done,total}=progress(event);return done<total}).length],['✓','準備完了',scheduled.filter(event=>{const {done,total}=progress(event);return total>0&&done===total}).length]];
   if($('stats'))$('stats').innerHTML = stats.map(([icon,label,count]) => `<div class="stat"><span class="stat-icon" aria-hidden="true">${icon}</span><div><small>${label}</small><strong>${count}</strong><span class="unit">件</span></div></div>`).join('');
   $('list-tab').setAttribute('aria-pressed', tab === 'list');
   $('calendar-tab').setAttribute('aria-pressed', tab === 'calendar');
@@ -162,13 +177,14 @@ function showEvent() {
 function renderDetails(id,message='') {
   const event = events.find(item => item.id === id);
   if (!event) {eventDialog.close();return}
+  eventDialog.dataset.eventId=id;
   const rows=timeline(event.time,event.performers);
   const program=rows.length?`<div class="program-scroll"><table class="program-table event-program-table"><colgroup><col class="program-order"><col class="program-performer"><col><col class="program-duration"><col class="program-end"></colgroup><thead><tr><th>順</th><th>演者・仲入り</th><th>ネタ・演し物</th><th class="duration-value">持ち時間</th><th>終了予定</th></tr></thead><tbody>${rows.map((p,i)=>`<tr><td>${i+1}</td><td>${esc(p.type==='break'?'仲入り':p.stageName)}</td><td>${esc(p.piece)}</td><td class="duration-value">${formatDuration(Number.isFinite(p.minutes)?p.minutes*60:null)}</td><td>${p.end}</td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">出演者は未登録です。</p>';
 
   eventDialog.innerHTML = `<div class="dialog-body"><div class="dialog-head"><h2 id="event-heading">${esc(event.title)}</h2><button type="button" data-close="event-dialog" aria-label="閉じる">×</button></div>
     <p>${dateLabel(event.date)} ${esc(event.time||'時間未定')}<br>会場　${esc(event.venue)}<br>区分　${esc(event.kind||'その他公演')}</p>${editable()?'<div class="form-actions"><button class="primary" data-edit>編集する</button><button type="button" class="secondary" data-duplicate>予定を複製</button></div>':''}<p class="save-feedback" role="status">${esc(message)}</p>
     <div class="form-actions"><button type="button" class="secondary" data-copy-invite>LINE案内文をコピー</button></div><section class="block" id="event-program"><h3>出演順・演目</h3>${program}${rows.length?'<button type="button" class="secondary" id="print-program">番組表を印刷</button>':''}</section>
-    <section class="block"><h3>準備チェックリスト</h3>${progressMarkup(event)}${event.checklist.map(item => `<div class="check-row task-summary ${item.done?'is-complete':'is-pending'}"><span class="task-status">${item.done?'✓ 完了':'未完了'}</span><strong>${esc(item.label)}</strong><small>担当：${esc((item.assignees||[]).join('・')||'未設定')} ／ 完了予定：${esc(item.dueDate||'未設定')}</small></div>`).join('')}</section>
+    <section class="block"><h3>準備チェックリスト</h3>${progressMarkup(event)}${event.checklist.map(item => `<div class="check-row task-summary ${item.excluded?'is-excluded':item.done?'is-complete':'is-pending'}"><span class="task-status">${item.excluded?'対象外':item.done?'✓ 完了':'未完了'}</span><strong>${esc(item.label)}</strong><small>担当：${esc((item.assignees||[]).join('・')||'未設定')} ／ 完了予定：${esc(item.dueDate||'未設定')}</small></div>`).join('')}</section>
     <section class="block"><h3>メモ</h3><p class="memo">${esc(event.memo) || 'メモはありません。'}</p></section><section class="block" hidden><button type="button" class="primary" id="transfer-event" ${editable()?'':'disabled'}>${event.archivedAt?'記録を更新する':'終了して記録へ移す'}</button><p class="muted">終了した内容を記録に保存します。元データは転記済みの一覧に残ります。</p>${event.archivedAt?'<button type="button" class="secondary" id="unarchive-event">公演一覧に戻す</button>':''}</section></div>`;
   if($('print-program'))$('print-program').onclick=()=>{
     document.body.classList.add('print-program');
@@ -245,20 +261,29 @@ function renderForm(existing,recovery) {
   const event = recovery?.value || existing || {title:'',date:tab === 'calendar' ? selected : today(),time:'14:00',venue:'',memo:'',performers:[],checklist:copiedTasks()};
   eventDialog.onchange = null;
   eventDialog.innerHTML = `<div class="dialog-body"><div class="dialog-head"><h2 id="event-heading">${existing ? '公演を編集' : '公演を登録'}</h2><button type="button" data-close="event-dialog" aria-label="閉じる">×</button></div>
-    <form id="event-form"><div class="editor-bar"><div class="form-actions"><button class="primary" type="submit">保存する</button><button class="secondary" type="button" id="cancel-edit">キャンセル</button></div><p id="form-feedback" role="status" data-editor-status hidden></p></div><div class="fields"><label class="wide">公演名<input name="title" value="${esc(event.title)}" required></label><label>区分<select name="kind">${categoryOptions(event.kind||'その他公演',events.map(e=>e.kind))}</select></label><label>開催日<input name="date" type="date" value="${event.date}" required></label><label>開始時刻（空欄は時間未定）<input name="time" type="time" value="${esc(event.time)}"></label><label class="wide">会場<input name="venue" value="${esc(event.venue)}" required></label></div>
+    <form id="event-form"><div class="editor-bar"><div class="form-actions"><button class="primary" type="submit">変更を保存する</button><button class="secondary" type="button" id="cancel-edit">キャンセル</button></div><p id="form-feedback" role="status" data-editor-status hidden></p></div><div class="fields"><label class="wide">公演名<input name="title" value="${esc(event.title)}" required></label><label>区分<select name="kind">${categoryOptions(event.kind||'その他公演',events.map(e=>e.kind))}</select></label><label>開催日<input name="date" type="date" value="${event.date}" required></label><label>開始時刻（空欄は時間未定）<input name="time" type="time" value="${esc(event.time)}"></label><label class="wide">会場<input name="venue" value="${esc(event.venue)}" required></label></div>
     <section class="block"><h3>出演順・演目</h3><p class="muted">会員を選ぶか、「ゲスト演者を入力」から高座名を入力できます。終了予定は開演時刻と持ち時間から計算します。</p><p class="muted" role="status" data-roster-status></p><button type="button" class="secondary" data-roster-retry hidden>名簿を更新</button><div id="performers"></div><button type="button" class="secondary" id="add-performer">＋ 出演者を追加</button> <button type="button" class="secondary" id="add-break">＋ 仲入りを追加</button></section>
-    <section class="block"><h3>準備チェックリスト</h3>${!existing?'<p class="muted">最新のリストの項目をコピーしました。完了・担当者・完了予定日はリセットしています。</p>':''}<div id="task-rows"></div><button type="button" class="secondary" id="add-task">＋ 末尾に項目を追加</button></section>
+    <section class="block"><h3>準備チェックリスト</h3>${!existing?'<p class="muted">最新のリストの項目をコピーしました。完了・対象外・担当者・完了予定日はリセットしています。</p>':''}<div id="task-rows"></div><button type="button" class="secondary" id="add-task">＋ 末尾に項目を追加</button></section>
     <section class="block"><label>公演メモ<textarea name="memo" rows="4"></textarea></label></section>${existing?'<section class="delete-zone"><button type="button" class="secondary" id="show-delete" aria-expanded="false" aria-controls="delete-confirmation">この公演を削除する…</button><div id="delete-confirmation" hidden><p>削除すると、この公演の出演者・準備リスト・メモも削除されます。</p><label><input type="checkbox" id="confirm-delete">この公演を削除することを確認しました</label><button type="button" class="danger" id="delete-event" disabled>公演を削除する</button></div></section>':''}</form></div>`;
   mountCategoryAdder($('event-form').elements.kind,()=>events.map(e=>e.kind));
   $('event-form').elements.memo.value = event.memo;
   const taskRows=$('task-rows');
   function addTask(item,before=null) {
     const row=document.createElement('div');row.className='check-row task-edit-row';
-    row.innerHTML=`<label>準備項目<input name="label" value="${esc(item.label)}" required></label>${assigneePicker(item,0)}<label>完了予定日（任意）<input type="date" data-due value="${esc(item.dueDate||'')}"></label><label><input type="checkbox" data-done ${item.done?'checked':''}>完了</label><div class="task-row-actions"><button type="button" class="secondary" data-insert-before>＋ 前に挿入</button><button type="button" class="secondary" data-insert-after>＋ 後に挿入</button><button type="button" class="secondary" data-remove-task>項目を外す</button></div>`;
+    row.innerHTML=`<label class="task-toggle"><input type="checkbox" data-done ${item.done?'checked':''}><span data-task-title>${esc(item.label||'新しい準備項目')}</span></label><span class="task-edit-status" data-task-status></span><label class="task-toggle"><input type="checkbox" data-excluded ${item.excluded?'checked':''}>今回は対象外</label><label>作業名を変更<input name="label" value="${esc(item.label)}" required></label>${assigneePicker(item,0)}<label>完了予定日（任意）<input type="date" data-due value="${esc(item.dueDate||'')}"></label><div class="task-row-actions"><button type="button" class="secondary" data-insert-before>＋ 前に挿入</button><button type="button" class="secondary" data-insert-after>＋ 後に挿入</button><button type="button" class="secondary" data-remove-task>項目を外す</button></div>`;
+    const done=row.querySelector('[data-done]'),excluded=row.querySelector('[data-excluded]');
+    const showStatus=()=>{
+      row.querySelector('[data-task-status]').textContent=excluded.checked?'対象外':done.checked?'完了':'未完了';
+      row.dataset.taskState=excluded.checked?'excluded':done.checked?'complete':'pending';
+    };
+    done.onchange=()=>{if(done.checked)excluded.checked=false;showStatus()};
+    excluded.onchange=()=>{if(excluded.checked)done.checked=false;showStatus()};
+    row.querySelector('[name=label]').oninput=event=>row.querySelector('[data-task-title]').textContent=event.target.value||'新しい準備項目';
+    showStatus();
     taskRows.insertBefore(row,before);return row;
   }
   event.checklist.forEach(item=>addTask(item));
-  const blankTask=()=>({label:'',done:false,assignees:[],dueDate:''});
+  const blankTask=()=>draftTask('');
   $('add-task').onclick=()=>{if(taskRows.children.length>=200){notify('準備項目は200件までです。');return}addTask(blankTask()).querySelector('[name="label"]').focus()};
   taskRows.onclick=click=>{
     const button=click.target.closest('button');if(!button)return;const row=button.closest('.task-edit-row');
@@ -315,7 +340,6 @@ function renderForm(existing,recovery) {
     const next = {
       ...existing,
       id:submissionId,
-      checklistUpdatedAt:new Date().toISOString(),
       kind:text('kind'),title:text('title'),date:text('date'),time:text('time'),venue:text('venue'),memo:form.get('memo'),
       performers:[...list.children].map(row => {
         const input=name=>row.querySelector(`[name=${name}]`);
@@ -326,8 +350,10 @@ function renderForm(existing,recovery) {
           minutes:programMinutes(row),endTime:input('endTime').value
         };
       }),
-      checklist:[...taskRows.children].map(row=>({label:row.querySelector('[name="label"]').value.trim(),done:row.querySelector('[data-done]').checked,dueDate:row.querySelector('[data-due]').value,assignees:[...row.querySelectorAll('[data-owner]:checked')].map(el=>el.value)}))
+      checklist:[...taskRows.children].map(row=>({label:row.querySelector('[name="label"]').value.trim(),done:row.querySelector('[data-done]').checked,excluded:row.querySelector('[data-excluded]').checked,dueDate:row.querySelector('[data-due]').value,assignees:[...row.querySelectorAll('[data-owner]:checked')].map(el=>el.value)}))
     };
+    const checklistShape=items=>items.map(({label,done,excluded,dueDate,assignees})=>[label,done,!!excluded,dueDate||'',assignees||[]]);
+    if(!existing||JSON.stringify(checklistShape(existing.checklist))!==JSON.stringify(checklistShape(next.checklist)))next.checklistUpdatedAt=new Date().toISOString();
     const feedback = $('form-feedback');
     if (!validEvent(next)) {
       feedback.textContent = '必須項目と日時・持ち時間を確認してください。';
@@ -380,7 +406,7 @@ $('schedule').onclick = async click => {
   }
 };
 $('list-tab').onclick = () => {tab = 'list'; render();};
-$('calendar-tab').onclick = () => {location.href = 'rehearsals.html?v=20261122-checklist1';};
+$('calendar-tab').onclick = () => {location.href = 'rehearsals.html?v=20261122-checklist2';};
 $('new-event').onclick = () => renderForm();
 $('data-open').onclick = () => $('data-dialog').showModal();
 guardEditor(eventDialog);
@@ -442,7 +468,10 @@ cloud.onState(state=>{
  eventRecovery.render();
  const identity=state.configured?`${state.user?.uid||''}:${state.role||''}`:'local';
  if(identity===cloudIdentity){if(state.ready!==false&&requestedEvent)render();return;}cloudIdentity=identity;performerNames=[];stopCloud?.();cloudLoaded=false;cloudLoadError='';
- if(state.configured){events=[];eventDialog.close();if($('data-dialog').open)$('data-dialog').close();render();if(state.role){stopCloud=cloud.watch('events',doc=>{if(doc&&(!Array.isArray(doc.items)||!doc.items.every(validEvent))){notify('共通データの形式を確認してください。');return}events=doc?.items||[];cloudRevision=doc?.revision||0;cloudLoaded=true;cloudLoadError='';render()},message=>{cloudLoadError=message;notify(message);render()})}}
+ if(state.configured){events=[];eventDialog.close();if($('data-dialog').open)$('data-dialog').close();render();if(state.role){stopCloud=cloud.watch('events',doc=>{if(doc&&(!Array.isArray(doc.items)||!doc.items.every(validEvent))){notify('共通データの形式を確認してください。');return}const detailId=eventDialog.open&&!$('event-form')?eventDialog.dataset.eventId:'';
+ const previous=detailId&&events.find(item=>item.id===detailId);
+ events=doc?.items||[];cloudRevision=doc?.revision||0;cloudLoaded=true;cloudLoadError='';render();
+ if(detailId&&JSON.stringify(previous)!==JSON.stringify(events.find(item=>item.id===detailId)))renderDetails(detailId)},message=>{cloudLoadError=message;notify(message);render()})}}
 });
 startCloud();
 

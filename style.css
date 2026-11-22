@@ -38,3 +38,11 @@ dialog{border:1px solid var(--line);border-radius:14px;width:min(680px,calc(100%
 .task-summary strong{overflow-wrap:anywhere;line-height:1.6}
 .task-summary small{grid-column:2;color:var(--muted);line-height:1.65;overflow-wrap:anywhere}
 @media(max-width:400px){.task-summary{padding:12px;gap:8px;grid-template-columns:4.8em minmax(0,1fr)}.task-summary small{grid-column:1 / -1}}
+
+.check-row.task-edit-row{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;align-items:start}
+.task-edit-row .task-toggle{min-height:44px;display:flex;gap:10px;align-items:center;overflow-wrap:anywhere}
+.task-edit-row .task-toggle input{margin:0}
+.task-edit-status{justify-self:start;padding:2px 8px;border-radius:6px;background:#f9e4e7;color:#8b1526;font-weight:700}
+.task-edit-row[data-task-state=complete] .task-edit-status{background:#dfede3;color:#28513c}
+.task-edit-row[data-task-state=excluded] .task-edit-status,.task-summary.is-excluded .task-status{background:#e7e8ed;color:#363c53}
+.task-summary.is-excluded{border-left-color:#656e83;background:#f4f5f8}
