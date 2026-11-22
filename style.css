@@ -58,14 +58,12 @@ dialog{border:1px solid var(--line);border-radius:14px;width:min(680px,calc(100%
 [data-save-phase="saved"]{color:#285b40;font-weight:700}
 .save-feedback:not(:empty){padding:10px 12px;border-left:4px solid #59718c;background:#f1f4f7;line-height:1.65;overflow-wrap:anywhere}
 .schedule-change{display:inline-block;margin:6px 0;padding:4px 9px;border:1px solid #bb8e40;border-radius:6px;background:#fff0cd;color:#653c0b;font-size:.94rem;font-weight:700;line-height:1.6;overflow-wrap:anywhere}
-.my-preparation,.quick-help,.template-tools{border:1px solid var(--line);border-radius:10px;padding:12px;margin:14px 0;background:var(--white)}
-.my-preparation summary,.quick-help summary,.template-tools summary{font-size:1rem;font-weight:700;cursor:pointer;min-height:36px;line-height:1.7}
-.my-preparation li{margin:14px 0;line-height:1.65;overflow-wrap:anywhere}
-.my-preparation ul{padding-left:1.4em}.my-preparation small{font-size:.94rem}
+.quick-help,.template-tools{border:1px solid var(--line);border-radius:10px;padding:12px;margin:14px 0;background:var(--white)}
+.quick-help summary,.template-tools summary{font-size:1rem;font-weight:700;cursor:pointer;min-height:36px;line-height:1.7}
 .quick-help p{font-size:1rem;line-height:1.8}.quick-help h3{margin-top:18px;font-size:1.1rem}
 .template-tools label{margin:12px 0}.template-tools input,.template-tools select{max-width:100%}
 #member-form[hidden]{display:none}#member-form .editor-bar{margin-top:12px}
 @media(max-width:400px){.editor-bar .form-actions>button.primary{flex:1 1 160px}.editor-bar .form-actions>button.secondary{flex:1 1 100px}.schedule-change{max-width:100%}}
-@media print{.my-preparation,.quick-help,.template-tools,.editor-bar{display:none!important}}
+@media print{.quick-help,.template-tools,.editor-bar{display:none!important}}
 
 .save-feedback[data-save-phase="error"]{border-left-color:#a10f26;background:#fff0f0}.save-feedback[data-save-phase="saved"]{border-left-color:#285b40;background:#edf4ef}

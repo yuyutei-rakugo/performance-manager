@@ -1,6 +1,6 @@
-import {cloud} from './cloud.js?v=20261122-workflow2';
-import {validRehearsal,validAttendance,japanDate,untilJapanMidnight,featuredRehearsal,rehearsalBadge,rehearsalDateTime} from './rehearsal-model.js?v=20261122-workflow2';
-import {assignedPreparation,scheduleChangeBadge,rehearsalTitle} from './record-transfer.js?v=20261122-workflow2';
+import {cloud} from './cloud.js?v=20261122-workflow3';
+import {validRehearsal,validAttendance,japanDate,untilJapanMidnight,featuredRehearsal,rehearsalBadge,rehearsalDateTime} from './rehearsal-model.js?v=20261122-workflow3';
+import {scheduleChangeBadge,rehearsalTitle} from './record-transfer.js?v=20261122-workflow3';
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const label=s=>s==='未回答'||!s?'未登録':s;
 export function mountMemberHome(){
@@ -32,21 +32,13 @@ export function mountMemberHome(){
   // Keep the actual buttons connected while polling updates the displayed answer.
   if(key!==renderedKey){
    renderedKey=key;
-   panel.innerHTML=`<h2>${practicePage?'次回の稽古':'次回の公演'}</h2><div data-next-plan></div>${p?`<div class="quick-attendance">${!shared?`<label>自分の名前<select id="quick-person"><option value="">選んでください</option>${names.map(n=>`<option value="${esc(n)}" ${n===self?'selected':''}>${esc(n)}</option>`).join('')}</select></label><p class="muted">名前をこのブラウザに覚えます。共有端末では自分の名前に切り替えてください。現在は端末内保存で、本人認証・端末間の同期は未接続です。</p>`:''}<p>自分の回答${self?'（'+esc(self)+'）':''}：<strong></strong></p><p class="sync-warning" hidden>出欠を更新できませんでした。</p><div class="rsvp-buttons">${['出席','欠席','未定'].map(s=>`<button type="button" class="secondary" data-quick-status="${s}">${s}</button>`).join('')}</div><a data-open-rehearsal="${esc(p.id)}" href="rehearsals.html?v=20261122-workflow2&detail=${encodeURIComponent(p.id)}">出欠一覧・稽古の詳細を見る</a></div>`:''}<p class="save-feedback" role="status"></p>${!practicePage?'<details class="my-preparation"><summary>自分の未完了作業</summary><div data-my-preparation></div></details>':''}`;
+   panel.innerHTML=`<h2>${practicePage?'次回の稽古':'次回の公演'}</h2><div data-next-plan></div>${p?`<div class="quick-attendance">${!shared?`<label>自分の名前<select id="quick-person"><option value="">選んでください</option>${names.map(n=>`<option value="${esc(n)}" ${n===self?'selected':''}>${esc(n)}</option>`).join('')}</select></label><p class="muted">名前をこのブラウザに覚えます。共有端末では自分の名前に切り替えてください。現在は端末内保存で、本人認証・端末間の同期は未接続です。</p>`:''}<p>自分の回答${self?'（'+esc(self)+'）':''}：<strong></strong></p><p class="sync-warning" hidden>出欠を更新できませんでした。</p><div class="rsvp-buttons">${['出席','欠席','未定'].map(s=>`<button type="button" class="secondary" data-quick-status="${s}">${s}</button>`).join('')}</div><a data-open-rehearsal="${esc(p.id)}" href="rehearsals.html?v=20261122-workflow3&detail=${encodeURIComponent(p.id)}">出欠一覧・稽古の詳細を見る</a></div>`:''}<p class="save-feedback" role="status"></p>`;
   }
   panel.querySelector('h2').textContent=practicePage?(p?.date===today?'今日の稽古':'次回の稽古'):'次回の公演';
   panel.querySelector('[data-next-plan]').innerHTML=!authorized?
    `<p>会員ログインすると、${practicePage?'稽古の予定と自分の出欠':'公演の予定'}を確認できます。</p>`:
    first?plan(first,first===p?'practice':'event'):
    shared&&!(practicePage?loadedPractices:loadedEvents)?'<p>予定を読み込み中…</p>':'<p>これからの予定はありません。</p>';
-  const own=panel.querySelector('[data-my-preparation]');
-  if(own){
-   const assignments=authorized?assignedPreparation(events,self,today):[];
-   const text=!authorized?'会員ログインすると、自分の担当作業を確認できます。':!self?'担当作業の確認には会員ログインが必要です。':!loadedEvents&&shared?'作業を読み込み中…':scheduleError?'最新の作業を確認できません。予定を再読み込みしてください。':assignments.length?'':'担当する未完了作業はありません。';
-   const html=text?'<p>'+esc(text)+'</p>':'<ul>'+assignments.map(({event,task})=>'<li><strong>'+esc(task.label)+'</strong><br><a href="./?detail='+encodeURIComponent(event.id)+'">'+esc(event.title)+'</a><br><small>開催 '+esc(event.date)+(task.dueDate?' ／ 期限 '+esc(task.dueDate):'')+'</small></li>').join('')+'</ul>';
-   if(own.innerHTML!==html)own.innerHTML=html;
-   panel.querySelector('.my-preparation summary').textContent='自分の未完了作業'+(authorized&&self&&!scheduleError&&(!shared||loadedEvents)?'（'+assignments.length+'件）':'');
-  }
   const quick=panel.querySelector('.quick-attendance');
   if(quick){
    quick.querySelector('strong').textContent=current;
