@@ -1,7 +1,7 @@
-import {startEditor,finishEditor,leaveEditor,guardEditor,editorState,saveRecovery,recoveryScope,recoveredEditState} from './editor-dialog.js?v=20261122-tools2';
-import {categoryOptions} from './categories.js?v=20261122-tools2';
-import {readRecords,writeRecords} from './record-transfer.js?v=20261122-tools2';
-import {cloud} from './cloud.js?v=20261122-tools2';
+import {startEditor,finishEditor,leaveEditor,guardEditor,editorState,saveRecovery,recoveryScope,recoveredEditState} from './editor-dialog.js?v=20261122-category1';
+import {categoryOptions,mountCategoryAdder} from './categories.js?v=20261122-category1';
+import {readRecords,writeRecords} from './record-transfer.js?v=20261122-category1';
+import {cloud} from './cloud.js?v=20261122-category1';
 export function historyEditor(getData,refresh,refreshRows=()=>{}){
  const section=document.createElement('section');section.className='record-edit-panel';section.innerHTML='<div class="record-edit-actions"><button id="history-edit-mode" class="secondary" type="button" aria-controls="body" hidden>記録を編集する</button><button id="history-add" class="primary" type="button" disabled hidden>＋ 稽古・公演記録を追加</button></div><p id="history-edit-result" class="save-feedback" role="status"></p><p id="history-edit-status" role="status">共通保存の接続を確認しています…</p>';
  (document.getElementById('history-tools')||document.querySelector('main')).append(section);
@@ -93,6 +93,7 @@ export function historyEditor(getData,refresh,refreshRows=()=>{}){
   const record=recovery?.value||existing||{id:crypto.randomUUID(),date:new Date().toLocaleDateString('sv-SE'),kind:'その他公演',occasion:'',pieces:{},note:''};const expected=revision;
   dialog.innerHTML=`<form><h2>${existing?'記録を修正':'稽古・公演記録を追加'}</h2><div class="editor-bar"><div class="form-actions"><button type="submit">保存する</button><button type="button" data-cancel>キャンセル</button></div><p role="alert" data-editor-status hidden></p></div><label>日付<input name="date" type="date" required value="${esc(record.date)}"></label><label>区分<select name="kind">${categoryOptions(record.kind,data.records.map(r=>r.kind))}</select></label><label>公演・稽古名<input name="occasion" required value="${esc(record.occasion)}"></label><p>各演者の演目を入力してください。演目未定の出席は「○」、記録なしは空欄にできます。</p>${data.names.map(n=>`<label>${esc(n)}<input data-piece="${esc(n)}" value="${esc(record.pieces[n]||'')}" placeholder="演目・○・空欄"></label>`).join('')}<label>注記<textarea name="note"></textarea></label>${existing?' <button type="button" data-delete>削除する</button>':''}</form>`;
   const form=dialog.querySelector('form');
+  mountCategoryAdder(form.elements.kind,()=>data.records.map(r=>r.kind));
   form.querySelector('[name=note]').value=record.note;
   startEditor(dialog,form);
   const canRetry=recoveredEditState(form,recovery,existing);
