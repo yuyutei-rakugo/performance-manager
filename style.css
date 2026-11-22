@@ -29,3 +29,12 @@ dialog{border:1px solid var(--line);border-radius:14px;width:min(680px,calc(100%
 .event-card .meta span:nth-child(2){overflow-wrap:anywhere}
 .event-card .date-badge{min-height:78px}.event-card .date-badge small{font-size:.9rem}.event-card .date-badge strong{font-size:1.9rem}
 @media(max-width:650px){.tabs button,.tabs a{min-height:54px;font-size:1.05rem}.event-card .meta{font-size:.98rem;gap:6px}.event-card .meta span:first-child{font-size:1.08rem}.event-card .date-badge{min-height:70px}.event-card .date-badge strong{font-size:1.8rem}.event-card h3{font-size:1.08rem}}
+
+/* Preparation status stays legible without relying on color alone. */
+.task-summary{display:grid;grid-template-columns:5.4em minmax(0,1fr);gap:8px 12px;align-items:start;padding:16px;margin:12px 0;border:1px solid #dfd8cb;border-left:5px solid #b3152b;border-radius:10px;background:#fffaf3}
+.task-summary.is-complete{border-left-color:#46705b;background:#f2f7f3}
+.task-summary .task-status{display:inline-block;text-align:center;padding:4px 6px;border-radius:6px;background:#f9e4e7;color:#8b1526;font-size:.85em;font-weight:700;white-space:nowrap}
+.task-summary.is-complete .task-status{background:#dfede3;color:#28513c}
+.task-summary strong{overflow-wrap:anywhere;line-height:1.6}
+.task-summary small{grid-column:2;color:var(--muted);line-height:1.65;overflow-wrap:anywhere}
+@media(max-width:400px){.task-summary{padding:12px;gap:8px;grid-template-columns:4.8em minmax(0,1fr)}.task-summary small{grid-column:1 / -1}}
