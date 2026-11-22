@@ -35,6 +35,7 @@ w.cloud={
  w.eval(clean('record-transfer.js')+'\n'+clean('admin.js'));
  await tick();
  assert(q('#member-form').hidden);w.HTMLElement.prototype.scrollIntoView=function(){};q('#new-member').click();assert(!q('#member-form').hidden);q('#member-form').elements.name.value='未保存';q('#member-form').dispatchEvent(new w.Event('input',{bubbles:true}));assert.match(q('#member-result').textContent,/未保存/);q('#cancel-member').click();assert(q('#member-form').hidden);
+ let finishMember;w.cloud.memberSave=()=>new Promise(resolve=>finishMember=resolve);q('#new-member').click();q('#member-form').elements.name.value='試験会員';const memberSave=q('#member-form').onsubmit({preventDefault(){},target:q('#member-form')});assert([...q('#member-form').children].filter(el=>!el.classList.contains('editor-bar')).every(el=>el.inert));finishMember();await memberSave;assert(q('#member-form').hidden);assert.match(q('#member-feedback').textContent,/保存しました/);assert([...q('#member-form').children].every(el=>!el.inert));
  q('[data-past]').checked=true;
  const first=q('#archive-selected').onclick();
  events={items:[{...source,title:'新しい公演名'}],revision:2};
