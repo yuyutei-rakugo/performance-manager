@@ -492,6 +492,8 @@ async function main(){
     docs.events.revision++;
     await checklistViewer.reload();
     await checklistViewer.locator('[data-event]').click();
+    await checklistViewer.clock.setFixedTime(new Date(Date.now()+120000));
+    await checklistViewer.evaluate(()=>window.dispatchEvent(new Event('focus')));
     await checklistViewer.locator('#event-dialog').getByText('対象作業なし',{exact:true}).waitFor();
     docs.events.items[0].checklist=committedTasks;
     docs.events.revision++;
