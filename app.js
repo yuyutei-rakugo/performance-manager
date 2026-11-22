@@ -1,11 +1,11 @@
-import {startEditor,finishEditor,leaveEditor,guardEditor,editorState,saveRecovery,recoveryScope,recoveredEditState} from './editor-dialog.js?v=20261122-checklist2';
-import {performerPicker,updatePerformerPickers,readPerformer,showPerformerRoster} from './performer-picker.js?v=20261122-checklist2';
-import {mountMemberHome} from './member-home.js?v=20261122-checklist2';
-import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261122-checklist2';
-import {readCategories,saveCategories,validCategories,categoryOptions,mountCategories,mountCategoryAdder} from './categories.js?v=20261122-checklist2';
-import {mountScheduleImport} from './schedule-import.js?v=20261122-checklist2';
-import {draftTask,duplicateSchedule,copyScheduleInvite,validPerformer,timeline,formatDuration,toRecord,transferRecord,readRecords,mergeRecords,mergedRecords} from './record-transfer.js?v=20261122-checklist2';
-import {cloud,startCloud,mountAccount} from './cloud.js?v=20261122-checklist2';
+import {startEditor,finishEditor,leaveEditor,guardEditor,editorState,saveRecovery,recoveryScope,recoveredEditState} from './editor-dialog.js?v=20261122-workflow1';
+import {performerPicker,updatePerformerPickers,readPerformer,showPerformerRoster} from './performer-picker.js?v=20261122-workflow1';
+import {mountMemberHome} from './member-home.js?v=20261122-workflow1';
+import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261122-workflow1';
+import {readCategories,saveCategories,validCategories,categoryOptions,mountCategories,mountCategoryAdder} from './categories.js?v=20261122-workflow1';
+import {mountScheduleImport} from './schedule-import.js?v=20261122-workflow1';
+import {scheduleChange,scheduleChangeBadge,preparationTemplates,draftTask,duplicateSchedule,copyScheduleInvite,validPerformer,timeline,formatDuration,toRecord,transferRecord,readRecords,mergeRecords,mergedRecords} from './record-transfer.js?v=20261122-workflow1';
+import {cloud,startCloud,mountAccount} from './cloud.js?v=20261122-workflow1';
 'use strict';
 
 const key = 'yuitei.events.v1';
@@ -131,7 +131,7 @@ function progressMarkup(event) {
 }
 function card(event) {
   const [year, mon, day] = event.date.split('-');
-  return `<article class="event-card"><div class="date-badge" aria-hidden="true"><small>${Number(mon)}月</small><strong>${Number(day)}</strong></div><div><h3>${esc(event.title)}</h3><div class="meta"><span>${year}/${mon}/${day} ${esc(event.time||'時間未定')}</span><span>＠ ${esc(event.venue)}</span></div></div>${progressMarkup(event)}<div class="event-actions"><button class="secondary" data-event="${esc(event.id)}" aria-label="${esc(event.title)}の詳細">詳細 ›</button></div></article>`;
+  return `<article class="event-card"><div class="date-badge" aria-hidden="true"><small>${Number(mon)}月</small><strong>${Number(day)}</strong></div><div><h3>${esc(event.title)}</h3>${scheduleChangeBadge(event,esc)}<div class="meta"><span>${year}/${mon}/${day} ${esc(event.time||'時間未定')}</span><span>＠ ${esc(event.venue)}</span></div></div>${progressMarkup(event)}<div class="event-actions"><button class="secondary" data-event="${esc(event.id)}" aria-label="${esc(event.title)}の詳細">詳細 ›</button></div></article>`;
 }
 let requestedEvent=new URLSearchParams(location.search).get('detail');
 function render() {
@@ -182,7 +182,7 @@ function renderDetails(id,message='') {
   const program=rows.length?`<div class="program-scroll"><table class="program-table event-program-table"><colgroup><col class="program-order"><col class="program-performer"><col><col class="program-duration"><col class="program-end"></colgroup><thead><tr><th>順</th><th>演者・仲入り</th><th>ネタ・演し物</th><th class="duration-value">持ち時間</th><th>終了予定</th></tr></thead><tbody>${rows.map((p,i)=>`<tr><td>${i+1}</td><td>${esc(p.type==='break'?'仲入り':p.stageName)}</td><td>${esc(p.piece)}</td><td class="duration-value">${formatDuration(Number.isFinite(p.minutes)?p.minutes*60:null)}</td><td>${p.end}</td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">出演者は未登録です。</p>';
 
   eventDialog.innerHTML = `<div class="dialog-body"><div class="dialog-head"><h2 id="event-heading">${esc(event.title)}</h2><button type="button" data-close="event-dialog" aria-label="閉じる">×</button></div>
-    <p>${dateLabel(event.date)} ${esc(event.time||'時間未定')}<br>会場　${esc(event.venue)}<br>区分　${esc(event.kind||'その他公演')}</p>${editable()?'<div class="form-actions"><button class="primary" data-edit>編集する</button><button type="button" class="secondary" data-duplicate>予定を複製</button></div>':''}<p class="save-feedback" role="status">${esc(message)}</p>
+    ${scheduleChangeBadge(event,esc)}<p>${dateLabel(event.date)} ${esc(event.time||'時間未定')}<br>会場　${esc(event.venue)}<br>区分　${esc(event.kind||'その他公演')}</p>${editable()?'<div class="form-actions"><button class="primary" data-edit>編集する</button><button type="button" class="secondary" data-duplicate>予定を複製</button></div>':''}<p class="save-feedback" role="status">${esc(message)}</p>
     <div class="form-actions"><button type="button" class="secondary" data-copy-invite>LINE案内文をコピー</button></div><section class="block" id="event-program"><h3>出演順・演目</h3>${program}${rows.length?'<button type="button" class="secondary" id="print-program">番組表を印刷</button>':''}</section>
     <section class="block"><h3>準備チェックリスト</h3>${progressMarkup(event)}${event.checklist.map(item => `<div class="check-row task-summary ${item.excluded?'is-excluded':item.done?'is-complete':'is-pending'}"><span class="task-status">${item.excluded?'対象外':item.done?'✓ 完了':'未完了'}</span><strong>${esc(item.label)}</strong><small>担当：${esc((item.assignees||[]).join('・')||'未設定')} ／ 完了予定：${esc(item.dueDate||'未設定')}</small></div>`).join('')}</section>
     <section class="block"><h3>メモ</h3><p class="memo">${esc(event.memo) || 'メモはありません。'}</p></section><section class="block" hidden><button type="button" class="primary" id="transfer-event" ${editable()?'':'disabled'}>${event.archivedAt?'記録を更新する':'終了して記録へ移す'}</button><p class="muted">終了した内容を記録に保存します。元データは転記済みの一覧に残ります。</p>${event.archivedAt?'<button type="button" class="secondary" id="unarchive-event">公演一覧に戻す</button>':''}</section></div>`;
@@ -204,7 +204,7 @@ async function deleteEvent(id) {
   const event = events.find(item => item.id === id);
   if (!event) return;
   const dialogContent=eventDialog.firstElementChild;
-  if (confirm('「' + event.title + '」を削除しますか？既に転記した記録は残ります。') && await save(events.filter(item => item.id !== id))) {
+  if (confirm('「' + event.title + '」を削除しますか？既に転記した記録は残ります。'+(event.preparationTemplate?' この公演だけに保存したひな形は候補から外れます。':'')) && await save(events.filter(item => item.id !== id))) {
     if(eventDialog.open&&eventDialog.firstElementChild===dialogContent)eventDialog.close();
     notify('公演を削除しました。');
   }
@@ -268,6 +268,30 @@ function renderForm(existing,recovery) {
   mountCategoryAdder($('event-form').elements.kind,()=>events.map(e=>e.kind));
   $('event-form').elements.memo.value = event.memo;
   const taskRows=$('task-rows');
+  let templateValue=event.preparationTemplate||null;
+  const templates=preparationTemplates(events);
+  const templateBox=document.createElement('details');templateBox.className='template-tools';
+  templateBox.innerHTML='<summary>準備項目のひな形</summary><p class="muted">作業名だけを使います。完了・対象外・担当・期限は引き継ぎません。</p><label>ひな形を選ぶ<select data-template-choice><option value="">選んでください</option><option value="standard">標準の準備項目</option>'+templates.map((t,i)=>'<option value="'+i+'">'+esc(t.name)+'</option>').join('')+'</select></label><button type="button" class="secondary" data-template-apply>このひな形を使う</button><label>ひな形の名前<input data-template-name maxlength="80" placeholder="例：来らっせ寄席用"></label><button type="button" class="secondary" data-template-create>この作業内容をひな形にする</button><p role="status"></p>';
+  taskRows.before(templateBox);
+  const templateMessage=templateBox.querySelector('[role=status]');
+  templateBox.querySelector('[data-template-create]').onclick=()=>{
+   const name=templateBox.querySelector('[data-template-name]').value.trim();
+   const labels=[...taskRows.querySelectorAll('[name=label]')].map(el=>el.value.trim());
+   if(!name||!labels.length||labels.some(label=>!label||label.length>500)){templateMessage.textContent='名前とすべての作業名を入力してください。';return}
+   if(templates.some(t=>t.name===name)&&!confirm('同じ名前のひな形を今回の作業内容で更新しますか？'))return;
+   templateValue={name,labels,updatedAt:new Date().toISOString()};
+   templateMessage.textContent='「変更を保存する」を押すと、この公演と一緒にひな形を共有保存します。';
+  };
+  templateBox.querySelector('[data-template-apply]').onclick=()=>{
+   const value=templateBox.querySelector('[data-template-choice]').value;
+   const labels=value==='standard'?tasks:templates[Number(value)]?.labels;
+   if(value===''||!labels){templateMessage.textContent='ひな形を選んでください。';return}
+   if(!confirm('現在の準備項目をひな形に置き換えます。完了・対象外・担当・期限は解除されます。よろしいですか？'))return;
+   taskRows.replaceChildren();labels.forEach(label=>addTask(draftTask(label)));
+   if(value!=='standard')templateValue=templates[Number(value)];
+   taskRows.dispatchEvent(new Event('change',{bubbles:true}));
+   templateMessage.textContent='ひな形を適用しました。確認して「変更を保存する」を押してください。';
+  };
   function addTask(item,before=null) {
     const row=document.createElement('div');row.className='check-row task-edit-row';
     row.innerHTML=`<label class="task-toggle"><input type="checkbox" data-done ${item.done?'checked':''}><span data-task-title>${esc(item.label||'新しい準備項目')}</span></label><span class="task-edit-status" data-task-status></span><label class="task-toggle"><input type="checkbox" data-excluded ${item.excluded?'checked':''}>今回は対象外</label><label>作業名を変更<input name="label" value="${esc(item.label)}" required></label>${assigneePicker(item,0)}<label>完了予定日（任意）<input type="date" data-due value="${esc(item.dueDate||'')}"></label><div class="task-row-actions"><button type="button" class="secondary" data-insert-before>＋ 前に挿入</button><button type="button" class="secondary" data-insert-after>＋ 後に挿入</button><button type="button" class="secondary" data-remove-task>項目を外す</button></div>`;
@@ -352,6 +376,8 @@ function renderForm(existing,recovery) {
       }),
       checklist:[...taskRows.children].map(row=>({label:row.querySelector('[name="label"]').value.trim(),done:row.querySelector('[data-done]').checked,excluded:row.querySelector('[data-excluded]').checked,dueDate:row.querySelector('[data-due]').value,assignees:[...row.querySelectorAll('[data-owner]:checked')].map(el=>el.value)}))
     };
+    if(templateValue)next.preparationTemplate=templateValue;
+    next.scheduleChange=scheduleChange(existing,next);
     const checklistShape=items=>items.map(({label,done,excluded,dueDate,assignees})=>[label,done,!!excluded,dueDate||'',assignees||[]]);
     if(!existing||JSON.stringify(checklistShape(existing.checklist))!==JSON.stringify(checklistShape(next.checklist)))next.checklistUpdatedAt=new Date().toISOString();
     const feedback = $('form-feedback');
@@ -406,7 +432,7 @@ $('schedule').onclick = async click => {
   }
 };
 $('list-tab').onclick = () => {tab = 'list'; render();};
-$('calendar-tab').onclick = () => {location.href = 'rehearsals.html?v=20261122-checklist2';};
+$('calendar-tab').onclick = () => {location.href = 'rehearsals.html?v=20261122-workflow1';};
 $('new-event').onclick = () => renderForm();
 $('data-open').onclick = () => $('data-dialog').showModal();
 guardEditor(eventDialog);

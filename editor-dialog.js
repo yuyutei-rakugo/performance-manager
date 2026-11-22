@@ -7,6 +7,18 @@ export function startEditor(dialog,form){
  const baseline=snapshot();
  const editor={form,pending:false,committed:false,dirty:()=>snapshot()!==baseline};
  editors.set(dialog,editor);
+ const status=form.querySelector('[data-editor-status]');
+ const changed=()=>{
+  if(editor.pending||editor.committed||editors.get(dialog)!==editor)return;
+  if(status){status.hidden=false;status.dataset.savePhase=editor.dirty()?'dirty':'ready';status.textContent=editor.dirty()?'未保存':'編集中'}
+ };
+ form.addEventListener('input',changed);form.addEventListener('change',changed);
+ if(status&&!status.textContent){status.hidden=false;status.dataset.savePhase='ready';status.textContent='編集中'}
+ const actions=form.querySelector('.editor-bar .form-actions');
+ if(actions){for(const button of actions.querySelectorAll('button')){
+  if(button.type==='submit'){button.textContent='変更を保存する';button.classList.add('primary')}
+  else if(button.textContent.trim()==='キャンセル')button.classList.add('secondary');
+ }}
  return editor;
 }
 
@@ -20,7 +32,7 @@ export function editorState(form,message,pending=false){
   form.querySelector('.editor-bar button:not([type=button])').disabled=pending;
  }
  const status=form.querySelector('[data-editor-status]');
- if(status){status.textContent=message;status.hidden=!message}
+ if(status){status.textContent=message;status.hidden=!message;status.dataset.savePhase=pending?'pending':/できません|失敗|確認してください|更新されています/.test(message)?'error':/保存しました/.test(message)?'saved':'ready'}
 }
 
 export function finishEditor(dialog){

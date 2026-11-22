@@ -1,4 +1,4 @@
-import {cloud} from './cloud.js?v=20261122-checklist2';
+import {cloud} from './cloud.js?v=20261122-workflow1';
 export const historyKey='yuitei.history.v1';
 export const validRecord=r=>r&&typeof r.id==='string'&&typeof r.date==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(r.date)&&typeof r.kind==='string'&&typeof r.occasion==='string'&&typeof r.note==='string'&&r.pieces&&typeof r.pieces==='object'&&!Array.isArray(r.pieces)&&Object.values(r.pieces).every(v=>typeof v==='string');
 export function readRecords(){const raw=JSON.parse(localStorage.getItem(historyKey)||'{"version":1,"items":[]}');if(raw.version!==1||!Array.isArray(raw.items)||!raw.items.every(validRecord))throw Error('保存済みの記録を読み込めません。上書きを停止しています。');return raw.items;}
@@ -59,4 +59,35 @@ export async function copyScheduleInvite(type,source,report){
   const prompt=document.createElement('dialog');prompt.innerHTML='<div class="dialog-body"><h2>LINE案内文</h2><p>案内文を長押し、または全選択してコピーしてください。</p><textarea aria-label="LINE案内文" rows="10" readonly></textarea><button type="button">閉じる</button></div>';
   prompt.querySelector('textarea').value=text;prompt.querySelector('button').onclick=()=>prompt.close();prompt.addEventListener('close',()=>prompt.remove(),{once:true});document.body.append(prompt);prompt.showModal();prompt.querySelector('textarea').select();
  }
+}
+
+// Small, optional schedule metadata; older schedules remain valid.
+export function scheduleChange(previous,next,now=new Date()){
+ if(!previous)return next.scheduleChange;
+ const fields=[];
+ if(previous.title!==next.title)fields.push('名称');
+ if(previous.date!==next.date||previous.time!==next.time)fields.push('日時');
+ if(previous.venue!==next.venue)fields.push('会場');
+ return fields.length?{at:now.toISOString(),fields}:previous.scheduleChange;
+}
+export function scheduleChangeBadge(row,escape,now=Date.now()){
+ const change=row.scheduleChange,age=now-Date.parse(change?.at);
+ if(!change||!Array.isArray(change.fields)||!change.fields.length||!Number.isFinite(age)||age<0||age>7*86400000)return '';
+ const fields=change.fields.filter(v=>['名称','日時','会場'].includes(v));
+ if(!fields.length)return '';
+ const date=new Date(change.at).toLocaleDateString('ja-JP',{timeZone:'Asia/Tokyo',month:'numeric',day:'numeric'});
+ return '<span class="schedule-change">変更あり：'+escape(fields.join('・'))+'（'+escape(date)+'）</span>';
+}
+export function preparationTemplates(rows){
+ const names=new Map();
+ for(const row of rows){
+  const value=row.preparationTemplate;
+  if(!value||typeof value.name!=='string'||!value.name.trim()||value.name.length>80||!Array.isArray(value.labels)||!value.labels.length||value.labels.length>200||!value.labels.every(v=>typeof v==='string'&&v.trim()&&v.length<=500)||!Number.isFinite(Date.parse(value.updatedAt)))continue;
+  if(!names.has(value.name)||Date.parse(names.get(value.name).updatedAt)<Date.parse(value.updatedAt))names.set(value.name,value);
+ }
+ return [...names.values()].sort((a,b)=>a.name.localeCompare(b.name,'ja'));
+}
+export function assignedPreparation(rows,person,today){
+ if(!person)return [];
+ return rows.filter(row=>!row.archivedAt&&row.date>=today).sort((a,b)=>(a.date+(a.time||'')).localeCompare(b.date+(b.time||''))).flatMap(row=>(row.checklist||[]).filter(task=>!task.done&&!task.excluded&&Array.isArray(task.assignees)&&task.assignees.includes(person)).map(task=>({event:row,task})));
 }
