@@ -1,12 +1,12 @@
-import {startEditor,finishEditor,leaveEditor,guardEditor,editorState,hasEditorDraft,saveRecovery,recoveryScope,recoveredEditState} from './editor-dialog.js?v=20261121-mode1';
-import {performerPicker,updatePerformerPickers,readPerformer,showPerformerRoster} from './performer-picker.js?v=20261121-mode1';
-import {mountMemberHome} from './member-home.js?v=20261121-mode1';
-import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261121-mode1';
-import {readCategories,saveCategories,validCategories} from './categories.js?v=20261121-mode1';
-import {mountScheduleImport} from './schedule-import.js?v=20261121-mode1';
-import {toRecord,formatDuration,rehearsalTitle,readRecords,mergeRecords,mergedRecords} from './record-transfer.js?v=20261121-mode1';
-import {cloud,startCloud,mountAccount} from './cloud.js?v=20261121-mode1';
-import {statuses,rehearsalNames,validRehearsal,validAttendance,attendanceSummary,japanDate,rehearsalBadge,rehearsalDateTime} from './rehearsal-model.js?v=20261121-mode1';
+import {startEditor,finishEditor,leaveEditor,guardEditor,editorState,hasEditorDraft,saveRecovery,recoveryScope,recoveredEditState} from './editor-dialog.js?v=20261122-tools1';
+import {performerPicker,updatePerformerPickers,readPerformer,showPerformerRoster} from './performer-picker.js?v=20261122-tools1';
+import {mountMemberHome} from './member-home.js?v=20261122-tools1';
+import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261122-tools1';
+import {readCategories,saveCategories,validCategories} from './categories.js?v=20261122-tools1';
+import {mountScheduleImport} from './schedule-import.js?v=20261122-tools1';
+import {duplicateSchedule,copyScheduleInvite,toRecord,formatDuration,rehearsalTitle,readRecords,mergeRecords,mergedRecords} from './record-transfer.js?v=20261122-tools1';
+import {cloud,startCloud,mountAccount} from './cloud.js?v=20261122-tools1';
+import {statuses,rehearsalNames,validRehearsal,validAttendance,attendanceSummary,japanDate,rehearsalBadge,rehearsalDateTime} from './rehearsal-model.js?v=20261122-tools1';
 const $=id=>document.getElementById(id),esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const key='yuitei.rehearsals.v1';let items=[],attendance={},names=[],revision=0,loaded=false,storageOK=true,stop,stopAttendance,opened=null,detailRevision=0,busy=false,archiving=false;
 let noticeTimer;
@@ -63,7 +63,8 @@ function form(existing,onCancel=()=>dialog.close(),recovery){if(!canEdit())retur
  const editor=$('rehearsal-form'),submissionId=existing?.id||recovery?.id||crypto.randomUUID();
  editor.querySelector('[data-cancel-edit]').onclick=()=>leaveEditor(dialog,onCancel);
  startEditor(dialog,editor);
- const canRetry=recoveredEditState(editor,recovery,existing);
+ const canRetry=recovery?.duplicated?true:recoveredEditState(editor,recovery,existing);
+ if(recovery?.duplicated)editorState(editor,'複製した予定です。開催日を入力して保存してください。');
  editor.onsubmit=async e=>{
   e.preventDefault();
   if(busy||!canRetry||editor.querySelector('button.primary').disabled)return;
@@ -98,9 +99,9 @@ function form(existing,onCancel=()=>dialog.close(),recovery){if(!canEdit())retur
  }
  if(!dialog.open)dialog.showModal();
 }
-function detail(id,message=''){const r=items.find(x=>x.id===id);if(!r)return;stopAttendance?.();opened=id;attendanceState=cloud.state.configured?'loading':'ready';detailRevision=revision;dialog.innerHTML=`<div class="dialog-body"><div class="dialog-head"><h2>${rehearsalBadge(r,rehearsalTitle(r),esc)}</h2><button data-close aria-label="閉じる">×</button></div><p>${rehearsalDateTime(r,esc)}<br>場所：${esc(r.venue)}</p><p class="muted">予定ID：${esc(r.id)}</p><p class="memo">${esc(r.notes)}</p>${canEdit()?'<div class="form-actions"><button type="button" class="primary" id="edit-rehearsal-inside">編集する</button></div>':''}<p class="save-feedback" role="status">${esc(message)}</p><section id="attendance"></section><section class="block" id="practice-section"></section></div>`;$('edit-rehearsal-inside')?.addEventListener('click',()=>leaveEditor(dialog,()=>form(items.find(x=>x.id===id),()=>{
+function detail(id,message=''){const r=items.find(x=>x.id===id);if(!r)return;stopAttendance?.();opened=id;attendanceState=cloud.state.configured?'loading':'ready';detailRevision=revision;dialog.innerHTML=`<div class="dialog-body"><div class="dialog-head"><h2>${rehearsalBadge(r,rehearsalTitle(r),esc)}</h2><button data-close aria-label="閉じる">×</button></div><p>${rehearsalDateTime(r,esc)}<br>場所：${esc(r.venue)}</p><p class="muted">予定ID：${esc(r.id)}</p><p class="memo">${esc(r.notes)}</p>${canEdit()?'<div class="form-actions"><button type="button" class="primary" id="edit-rehearsal-inside">編集する</button><button type="button" class="secondary" id="duplicate-rehearsal">予定を複製</button></div>':''}<p class="save-feedback" role="status">${esc(message)}</p><div class="form-actions"><button type="button" class="secondary" id="copy-invite">LINE案内文をコピー</button></div><section id="attendance"></section><section class="block" id="practice-section"></section></div>`;$('edit-rehearsal-inside')?.addEventListener('click',()=>leaveEditor(dialog,()=>form(items.find(x=>x.id===id),()=>{
  if(items.some(item=>item.id===id&&!item.archivedAt))detail(id);else dialog.close();
-})));practiceView(id);if(!dialog.open)dialog.showModal();if(cloud.state.configured&&cloud.state.role){watchDetailAttendance(id);if(cloud.state.provider==='apps-script'){loadRoster(true);refreshDetailPractices(id)}}else attendanceView(id)}
+})));$('copy-invite').onclick=()=>copyScheduleInvite('rehearsal',r,notify);$('duplicate-rehearsal')?.addEventListener('click',()=>leaveEditor(dialog,()=>{form(null,()=>detail(id),{value:duplicateSchedule('rehearsal',r),duplicated:true});notify('開催日を入力して保存してください。出欠・稽古ネタは引き継ぎません。')}));practiceView(id);if(!dialog.open)dialog.showModal();if(cloud.state.configured&&cloud.state.role){watchDetailAttendance(id);if(cloud.state.provider==='apps-script'){loadRoster(true);refreshDetailPractices(id)}}else attendanceView(id)}
 function confirmArchive(id,editor,button){
  if(archiving||busy||cloud.state.role!=='admin')return;
  const prompt=document.createElement('dialog');
