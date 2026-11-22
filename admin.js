@@ -73,7 +73,7 @@ function showBackups(result){
 $('backup-choice').onchange=()=>$('backup-restore').disabled=backupBusy||!$('backup-choice').value||!backupExpected;
 async function backupAction(action){
  if(backupBusy||!backupAllowed())return;
- const owner=backupOwner;backupBusy=true;
+ const owner=backupOwner,generation=accountGeneration;backupBusy=true;
  for(const id of ['backup-list','backup-now','backup-restore','backup-choice'])$(id).disabled=true;
  $('backup-status').textContent='処理中…';
  try{
@@ -83,16 +83,17 @@ async function backupAction(action){
    const label=$('backup-choice').selectedOptions[0].textContent;
    if(!confirm(label+' の公演・稽古・記録・出欠に戻します。全会員に反映されます。現在の内容もバックアップします。実行しますか？')){$('backup-status').textContent='復元を中止しました。';return}
    await cloud.restoreBackup(id,expected);
-   if(owner!==backupOwner)return;
+   if(owner!==backupOwner||generation!==accountGeneration)return;
    $('backup-status').textContent='復元しました。他の画面・端末も開き直して確認してください。';
-   await refresh();backupExpected='';
+   backupExpected='';
+   await refreshAfterSave(refresh,$('backup-status'));
   }else{
    const result=await (action==='create'?cloud.createBackup():cloud.backups());
-   if(owner!==backupOwner)return;
+   if(owner!==backupOwner||generation!==accountGeneration)return;
    const count=showBackups(result);
    $('backup-status').textContent=action==='create'?'今の内容をバックアップしました。':count+'件のバックアップがあります。';
   }
- }catch(error){if(owner===backupOwner)$('backup-status').textContent='処理できませんでした。'+error.message+' 新機能が未対応の場合はApps Scriptを更新してください。'}
+ }catch(error){if(owner===backupOwner&&generation===accountGeneration)$('backup-status').textContent='処理できませんでした。'+error.message+' 新機能が未対応の場合はApps Scriptを更新してください。'}
  finally{backupBusy=false;for(const id of ['backup-list','backup-now','backup-choice'])$(id).disabled=false;$('backup-restore').disabled=!backupExpected||!$('backup-choice').value}
 }
 $('backup-list').onclick=()=>backupAction('list');$('backup-now').onclick=()=>backupAction('create');$('backup-restore').onclick=()=>backupAction('restore');

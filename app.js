@@ -120,7 +120,11 @@ function card(event) {
 }
 let requestedEvent=new URLSearchParams(location.search).get('detail');
 function render() {
-  if(requestedEvent&&(!cloud.state.configured||cloudLoaded)){const id=requestedEvent;requestedEvent='';if(events.some(item=>item.id===id))queueMicrotask(()=>renderDetails(id))}
+  if(requestedEvent&&cloud.state.ready!==false&&(!cloud.state.configured||cloudLoaded)){
+    const id=requestedEvent;requestedEvent='';
+    if(events.some(item=>item.id===id&&!item.archivedAt))queueMicrotask(()=>renderDetails(id));
+    else notify('指定の公演予定は見つかりませんでした。');
+  }
   eventRecovery.render();
   $('new-event').disabled=!editable();
   const filter=document.getElementById('event-kind-filter');if(filter){const value=filter.value;filter.innerHTML='<option value="">全区分</option>'+categoryOptions(value,events.map(e=>e.kind));filter.value=value;}
@@ -436,7 +440,7 @@ mountMemberHome();mountAccount();
 cloud.onState(state=>{
  eventRecovery.render();
  const identity=state.configured?`${state.user?.uid||''}:${state.role||''}`:'local';
- if(identity===cloudIdentity)return;cloudIdentity=identity;performerNames=[];stopCloud?.();cloudLoaded=false;cloudLoadError='';
+ if(identity===cloudIdentity){if(state.ready!==false&&requestedEvent)render();return;}cloudIdentity=identity;performerNames=[];stopCloud?.();cloudLoaded=false;cloudLoadError='';
  if(state.configured){events=[];eventDialog.close();if($('data-dialog').open)$('data-dialog').close();render();if(state.role){stopCloud=cloud.watch('events',doc=>{if(doc&&(!Array.isArray(doc.items)||!doc.items.every(validEvent))){notify('共通データの形式を確認してください。');return}events=doc?.items||[];cloudRevision=doc?.revision||0;cloudLoaded=true;cloudLoadError='';render()},message=>{cloudLoadError=message;notify(message);render()})}}
 });
 startCloud();

@@ -54,7 +54,9 @@ export function historyEditor(getData,refresh,refreshRows=()=>{}){
   stop=cloud.watch('history',doc=>{
    if(doc&&(!Array.isArray(doc.items)||!doc.items.every(valid))){readFailure('共通記録の形式を確認してください。');return}
    revision=doc?.revision||0;loaded=true;received=true;
-   getData().records=doc?doc.items:structuredClone(original);refresh();
+   getData().records=doc?.useBuiltInHistory
+    ?[...new Map([...structuredClone(original),...doc.items].map(record=>[record.id,record])).values()]
+    :doc?doc.items:structuredClone(original);refresh();
    feedback(canEditRole?'記録を追加・修正できます。保存すると会員の端末に反映されます。':'記録は閲覧のみです。編集権限がありません。');controls();
   },message=>readFailure('共通記録を読み込めませんでした。'+message));
  });

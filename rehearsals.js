@@ -17,7 +17,7 @@ let accountGeneration=0,rosterState='loading',attendanceState='loading',schedule
 const attendanceTimes=new Map(),practiceSaves=new Map();
 let requestedDetail=new URL(location.href).searchParams.get('detail')||'';
 window.addEventListener('rehearsal-detail',event=>{const id=event.detail?.id;if(typeof id!=='string')return;requestedDetail=id;openRequestedDetail()});
-function openRequestedDetail(){if(!requestedDetail||cloud.state.configured&&!loaded||!cloud.state.configured&&cloud.state.ready===false)return;const id=requestedDetail;requestedDetail='';if(items.some(item=>item.id===id))detail(id);else notify('指定の稽古予定は見つかりませんでした。')}
+function openRequestedDetail(){if(!requestedDetail||cloud.state.configured&&!loaded||!cloud.state.configured&&cloud.state.ready===false)return;const id=requestedDetail;requestedDetail='';if(items.some(item=>item.id===id&&!item.archivedAt))detail(id);else notify('指定の稽古予定は見つかりませんでした。')}
 try{await applyConfirmedSchedule()}catch(e){notify(e.message||'予定の自動追加に失敗しました。再読み込みしてください。')}
 try{const raw=JSON.parse(localStorage.getItem(key)||'{"items":[],"attendance":{}}');if(!Array.isArray(raw.items)||!raw.items.every(validRehearsal)||!raw.attendance||!Object.values(raw.attendance).every(validAttendance))throw Error();items=raw.items;attendance=raw.attendance}catch{storageOK=false;notify('保存済みの稽古予定を読み込めません。上書きを停止しています。')}
 let localItems=structuredClone(items),localAttendance=structuredClone(attendance);

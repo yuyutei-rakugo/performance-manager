@@ -467,6 +467,12 @@ async function main(){
     await editorPage.getByRole('button',{name:'記録を編集する',exact:true}).click();
     await editorPage.locator('[data-record-edit=history-old]').waitFor();
 
+    const invited=await session('viewer');
+    const invitation=new URL(base);
+    invitation.searchParams.set('detail',docs.events.items[0].id);
+    await invited.goto(invitation.href);
+    await invited.locator('#event-dialog[open] #event-heading').getByText('翌日の公演').waitFor();
+
     const sample=docs.events.items[0];
     docs.events={revision:docs.events.revision+1,items:Array.from({length:500},(_,i)=>({...sample,id:'bulk-'+i}))};
     const narrow=await session('viewer');
