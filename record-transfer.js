@@ -1,4 +1,4 @@
-import {cloud} from './cloud.js?v=20261122-workflow2';
+import {cloud} from './cloud.js?v=20261122-workflow3';
 export const historyKey='yuitei.history.v1';
 export const validRecord=r=>r&&typeof r.id==='string'&&typeof r.date==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(r.date)&&typeof r.kind==='string'&&typeof r.occasion==='string'&&typeof r.note==='string'&&r.pieces&&typeof r.pieces==='object'&&!Array.isArray(r.pieces)&&Object.values(r.pieces).every(v=>typeof v==='string');
 export function readRecords(){const raw=JSON.parse(localStorage.getItem(historyKey)||'{"version":1,"items":[]}');if(raw.version!==1||!Array.isArray(raw.items)||!raw.items.every(validRecord))throw Error('保存済みの記録を読み込めません。上書きを停止しています。');return raw.items;}
@@ -86,8 +86,4 @@ export function preparationTemplates(rows){
   if(!names.has(value.name)||Date.parse(names.get(value.name).updatedAt)<Date.parse(value.updatedAt))names.set(value.name,value);
  }
  return [...names.values()].sort((a,b)=>a.name.localeCompare(b.name,'ja'));
-}
-export function assignedPreparation(rows,person,today){
- if(!person)return [];
- return rows.filter(row=>!row.archivedAt&&row.date>=today).sort((a,b)=>(a.date+(a.time||'')).localeCompare(b.date+(b.time||''))).flatMap(row=>(row.checklist||[]).filter(task=>!task.done&&!task.excluded&&Array.isArray(task.assignees)&&task.assignees.includes(person)).map(task=>({event:row,task})));
 }
