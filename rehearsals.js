@@ -1,12 +1,12 @@
-import {startEditor,finishEditor,leaveEditor,guardEditor,editorState,hasEditorDraft,saveRecovery,recoveryScope,recoveredEditState} from './editor-dialog.js?v=20261122-tools1';
-import {performerPicker,updatePerformerPickers,readPerformer,showPerformerRoster} from './performer-picker.js?v=20261122-tools1';
-import {mountMemberHome} from './member-home.js?v=20261122-tools1';
-import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261122-tools1';
-import {readCategories,saveCategories,validCategories} from './categories.js?v=20261122-tools1';
-import {mountScheduleImport} from './schedule-import.js?v=20261122-tools1';
-import {duplicateSchedule,copyScheduleInvite,toRecord,formatDuration,rehearsalTitle,readRecords,mergeRecords,mergedRecords} from './record-transfer.js?v=20261122-tools1';
-import {cloud,startCloud,mountAccount} from './cloud.js?v=20261122-tools1';
-import {statuses,rehearsalNames,validRehearsal,validAttendance,attendanceSummary,japanDate,rehearsalBadge,rehearsalDateTime} from './rehearsal-model.js?v=20261122-tools1';
+import {startEditor,finishEditor,leaveEditor,guardEditor,editorState,hasEditorDraft,saveRecovery,recoveryScope,recoveredEditState} from './editor-dialog.js?v=20261122-tools2';
+import {performerPicker,updatePerformerPickers,readPerformer,showPerformerRoster} from './performer-picker.js?v=20261122-tools2';
+import {mountMemberHome} from './member-home.js?v=20261122-tools2';
+import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261122-tools2';
+import {readCategories,saveCategories,validCategories} from './categories.js?v=20261122-tools2';
+import {mountScheduleImport} from './schedule-import.js?v=20261122-tools2';
+import {duplicateSchedule,copyScheduleInvite,toRecord,formatDuration,rehearsalTitle,readRecords,mergeRecords,mergedRecords} from './record-transfer.js?v=20261122-tools2';
+import {cloud,startCloud,mountAccount} from './cloud.js?v=20261122-tools2';
+import {statuses,rehearsalNames,validRehearsal,validAttendance,attendanceSummary,japanDate,rehearsalBadge,rehearsalDateTime} from './rehearsal-model.js?v=20261122-tools2';
 const $=id=>document.getElementById(id),esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const key='yuitei.rehearsals.v1';let items=[],attendance={},names=[],revision=0,loaded=false,storageOK=true,stop,stopAttendance,opened=null,detailRevision=0,busy=false,archiving=false;
 let noticeTimer;
@@ -17,7 +17,7 @@ let accountGeneration=0,rosterState='loading',attendanceState='loading',schedule
 const attendanceTimes=new Map(),practiceSaves=new Map();
 let requestedDetail=new URL(location.href).searchParams.get('detail')||'';
 window.addEventListener('rehearsal-detail',event=>{const id=event.detail?.id;if(typeof id!=='string')return;requestedDetail=id;openRequestedDetail()});
-function openRequestedDetail(){if(!requestedDetail||cloud.state.configured&&!loaded||!cloud.state.configured&&cloud.state.ready===false)return;const id=requestedDetail;requestedDetail='';if(items.some(item=>item.id===id))detail(id);else notify('指定の稽古予定は見つかりませんでした。')}
+function openRequestedDetail(){if(!requestedDetail||cloud.state.configured&&!loaded||!cloud.state.configured&&cloud.state.ready===false)return;const id=requestedDetail;requestedDetail='';if(items.some(item=>item.id===id&&!item.archivedAt))detail(id);else notify('指定の稽古予定は見つかりませんでした。')}
 try{await applyConfirmedSchedule()}catch(e){notify(e.message||'予定の自動追加に失敗しました。再読み込みしてください。')}
 try{const raw=JSON.parse(localStorage.getItem(key)||'{"items":[],"attendance":{}}');if(!Array.isArray(raw.items)||!raw.items.every(validRehearsal)||!raw.attendance||!Object.values(raw.attendance).every(validAttendance))throw Error();items=raw.items;attendance=raw.attendance}catch{storageOK=false;notify('保存済みの稽古予定を読み込めません。上書きを停止しています。')}
 let localItems=structuredClone(items),localAttendance=structuredClone(attendance);

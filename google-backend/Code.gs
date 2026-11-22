@@ -7,7 +7,7 @@ function initializeOwner(){
  const lock=LockService.getScriptLock();lock.waitLock(20000);
  try{const props=PropertiesService.getScriptProperties();if(props.getProperty('DB_FILE_ID'))throw Error('初期設定済みです。');const pin=props.getProperty('OWNER_PIN')||'1111';checkPin_(pin);const secret=Utilities.getUuid()+Utilities.getUuid();props.setProperty('AUTH_SECRET',secret);const owner={id:'owner',name:'勇水',role:'admin',active:true,epoch:1,salt:Utilities.getUuid(),owner:true};owner.pinHash=hashPin_(owner,pin);const file=Drive.Files.create({name:'結友亭の帳面-共通データ.json',mimeType:'application/json'},Utilities.newBlob(JSON.stringify({version:1,members:[owner],shared:{},attendance:{}}),'application/json'),{fields:'id'});props.setProperty('DB_FILE_ID',file.id);props.deleteProperty('OWNER_PIN');return '勇水を最初の管理者として登録しました。'}finally{lock.releaseLock()}
 }
-function doGet(){return output_({ok:true,service:'yuyutei-members',version:1,attendanceProxy:true,rehearsalArchiveToday:true,automaticBackup:true})}
+function doGet(){return output_({ok:true,service:'yuyutei-members',version:1,attendanceProxy:true,rehearsalArchiveToday:true,automaticBackup:true,backupRecoveryRevision:2})}
 function doPost(event){
  const lock=LockService.getScriptLock();let locked=false;
  try{if(!event||!event.postData||event.postData.contents.length>1500000)throw Error('リクエストを確認してください。');const req=JSON.parse(event.postData.contents);if(!req||typeof req!=='object')throw Error('リクエストを確認してください。');lock.waitLock(20000);locked=true;const db=readDb_();if(req.action==='login')return output_({ok:true,...login_(db,req)});const member=authorize_(db,req.token);let data;
@@ -55,7 +55,7 @@ function digest_(value){return Utilities.base64EncodeWebSafe(Utilities.computeHm
 function hashPin_(m,pin){return digest_(m.id+':'+m.salt+':'+pin)}
 let previousBackupText_=null;
 function readDb_(){const id=PropertiesService.getScriptProperties().getProperty('DB_FILE_ID');if(!id)throw Error('管理者の初期設定が必要です。');const response=UrlFetchApp.fetch('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(id)+'?alt=media',{headers:{Authorization:'Bearer '+ScriptApp.getOAuthToken()},muteHttpExceptions:true});if(response.getResponseCode()!==200)throw Error('専用データを読み込めません。Googleの接続設定を確認してください。');const text=response.getContentText('UTF-8');const parsed=JSON.parse(text);previousBackupText_=text;return parsed}
-function writeDb_(db){const text=JSON.stringify(db);if(text.length>1500000)throw Error('保存量が増えています。バックアップして管理者に確認してください。');if(previousBackupText_)createDataBackup_(JSON.parse(previousBackupText_));Drive.Files.update({},PropertiesService.getScriptProperties().getProperty('DB_FILE_ID'),Utilities.newBlob(text,'application/json'),{fields:'id'});previousBackupText_=text}
+function writeDb_(db){const text=JSON.stringify(db);if(text.length>1500000)throw Error('保存量が増えています。バックアップして管理者に確認してください。');if(previousBackupText_)createDataBackup_(previousBackupText_);Drive.Files.update({},PropertiesService.getScriptProperties().getProperty('DB_FILE_ID'),Utilities.newBlob(text,'application/json'),{fields:'id'});previousBackupText_=text}
 function output_(data){return ContentService.createTextOutput(JSON.stringify(data)).setMimeType(ContentService.MimeType.JSON)}
 function publicMember_(m){return {id:m.id,name:m.name,role:m.role,active:m.active,owner:!!m.owner,...(m.role==='admin'?{attendanceProxy:true}:{})}}
 function login_(db,req){
@@ -106,7 +106,7 @@ function archivePast_(db,req,actor){
  }
  if(map.size>500)throw Error('記録は500件までです。');
  if(count){
-  db.shared.history={items:Array.from(map.values()),revision:history.revision+1,updatedBy:actor.id,updatedAt:new Date().toISOString()};
+  db.shared.history={items:Array.from(map.values()),revision:history.revision+1,updatedBy:actor.id,updatedAt:new Date().toISOString(),...(history.useBuiltInHistory===true?{useBuiltInHistory:true}:{})};
   for(const name in changed){db.shared[name].revision++;db.shared[name].updatedBy=actor.id;db.shared[name].updatedAt=new Date().toISOString()}
  }
  return detail?{count,rehearsals}:{count};
@@ -121,25 +121,37 @@ function validCollection_(name,items){
 
 // Private Drive snapshots. The first changed save each JST day preserves the pre-change data.
 // Manual and pre-restore snapshots also run under the same script lock.
-function backupIndex_(){
+function storedBackups_(){
  const raw=PropertiesService.getScriptProperties().getProperty('DATA_BACKUPS');
  const rows=JSON.parse(raw||'[]');
  if(!Array.isArray(rows))throw Error('バックアップ管理情報を確認してください。');
  return rows;
 }
-function createDataBackup_(db,force=false){
+function backupIndex_(){return storedBackups_().slice(0,14)}
+function createDataBackup_(snapshot,force=false){
  const props=PropertiesService.getScriptProperties(),day=Utilities.formatDate(new Date(),'Asia/Tokyo','yyyy-MM-dd');
- let rows=backupIndex_();
  if(!force&&props.getProperty('DATA_BACKUP_DAY')===day)return;
+ let rows=storedBackups_();
  const createdAt=new Date().toISOString();
  let file;
- try{file=Drive.Files.create({name:'結友亭の帳面-バックアップ-'+createdAt.replace(/[:.]/g,'-')+'.json',mimeType:'application/json'},Utilities.newBlob(JSON.stringify(db),'application/json'),{fields:'id'})}
+ try{file=Drive.Files.create({name:'結友亭の帳面-バックアップ-'+createdAt.replace(/[:.]/g,'-')+'.json',mimeType:'application/json'},Utilities.newBlob(typeof snapshot==='string'?snapshot:JSON.stringify(snapshot),'application/json'),{fields:'id'})}
  catch{throw Error('バックアップを作成できないため保存を中止しました。時間をおいて再試行してください。')}
  rows=[{id:file.id,createdAt},...rows];
- const expired=rows.slice(14);rows=rows.slice(0,14);
- props.setProperty('DATA_BACKUPS',JSON.stringify(rows));props.setProperty('DATA_BACKUP_DAY',day);
- // Cleanup failure must not invalidate an already confirmed snapshot.
- for(const row of expired){try{Drive.Files.remove(row.id)}catch{}}
+ try{props.setProperty('DATA_BACKUPS',JSON.stringify(rows))}
+ catch{
+  try{Drive.Files.remove(file.id)}catch{}
+  throw Error('バックアップを登録できないため保存を中止しました。');
+ }
+ props.setProperty('DATA_BACKUP_DAY',day);
+ // Retain IDs whose cleanup failed so the next backup can retry.
+ const remaining=rows.slice(0,14);
+ for(const row of rows.slice(14)){
+  try{Drive.Files.update({trashed:true},row.id,null,{fields:'id'})}
+  catch{remaining.push(row)}
+ }
+ if(remaining.length!==rows.length){
+  try{props.setProperty('DATA_BACKUPS',JSON.stringify(remaining))}catch{}
+ }
  return rows[0];
 }
 function restoreDataBackup_(db,req,actor){
@@ -149,18 +161,25 @@ function restoreDataBackup_(db,req,actor){
  const response=UrlFetchApp.fetch('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(entry.id)+'?alt=media',{headers:{Authorization:'Bearer '+ScriptApp.getOAuthToken()},muteHttpExceptions:true});
  if(response.getResponseCode()!==200)throw Error('バックアップを読み込めませんでした。');
  const snapshot=JSON.parse(response.getContentText('UTF-8'));
- if(snapshot.version!==1||!snapshot.shared||!snapshot.attendance||Array.isArray(snapshot.shared)||Array.isArray(snapshot.attendance))throw Error('バックアップの形式を確認してください。');
+ if(!snapshot||snapshot.version!==1||!isBackupMap_(snapshot.shared)||!isBackupMap_(snapshot.attendance))throw Error('バックアップの形式を確認してください。');
  for(const name of Object.keys(snapshot.shared)){checkCollection_(name);validCollection_(name,snapshot.shared[name].items)}
- for(const id of Object.keys(snapshot.attendance)){checkId_(id);for(const row of Object.values(snapshot.attendance[id]))if(!row||typeof row.stageName!=='string'||!['出席','欠席','未定','未回答'].includes(row.status))throw Error('出欠の形式を確認してください。')}
+ for(const id of Object.keys(snapshot.attendance)){checkId_(id);if(!isBackupMap_(snapshot.attendance[id]))throw Error('出欠の形式を確認してください。');for(const row of Object.values(snapshot.attendance[id]))if(!row||typeof row.stageName!=='string'||!['出席','欠席','未定','未回答'].includes(row.status))throw Error('出欠の形式を確認してください。')}
  createDataBackup_(db,true);
  const shared={};
  for(const name of ['events','rehearsals','history']){
   shared[name]={items:snapshot.shared[name]?.items||[],revision:Math.max(db.shared[name]?.revision||0,snapshot.shared[name]?.revision||0)+1,updatedBy:actor.id,updatedAt:new Date().toISOString()};
  }
+ if(!snapshot.shared.history||snapshot.shared.history.useBuiltInHistory===true)shared.history.useBuiltInHistory=true;
+ const names=new Map(db.members.map(member=>[member.id,member.name]));
+ for(const rows of Object.values(snapshot.attendance)){
+  for(const [id,row] of Object.entries(rows))if(names.has(id))row.stageName=names.get(id);
+ }
  db.shared=shared;db.attendance=snapshot.attendance;
  writeDb_(db);
  return {restored:true};
 }
+
+function isBackupMap_(value){return value&&typeof value==='object'&&!Array.isArray(value)}
 
 // Owner's editor action: create an initial checkpoint without changing the database.
 function backupNow(){

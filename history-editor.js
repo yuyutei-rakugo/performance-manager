@@ -1,7 +1,7 @@
-import {startEditor,finishEditor,leaveEditor,guardEditor,editorState,saveRecovery,recoveryScope,recoveredEditState} from './editor-dialog.js?v=20261122-tools1';
-import {categoryOptions} from './categories.js?v=20261122-tools1';
-import {readRecords,writeRecords} from './record-transfer.js?v=20261122-tools1';
-import {cloud} from './cloud.js?v=20261122-tools1';
+import {startEditor,finishEditor,leaveEditor,guardEditor,editorState,saveRecovery,recoveryScope,recoveredEditState} from './editor-dialog.js?v=20261122-tools2';
+import {categoryOptions} from './categories.js?v=20261122-tools2';
+import {readRecords,writeRecords} from './record-transfer.js?v=20261122-tools2';
+import {cloud} from './cloud.js?v=20261122-tools2';
 export function historyEditor(getData,refresh,refreshRows=()=>{}){
  const section=document.createElement('section');section.className='record-edit-panel';section.innerHTML='<div class="record-edit-actions"><button id="history-edit-mode" class="secondary" type="button" aria-controls="body" hidden>記録を編集する</button><button id="history-add" class="primary" type="button" disabled hidden>＋ 稽古・公演記録を追加</button></div><p id="history-edit-result" class="save-feedback" role="status"></p><p id="history-edit-status" role="status">共通保存の接続を確認しています…</p>';
  (document.getElementById('history-tools')||document.querySelector('main')).append(section);
@@ -54,7 +54,9 @@ export function historyEditor(getData,refresh,refreshRows=()=>{}){
   stop=cloud.watch('history',doc=>{
    if(doc&&(!Array.isArray(doc.items)||!doc.items.every(valid))){readFailure('共通記録の形式を確認してください。');return}
    revision=doc?.revision||0;loaded=true;received=true;
-   getData().records=doc?doc.items:structuredClone(original);refresh();
+   getData().records=doc?.useBuiltInHistory
+    ?[...new Map([...structuredClone(original),...doc.items].map(record=>[record.id,record])).values()]
+    :doc?doc.items:structuredClone(original);refresh();
    feedback(canEditRole?'記録を追加・修正できます。保存すると会員の端末に反映されます。':'記録は閲覧のみです。編集権限がありません。');controls();
   },message=>readFailure('共通記録を読み込めませんでした。'+message));
  });

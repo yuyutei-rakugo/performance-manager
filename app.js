@@ -1,11 +1,11 @@
-import {startEditor,finishEditor,leaveEditor,guardEditor,editorState,saveRecovery,recoveryScope,recoveredEditState} from './editor-dialog.js?v=20261122-tools1';
-import {performerPicker,updatePerformerPickers,readPerformer,showPerformerRoster} from './performer-picker.js?v=20261122-tools1';
-import {mountMemberHome} from './member-home.js?v=20261122-tools1';
-import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261122-tools1';
-import {readCategories,saveCategories,validCategories,categoryOptions,mountCategories} from './categories.js?v=20261122-tools1';
-import {mountScheduleImport} from './schedule-import.js?v=20261122-tools1';
-import {duplicateSchedule,copyScheduleInvite,validPerformer,timeline,formatDuration,toRecord,transferRecord,readRecords,mergeRecords,mergedRecords} from './record-transfer.js?v=20261122-tools1';
-import {cloud,startCloud,mountAccount} from './cloud.js?v=20261122-tools1';
+import {startEditor,finishEditor,leaveEditor,guardEditor,editorState,saveRecovery,recoveryScope,recoveredEditState} from './editor-dialog.js?v=20261122-tools2';
+import {performerPicker,updatePerformerPickers,readPerformer,showPerformerRoster} from './performer-picker.js?v=20261122-tools2';
+import {mountMemberHome} from './member-home.js?v=20261122-tools2';
+import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261122-tools2';
+import {readCategories,saveCategories,validCategories,categoryOptions,mountCategories} from './categories.js?v=20261122-tools2';
+import {mountScheduleImport} from './schedule-import.js?v=20261122-tools2';
+import {duplicateSchedule,copyScheduleInvite,validPerformer,timeline,formatDuration,toRecord,transferRecord,readRecords,mergeRecords,mergedRecords} from './record-transfer.js?v=20261122-tools2';
+import {cloud,startCloud,mountAccount} from './cloud.js?v=20261122-tools2';
 'use strict';
 
 const key = 'yuitei.events.v1';
@@ -120,7 +120,11 @@ function card(event) {
 }
 let requestedEvent=new URLSearchParams(location.search).get('detail');
 function render() {
-  if(requestedEvent&&(!cloud.state.configured||cloudLoaded)){const id=requestedEvent;requestedEvent='';if(events.some(item=>item.id===id))queueMicrotask(()=>renderDetails(id))}
+  if(requestedEvent&&cloud.state.ready!==false&&(!cloud.state.configured||cloudLoaded)){
+    const id=requestedEvent;requestedEvent='';
+    if(events.some(item=>item.id===id&&!item.archivedAt))queueMicrotask(()=>renderDetails(id));
+    else notify('指定の公演予定は見つかりませんでした。');
+  }
   eventRecovery.render();
   $('new-event').disabled=!editable();
   const filter=document.getElementById('event-kind-filter');if(filter){const value=filter.value;filter.innerHTML='<option value="">全区分</option>'+categoryOptions(value,events.map(e=>e.kind));filter.value=value;}
@@ -375,7 +379,7 @@ $('schedule').onclick = async click => {
   }
 };
 $('list-tab').onclick = () => {tab = 'list'; render();};
-$('calendar-tab').onclick = () => {location.href = 'rehearsals.html?v=20261122-tools1';};
+$('calendar-tab').onclick = () => {location.href = 'rehearsals.html?v=20261122-tools2';};
 $('new-event').onclick = () => renderForm();
 $('data-open').onclick = () => $('data-dialog').showModal();
 guardEditor(eventDialog);
@@ -436,7 +440,7 @@ mountMemberHome();mountAccount();
 cloud.onState(state=>{
  eventRecovery.render();
  const identity=state.configured?`${state.user?.uid||''}:${state.role||''}`:'local';
- if(identity===cloudIdentity)return;cloudIdentity=identity;performerNames=[];stopCloud?.();cloudLoaded=false;cloudLoadError='';
+ if(identity===cloudIdentity){if(state.ready!==false&&requestedEvent)render();return;}cloudIdentity=identity;performerNames=[];stopCloud?.();cloudLoaded=false;cloudLoadError='';
  if(state.configured){events=[];eventDialog.close();if($('data-dialog').open)$('data-dialog').close();render();if(state.role){stopCloud=cloud.watch('events',doc=>{if(doc&&(!Array.isArray(doc.items)||!doc.items.every(validEvent))){notify('共通データの形式を確認してください。');return}events=doc?.items||[];cloudRevision=doc?.revision||0;cloudLoaded=true;cloudLoadError='';render()},message=>{cloudLoadError=message;notify(message);render()})}}
 });
 startCloud();
