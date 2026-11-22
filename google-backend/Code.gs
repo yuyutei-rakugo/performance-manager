@@ -7,7 +7,7 @@ function initializeOwner(){
  const lock=LockService.getScriptLock();lock.waitLock(20000);
  try{const props=PropertiesService.getScriptProperties();if(props.getProperty('DB_FILE_ID'))throw Error('初期設定済みです。');const pin=props.getProperty('OWNER_PIN')||'1111';checkPin_(pin);const secret=Utilities.getUuid()+Utilities.getUuid();props.setProperty('AUTH_SECRET',secret);const owner={id:'owner',name:'勇水',role:'admin',active:true,epoch:1,salt:Utilities.getUuid(),owner:true};owner.pinHash=hashPin_(owner,pin);const file=Drive.Files.create({name:'結友亭の帳面-共通データ.json',mimeType:'application/json'},Utilities.newBlob(JSON.stringify({version:1,members:[owner],shared:{},attendance:{}}),'application/json'),{fields:'id'});props.setProperty('DB_FILE_ID',file.id);props.deleteProperty('OWNER_PIN');return '勇水を最初の管理者として登録しました。'}finally{lock.releaseLock()}
 }
-function doGet(){return output_({ok:true,service:'yuyutei-members',version:1,attendanceProxy:true,rehearsalArchiveToday:true})}
+function doGet(){return output_({ok:true,service:'yuyutei-members',version:1,attendanceProxy:true,rehearsalArchiveToday:true,automaticBackup:true})}
 function doPost(event){
  const lock=LockService.getScriptLock();let locked=false;
  try{if(!event||!event.postData||event.postData.contents.length>1500000)throw Error('リクエストを確認してください。');const req=JSON.parse(event.postData.contents);if(!req||typeof req!=='object')throw Error('リクエストを確認してください。');lock.waitLock(20000);locked=true;const db=readDb_();if(req.action==='login')return output_({ok:true,...login_(db,req)});const member=authorize_(db,req.token);let data;
@@ -34,6 +34,9 @@ function doPost(event){
   db.attendance[req.id]=rows;
   writeDb_(db);data={applied:true};break;
  }
+ case 'backupList':admin_(member);data={backups:backupIndex_(),expected:digest_(JSON.stringify({shared:db.shared,attendance:db.attendance}))};break;
+ case 'backupCreate':admin_(member);createDataBackup_(db,true);data={backups:backupIndex_(),expected:digest_(JSON.stringify({shared:db.shared,attendance:db.attendance}))};break;
+ case 'backupRestore':admin_(member);data=restoreDataBackup_(db,req,member);break;
  case 'members':admin_(member);data={members:db.members.map(publicMember_)};break;
  case 'memberSave':admin_(member);data={member:saveMember_(db,member,req.member)};writeDb_(db);break;
  case 'changePin':checkPin_(req.pin);member.salt=Utilities.getUuid();member.pinHash=hashPin_(member,req.pin);member.epoch++;writeDb_(db);data={};break;
@@ -50,8 +53,9 @@ function admin_(member){if(member.role!=='admin')throw Error('管理者のみ操
 function secret_(){const s=PropertiesService.getScriptProperties().getProperty('AUTH_SECRET');if(!s)throw Error('管理者の初期設定が必要です。');return s}
 function digest_(value){return Utilities.base64EncodeWebSafe(Utilities.computeHmacSha256Signature(String(value),secret_())).replace(/=+$/,'')}
 function hashPin_(m,pin){return digest_(m.id+':'+m.salt+':'+pin)}
-function readDb_(){const id=PropertiesService.getScriptProperties().getProperty('DB_FILE_ID');if(!id)throw Error('管理者の初期設定が必要です。');const response=UrlFetchApp.fetch('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(id)+'?alt=media',{headers:{Authorization:'Bearer '+ScriptApp.getOAuthToken()},muteHttpExceptions:true});if(response.getResponseCode()!==200)throw Error('専用データを読み込めません。Googleの接続設定を確認してください。');return JSON.parse(response.getContentText('UTF-8'))}
-function writeDb_(db){const text=JSON.stringify(db);if(text.length>1500000)throw Error('保存量が増えています。バックアップして管理者に確認してください。');Drive.Files.update({},PropertiesService.getScriptProperties().getProperty('DB_FILE_ID'),Utilities.newBlob(text,'application/json'),{fields:'id'})}
+let previousBackupText_=null;
+function readDb_(){const id=PropertiesService.getScriptProperties().getProperty('DB_FILE_ID');if(!id)throw Error('管理者の初期設定が必要です。');const response=UrlFetchApp.fetch('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(id)+'?alt=media',{headers:{Authorization:'Bearer '+ScriptApp.getOAuthToken()},muteHttpExceptions:true});if(response.getResponseCode()!==200)throw Error('専用データを読み込めません。Googleの接続設定を確認してください。');const text=response.getContentText('UTF-8');const parsed=JSON.parse(text);previousBackupText_=text;return parsed}
+function writeDb_(db){const text=JSON.stringify(db);if(text.length>1500000)throw Error('保存量が増えています。バックアップして管理者に確認してください。');if(previousBackupText_)createDataBackup_(JSON.parse(previousBackupText_));Drive.Files.update({},PropertiesService.getScriptProperties().getProperty('DB_FILE_ID'),Utilities.newBlob(text,'application/json'),{fields:'id'});previousBackupText_=text}
 function output_(data){return ContentService.createTextOutput(JSON.stringify(data)).setMimeType(ContentService.MimeType.JSON)}
 function publicMember_(m){return {id:m.id,name:m.name,role:m.role,active:m.active,owner:!!m.owner,...(m.role==='admin'?{attendanceProxy:true}:{})}}
 function login_(db,req){
@@ -113,4 +117,53 @@ function importLocal_(db,req,actor){
 }
 function validCollection_(name,items){
  if(!Array.isArray(items)||items.length>500)throw Error('保存するデータを確認してください。');const ids=new Set();for(const r of items){if(!r||typeof r.id!=='string'||!r.id||ids.has(r.id)||typeof r.date!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(r.date))throw Error('日付・IDを確認してください。');ids.add(r.id);if(name==='history'){if(!['kind','occasion','note'].every(k=>typeof r[k]==='string')||!r.pieces||typeof r.pieces!=='object'||Array.isArray(r.pieces)||!Object.values(r.pieces).every(v=>typeof v==='string'))throw Error('記録の形式を確認してください。')}else{if(!['title','time','venue',name==='events'?'memo':'notes'].every(k=>typeof r[k]==='string')||!r.title.trim()||!r.venue.trim()||!(name==='events'&&r.time==='')&&!/^([01]\d|2[0-3]):[0-5]\d$/.test(r.time))throw Error('予定の形式を確認してください。');if(name==='events'&&(!Array.isArray(r.performers)||!Array.isArray(r.checklist)||!r.checklist.length||!r.checklist.every(t=>t&&typeof t.label==='string'&&t.label.trim()&&typeof t.done==='boolean')))throw Error('出演者・準備項目を確認してください。')}}
+}
+
+// Private Drive snapshots. The first changed save each JST day preserves the pre-change data.
+// Manual and pre-restore snapshots also run under the same script lock.
+function backupIndex_(){
+ const raw=PropertiesService.getScriptProperties().getProperty('DATA_BACKUPS');
+ const rows=JSON.parse(raw||'[]');
+ if(!Array.isArray(rows))throw Error('バックアップ管理情報を確認してください。');
+ return rows;
+}
+function createDataBackup_(db,force=false){
+ const props=PropertiesService.getScriptProperties(),day=Utilities.formatDate(new Date(),'Asia/Tokyo','yyyy-MM-dd');
+ let rows=backupIndex_();
+ if(!force&&props.getProperty('DATA_BACKUP_DAY')===day)return;
+ const createdAt=new Date().toISOString();
+ let file;
+ try{file=Drive.Files.create({name:'結友亭の帳面-バックアップ-'+createdAt.replace(/[:.]/g,'-')+'.json',mimeType:'application/json'},Utilities.newBlob(JSON.stringify(db),'application/json'),{fields:'id'})}
+ catch{throw Error('バックアップを作成できないため保存を中止しました。時間をおいて再試行してください。')}
+ rows=[{id:file.id,createdAt},...rows];
+ const expired=rows.slice(14);rows=rows.slice(0,14);
+ props.setProperty('DATA_BACKUPS',JSON.stringify(rows));props.setProperty('DATA_BACKUP_DAY',day);
+ // Cleanup failure must not invalidate an already confirmed snapshot.
+ for(const row of expired){try{Drive.Files.remove(row.id)}catch{}}
+ return rows[0];
+}
+function restoreDataBackup_(db,req,actor){
+ const entry=backupIndex_().find(row=>row.id===req.id);
+ if(!entry)throw Error('バックアップを選択し直してください。');
+ if(req.expected!==digest_(JSON.stringify({shared:db.shared,attendance:db.attendance})))throw Error('ほかの会員が更新しました。最新の内容を確認してからやり直してください。');
+ const response=UrlFetchApp.fetch('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(entry.id)+'?alt=media',{headers:{Authorization:'Bearer '+ScriptApp.getOAuthToken()},muteHttpExceptions:true});
+ if(response.getResponseCode()!==200)throw Error('バックアップを読み込めませんでした。');
+ const snapshot=JSON.parse(response.getContentText('UTF-8'));
+ if(snapshot.version!==1||!snapshot.shared||!snapshot.attendance||Array.isArray(snapshot.shared)||Array.isArray(snapshot.attendance))throw Error('バックアップの形式を確認してください。');
+ for(const name of Object.keys(snapshot.shared)){checkCollection_(name);validCollection_(name,snapshot.shared[name].items)}
+ for(const id of Object.keys(snapshot.attendance)){checkId_(id);for(const row of Object.values(snapshot.attendance[id]))if(!row||typeof row.stageName!=='string'||!['出席','欠席','未定','未回答'].includes(row.status))throw Error('出欠の形式を確認してください。')}
+ createDataBackup_(db,true);
+ const shared={};
+ for(const name of ['events','rehearsals','history']){
+  shared[name]={items:snapshot.shared[name]?.items||[],revision:Math.max(db.shared[name]?.revision||0,snapshot.shared[name]?.revision||0)+1,updatedBy:actor.id,updatedAt:new Date().toISOString()};
+ }
+ db.shared=shared;db.attendance=snapshot.attendance;
+ writeDb_(db);
+ return {restored:true};
+}
+
+// Owner's editor action: create an initial checkpoint without changing the database.
+function backupNow(){
+ const lock=LockService.getScriptLock();lock.waitLock(20000);
+ try{createDataBackup_(readDb_(),true);return '現在の内容をバックアップしました。'}finally{lock.releaseLock()}
 }

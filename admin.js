@@ -1,5 +1,6 @@
-import {cloud,startCloud,mountAccount} from './cloud.js?v=20261121-mode1';
-import {toRecord,readRecords,mergeRecords} from './record-transfer.js?v=20261121-mode1';
+import {cloud,startCloud,mountAccount} from './cloud.js?v=20261122-tools1';
+import {toRecord,readRecords,mergeRecords} from './record-transfer.js?v=20261122-tools1';
+let backupExpected='',backupOwner='',backupBusy=false;
 const $=id=>document.getElementById(id),status=$('admin-status');let docs={},past=[],members=[],accountGeneration=0,archiveBusy=false;
 const today=()=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Tokyo'}).format(new Date());
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -57,7 +58,41 @@ async function refreshMembers(){const generation=accountGeneration;const rows=aw
 $('member-list').onclick=e=>{const button=e.target.closest('[data-member]');if(!button)return;const m=members.find(m=>m.id===button.dataset.member),f=$('member-form');f.elements.id.value=m.id;f.elements.name.value=m.name;f.elements.role.value=m.role;f.elements.active.checked=m.active;f.elements.pin.value='';f.scrollIntoView({behavior:'smooth'})};
 $('new-member').onclick=()=>$('member-form').reset();
 $('member-form').onsubmit=async e=>{e.preventDefault();const f=e.target,b=f.querySelector('button');b.disabled=true;try{await cloud.memberSave({id:f.elements.id.value,name:f.elements.name.value.trim(),role:f.elements.role.value,active:f.elements.active.checked,pin:f.elements.pin.value});f.reset();$('member-result').textContent='会員情報を保存しました。';await refreshAfterSave(refreshMembers,$('member-result'))}catch(error){$('member-result').textContent=error.message}finally{b.disabled=false}};
-$('migrate-local').onclick=async()=>{const b=$('migrate-local');b.disabled=true;try{if(!confirm('この端末の予定・記録・出欠を共通保存へ追加しますか？'))return;const response=await fetch('./history-data.json?v=20261121-mode1');if(!response.ok)throw Error('原記録を読み込めません。');const history=await response.json(),events=JSON.parse(localStorage.getItem('yuitei.events.v1')||'[]'),rehearsals=JSON.parse(localStorage.getItem('yuitei.rehearsals.v1')||'{"items":[],"attendance":{}}');await cloud.importLocal({documents:{events,rehearsals:rehearsals.items,history:[...new Map([...history.records,...readRecords()].map(record=>[record.id,record])).values()]},attendance:rehearsals.attendance});$('migrate-result').textContent='共通保存へ追加しました。別のスマホでも確認してください。';await refreshAfterSave(refresh,$('migrate-result'))}catch(e){$('migrate-result').textContent=e.message}finally{b.disabled=false}};
+$('migrate-local').onclick=async()=>{const b=$('migrate-local');b.disabled=true;try{if(!confirm('この端末の予定・記録・出欠を共通保存へ追加しますか？'))return;const response=await fetch('./history-data.json?v=20261122-tools1');if(!response.ok)throw Error('原記録を読み込めません。');const history=await response.json(),events=JSON.parse(localStorage.getItem('yuitei.events.v1')||'[]'),rehearsals=JSON.parse(localStorage.getItem('yuitei.rehearsals.v1')||'{"items":[],"attendance":{}}');await cloud.importLocal({documents:{events,rehearsals:rehearsals.items,history:[...new Map([...history.records,...readRecords()].map(record=>[record.id,record])).values()]},attendance:rehearsals.attendance});$('migrate-result').textContent='共通保存へ追加しました。別のスマホでも確認してください。';await refreshAfterSave(refresh,$('migrate-result'))}catch(e){$('migrate-result').textContent=e.message}finally{b.disabled=false}};
 $('pin-form').onsubmit=async e=>{e.preventDefault();try{await cloud.changePin(e.target.elements.pin.value);e.target.reset();e.target.querySelector('p').textContent='変更しました。新しい暗証番号でログインしてください。'}catch(error){e.target.querySelector('p').textContent=error.message}};
 $('data-open').onclick=()=>$('data-dialog').showModal();$('data-close').onclick=()=>$('data-dialog').close();
-cloud.onState(s=>{accountGeneration++;docs={};past=[];members=[];$('past-items').replaceChildren();$('member-list').replaceChildren();$('member-form').reset();$('pin-form').reset();if($('data-dialog').open)$('data-dialog').close();const ready=s.configured&&s.provider==='apps-script';$('admin-tools').hidden=s.ready===false||s.configured&&(!ready||s.role!=='admin');$('member-tools').hidden=!ready||s.role!=='admin';$('pin-form').querySelector('button').disabled=!ready||!s.user;if(s.ready===false)return;if(!s.configured){status.textContent='現在は端末内保存です。下で選んだ予定を、この端末の記録へ移せます。共通保存と会員・管理者の認証はまだ設定されていません。';refresh().catch(e=>status.textContent=e.message)}else if(!ready)status.textContent='この接続では管理者機能を利用できません。';else if(!s.user)status.textContent='登録名と暗証番号でログインしてください。';else if(s.role!=='admin')status.textContent='会員としてログインしています。管理者の操作は利用できません。';else{status.textContent=s.stageName+'：管理者としてログイン中';Promise.all([refresh(),refreshMembers()]).catch(e=>status.textContent=e.message)}});mountAccount();startCloud();
+cloud.onState(s=>{backupOwner=s.user?.uid||'';backupExpected='';$('backup-panel').hidden=!(s.configured&&s.provider==='apps-script'&&s.role==='admin');$('backup-choice').replaceChildren(new Option('一覧を確認してください',''));$('backup-restore').disabled=true;$('backup-status').textContent='';accountGeneration++;docs={};past=[];members=[];$('past-items').replaceChildren();$('member-list').replaceChildren();$('member-form').reset();$('pin-form').reset();if($('data-dialog').open)$('data-dialog').close();const ready=s.configured&&s.provider==='apps-script';$('admin-tools').hidden=s.ready===false||s.configured&&(!ready||s.role!=='admin');$('member-tools').hidden=!ready||s.role!=='admin';$('pin-form').querySelector('button').disabled=!ready||!s.user;if(s.ready===false)return;if(!s.configured){status.textContent='現在は端末内保存です。下で選んだ予定を、この端末の記録へ移せます。共通保存と会員・管理者の認証はまだ設定されていません。';refresh().catch(e=>status.textContent=e.message)}else if(!ready)status.textContent='この接続では管理者機能を利用できません。';else if(!s.user)status.textContent='登録名と暗証番号でログインしてください。';else if(s.role!=='admin')status.textContent='会員としてログインしています。管理者の操作は利用できません。';else{status.textContent=s.stageName+'：管理者としてログイン中';Promise.all([refresh(),refreshMembers()]).catch(e=>status.textContent=e.message)}});mountAccount();startCloud();
+
+function backupAllowed(){return cloud.state.configured&&cloud.state.provider==='apps-script'&&cloud.state.role==='admin'}
+function showBackups(result){
+ backupExpected=result.expected;
+ $('backup-choice').replaceChildren(new Option('日時を選んでください',''),...result.backups.map(row=>new Option(new Date(row.createdAt).toLocaleString('ja-JP',{timeZone:'Asia/Tokyo'}),row.id)));
+ $('backup-restore').disabled=true;
+ return result.backups.length;
+}
+$('backup-choice').onchange=()=>$('backup-restore').disabled=backupBusy||!$('backup-choice').value||!backupExpected;
+async function backupAction(action){
+ if(backupBusy||!backupAllowed())return;
+ const owner=backupOwner;backupBusy=true;
+ for(const id of ['backup-list','backup-now','backup-restore','backup-choice'])$(id).disabled=true;
+ $('backup-status').textContent='処理中…';
+ try{
+  if(action==='restore'){
+   const id=$('backup-choice').value,expected=backupExpected;
+   if(!id||!expected)return;
+   const label=$('backup-choice').selectedOptions[0].textContent;
+   if(!confirm(label+' の公演・稽古・記録・出欠に戻します。全会員に反映されます。現在の内容もバックアップします。実行しますか？')){$('backup-status').textContent='復元を中止しました。';return}
+   await cloud.restoreBackup(id,expected);
+   if(owner!==backupOwner)return;
+   $('backup-status').textContent='復元しました。他の画面・端末も開き直して確認してください。';
+   await refresh();backupExpected='';
+  }else{
+   const result=await (action==='create'?cloud.createBackup():cloud.backups());
+   if(owner!==backupOwner)return;
+   const count=showBackups(result);
+   $('backup-status').textContent=action==='create'?'今の内容をバックアップしました。':count+'件のバックアップがあります。';
+  }
+ }catch(error){if(owner===backupOwner)$('backup-status').textContent='処理できませんでした。'+error.message+' 新機能が未対応の場合はApps Scriptを更新してください。'}
+ finally{backupBusy=false;for(const id of ['backup-list','backup-now','backup-choice'])$(id).disabled=false;$('backup-restore').disabled=!backupExpected||!$('backup-choice').value}
+}
+$('backup-list').onclick=()=>backupAction('list');$('backup-now').onclick=()=>backupAction('create');$('backup-restore').onclick=()=>backupAction('restore');

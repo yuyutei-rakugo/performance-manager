@@ -1,4 +1,4 @@
-import {cloud} from './cloud.js?v=20261121-mode1';
+import {cloud} from './cloud.js?v=20261122-tools1';
 export const historyKey='yuitei.history.v1';
 export const validRecord=r=>r&&typeof r.id==='string'&&typeof r.date==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(r.date)&&typeof r.kind==='string'&&typeof r.occasion==='string'&&typeof r.note==='string'&&r.pieces&&typeof r.pieces==='object'&&!Array.isArray(r.pieces)&&Object.values(r.pieces).every(v=>typeof v==='string');
 export function readRecords(){const raw=JSON.parse(localStorage.getItem(historyKey)||'{"version":1,"items":[]}');if(raw.version!==1||!Array.isArray(raw.items)||!raw.items.every(validRecord))throw Error('保存済みの記録を読み込めません。上書きを停止しています。');return raw.items;}
@@ -37,3 +37,24 @@ export function toRecord(type,source,names=[],responses={}){const pieces=Object.
  return {id:`transferred:${type}:${source.id}`,date:source.date,kind:type==='event'?(source.kind||'その他公演'):(source.title==='師匠稽古'?'師匠稽古':source.title==='自主稽古'?'自主稽古':source.title==='通常稽古'?'通常稽古':'その他'),occasion:type==='event'?source.title:rehearsalTitle(source),pieces,note:[`会場：${source.venue}`,`開始：${source.time||'時間未定'}`,source.memo||source.notes||'',...lines].filter(Boolean).join('\n'),sourceType:type,sourceId:source.id,sourceData:structuredClone(source),attendance:type==='rehearsal'?structuredClone(responses):{},transferredAt:new Date().toISOString()};
 }
 export async function transferRecord(record){if(!validRecord(record))throw Error('記録の形式を確認してください。');if(!cloud.state.configured){mergeRecords([record]);return}if(!['admin','editor'].includes(cloud.state.role))throw Error('記録を移すには編集権限が必要です。');let stop;const doc=await new Promise((resolve,reject)=>{stop=cloud.watch('history',resolve,reject)});stop?.();const items=doc?.items||[];if(!items.every(validRecord))throw Error('共通記録の形式を確認してください。');const map=new Map(items.map(r=>[r.id,r]));map.set(record.id,record);if(map.size>500)throw Error('記録は500件までです。');await cloud.save('history',{items:[...map.values()]},doc?.revision||0);}
+
+export function duplicateSchedule(type,source){
+ const copy={title:source.title,date:'',time:source.time||'',venue:source.venue};
+ if(type==='event')Object.assign(copy,{kind:source.kind||'その他公演',memo:source.memo||'',performers:[],checklist:(source.checklist||[]).map(task=>({label:task.label,done:false,assignees:[],dueDate:''}))});
+ else Object.assign(copy,{otherContent:source.otherContent||'',notes:source.notes||'',practices:[]});
+ return copy;
+}
+export function scheduleInvite(type,source){
+ const url=new URL(type==='event'?'./':'rehearsals.html',location.href);
+ url.search='';url.hash='';url.searchParams.set('detail',source.id);
+ const day=/^\d{4}-\d{2}-\d{2}$/.test(source.date)?new Intl.DateTimeFormat('ja-JP',{timeZone:'Asia/Tokyo',year:'numeric',month:'long',day:'numeric',weekday:'short'}).format(new Date(source.date+'T12:00:00+09:00')):source.date;
+ return ['【結友亭 '+(type==='event'?'公演':'稽古')+'のご案内】',type==='event'?source.title:rehearsalTitle(source),'日時：'+day+' '+(source.time||'時間未定'),'場所：'+source.venue,type==='rehearsal'?'出欠は「帳面」からお願いします。':'詳しくは「帳面」でご確認ください。',url.href].filter(Boolean).join('\n');
+}
+export async function copyScheduleInvite(type,source,report){
+ const text=scheduleInvite(type,source);
+ try{if(!navigator.clipboard?.writeText)throw Error();await navigator.clipboard.writeText(text);report('案内文をコピーしました。LINEに貼り付けて送ってください。')}
+ catch{
+  const prompt=document.createElement('dialog');prompt.innerHTML='<div class="dialog-body"><h2>LINE案内文</h2><p>案内文を長押し、または全選択してコピーしてください。</p><textarea aria-label="LINE案内文" rows="10" readonly></textarea><button type="button">閉じる</button></div>';
+  prompt.querySelector('textarea').value=text;prompt.querySelector('button').onclick=()=>prompt.close();prompt.addEventListener('close',()=>prompt.remove(),{once:true});document.body.append(prompt);prompt.showModal();prompt.querySelector('textarea').select();
+ }
+}

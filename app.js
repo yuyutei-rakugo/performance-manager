@@ -1,11 +1,11 @@
-import {startEditor,finishEditor,leaveEditor,guardEditor,editorState,saveRecovery,recoveryScope,recoveredEditState} from './editor-dialog.js?v=20261121-mode1';
-import {performerPicker,updatePerformerPickers,readPerformer,showPerformerRoster} from './performer-picker.js?v=20261121-mode1';
-import {mountMemberHome} from './member-home.js?v=20261121-mode1';
-import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261121-mode1';
-import {readCategories,saveCategories,validCategories,categoryOptions,mountCategories} from './categories.js?v=20261121-mode1';
-import {mountScheduleImport} from './schedule-import.js?v=20261121-mode1';
-import {validPerformer,timeline,formatDuration,toRecord,transferRecord,readRecords,mergeRecords,mergedRecords} from './record-transfer.js?v=20261121-mode1';
-import {cloud,startCloud,mountAccount} from './cloud.js?v=20261121-mode1';
+import {startEditor,finishEditor,leaveEditor,guardEditor,editorState,saveRecovery,recoveryScope,recoveredEditState} from './editor-dialog.js?v=20261122-tools1';
+import {performerPicker,updatePerformerPickers,readPerformer,showPerformerRoster} from './performer-picker.js?v=20261122-tools1';
+import {mountMemberHome} from './member-home.js?v=20261122-tools1';
+import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261122-tools1';
+import {readCategories,saveCategories,validCategories,categoryOptions,mountCategories} from './categories.js?v=20261122-tools1';
+import {mountScheduleImport} from './schedule-import.js?v=20261122-tools1';
+import {duplicateSchedule,copyScheduleInvite,validPerformer,timeline,formatDuration,toRecord,transferRecord,readRecords,mergeRecords,mergedRecords} from './record-transfer.js?v=20261122-tools1';
+import {cloud,startCloud,mountAccount} from './cloud.js?v=20261122-tools1';
 'use strict';
 
 const key = 'yuitei.events.v1';
@@ -118,7 +118,9 @@ function card(event) {
   const [year, mon, day] = event.date.split('-');
   return `<article class="event-card"><div class="date-badge" aria-hidden="true"><small>${Number(mon)}月</small><strong>${Number(day)}</strong></div><div><h3>${esc(event.title)}</h3><div class="meta"><span>${year}/${mon}/${day} ${esc(event.time||'時間未定')}</span><span>＠ ${esc(event.venue)}</span></div></div>${progressMarkup(event)}<div class="event-actions"><button class="secondary" data-event="${esc(event.id)}" aria-label="${esc(event.title)}の詳細">詳細 ›</button></div></article>`;
 }
+let requestedEvent=new URLSearchParams(location.search).get('detail');
 function render() {
+  if(requestedEvent&&(!cloud.state.configured||cloudLoaded)){const id=requestedEvent;requestedEvent='';if(events.some(item=>item.id===id))queueMicrotask(()=>renderDetails(id))}
   eventRecovery.render();
   $('new-event').disabled=!editable();
   const filter=document.getElementById('event-kind-filter');if(filter){const value=filter.value;filter.innerHTML='<option value="">全区分</option>'+categoryOptions(value,events.map(e=>e.kind));filter.value=value;}
@@ -160,8 +162,8 @@ function renderDetails(id,message='') {
   const program=rows.length?`<div class="program-scroll"><table class="program-table event-program-table"><colgroup><col class="program-order"><col class="program-performer"><col><col class="program-duration"><col class="program-end"></colgroup><thead><tr><th>順</th><th>演者・仲入り</th><th>ネタ・演し物</th><th class="duration-value">持ち時間</th><th>終了予定</th></tr></thead><tbody>${rows.map((p,i)=>`<tr><td>${i+1}</td><td>${esc(p.type==='break'?'仲入り':p.stageName)}</td><td>${esc(p.piece)}</td><td class="duration-value">${formatDuration(Number.isFinite(p.minutes)?p.minutes*60:null)}</td><td>${p.end}</td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">出演者は未登録です。</p>';
 
   eventDialog.innerHTML = `<div class="dialog-body"><div class="dialog-head"><h2 id="event-heading">${esc(event.title)}</h2><button type="button" data-close="event-dialog" aria-label="閉じる">×</button></div>
-    <p>${dateLabel(event.date)} ${esc(event.time||'時間未定')}<br>会場　${esc(event.venue)}<br>区分　${esc(event.kind||'その他公演')}</p>${editable()?'<div class="form-actions"><button class="primary" data-edit>編集する</button></div>':''}<p class="save-feedback" role="status">${esc(message)}</p>
-    <section class="block" id="event-program"><h3>出演順・演目</h3>${program}${rows.length?'<button type="button" class="secondary" id="print-program">番組表を印刷</button>':''}</section>
+    <p>${dateLabel(event.date)} ${esc(event.time||'時間未定')}<br>会場　${esc(event.venue)}<br>区分　${esc(event.kind||'その他公演')}</p>${editable()?'<div class="form-actions"><button class="primary" data-edit>編集する</button><button type="button" class="secondary" data-duplicate>予定を複製</button></div>':''}<p class="save-feedback" role="status">${esc(message)}</p>
+    <div class="form-actions"><button type="button" class="secondary" data-copy-invite>LINE案内文をコピー</button></div><section class="block" id="event-program"><h3>出演順・演目</h3>${program}${rows.length?'<button type="button" class="secondary" id="print-program">番組表を印刷</button>':''}</section>
     <section class="block"><h3>準備チェックリスト</h3>${progressMarkup(event)}${event.checklist.map(item => `<div class="check-row"><span>${item.done?'完了':'未完了'}</span><strong>${esc(item.label)}</strong><small>担当：${esc((item.assignees||[]).join('・')||'未設定')} ／ 完了予定：${esc(item.dueDate||'未設定')}</small></div>`).join('')}</section>
     <section class="block"><h3>メモ</h3><p class="memo">${esc(event.memo) || 'メモはありません。'}</p></section><section class="block" hidden><button type="button" class="primary" id="transfer-event" ${editable()?'':'disabled'}>${event.archivedAt?'記録を更新する':'終了して記録へ移す'}</button><p class="muted">終了した内容を記録に保存します。元データは転記済みの一覧に残ります。</p>${event.archivedAt?'<button type="button" class="secondary" id="unarchive-event">公演一覧に戻す</button>':''}</section></div>`;
   if($('print-program'))$('print-program').onclick=()=>{
@@ -172,6 +174,8 @@ function renderDetails(id,message='') {
   $('transfer-event').onclick=async()=>{if(cloud.state.role!=='admin'||event.date>=today()||!confirm('終了した公演を稽古・公演記録へ移しますか？同じ公演は重複せず更新されます。'))return;try{await transferRecord(toRecord('event',event,memberNames));if(await save(events.map(e=>e.id===id?{...e,archivedAt:new Date().toISOString()}:e))){eventDialog.close();notify('稽古・公演記録へ移しました。')}else notify('記録への保存は完了しましたが、転記済み表示を保存できませんでした。再実行しても重複しません。')}catch(e){notify(e.message)}};
   if($('unarchive-event'))$('unarchive-event').onclick=async()=>{if(await save(events.map(e=>e.id===id?{...e,archivedAt:null}:e))){eventDialog.close();notify('公演一覧に戻しました。転記した記録は残しています。')}};
   eventDialog.querySelector('[data-edit]')?.addEventListener('click',()=>renderForm(events.find(item=>item.id===id)));
+  eventDialog.querySelector('[data-copy-invite]').onclick=()=>copyScheduleInvite('event',event,notify);
+  eventDialog.querySelector('[data-duplicate]')?.addEventListener('click',()=>{const value=duplicateSchedule('event',event);renderForm(null,{value,duplicated:true});notify('日時を確認して保存してください。演目と出欠は引き継ぎません。')});
   showEvent();
 }
 
@@ -296,7 +300,8 @@ function renderForm(existing,recovery) {
   $('add-break').onclick=()=>{list.append(performerRow({type:'break',name:'',stageName:'仲入り',piece:'休憩',minutes:10}));renumber()};
   $('cancel-edit').onclick = () => leaveEditor(eventDialog,()=>existing ? renderDetails(existing.id) : eventDialog.close());
   startEditor(eventDialog,$('event-form'));
-  const canRetry=recoveredEditState($('event-form'),recovery,existing);
+  const canRetry=recovery?.duplicated?true:recoveredEditState($('event-form'),recovery,existing);
+  if(recovery?.duplicated)editorState($('event-form'),'複製した予定です。開催日を入力して保存してください。');
   $('event-form').onsubmit = async submit => {
     submit.preventDefault();
     if(saving||!canRetry)return;
@@ -370,7 +375,7 @@ $('schedule').onclick = async click => {
   }
 };
 $('list-tab').onclick = () => {tab = 'list'; render();};
-$('calendar-tab').onclick = () => {location.href = 'rehearsals.html?v=20261121-mode1';};
+$('calendar-tab').onclick = () => {location.href = 'rehearsals.html?v=20261122-tools1';};
 $('new-event').onclick = () => renderForm();
 $('data-open').onclick = () => $('data-dialog').showModal();
 guardEditor(eventDialog);
