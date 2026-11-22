@@ -1,5 +1,5 @@
-import {cloud,startCloud,mountAccount} from './cloud.js?v=20261122-checklist2';
-import {toRecord,readRecords,mergeRecords} from './record-transfer.js?v=20261122-checklist2';
+import {cloud,startCloud,mountAccount} from './cloud.js?v=20261122-workflow1';
+import {toRecord,readRecords,mergeRecords} from './record-transfer.js?v=20261122-workflow1';
 let backupExpected='',backupOwner='',backupBusy=false;
 const $=id=>document.getElementById(id),status=$('admin-status');let docs={},past=[],members=[],accountGeneration=0,archiveBusy=false;
 const today=()=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Tokyo'}).format(new Date());
@@ -54,14 +54,42 @@ $('archive-selected').onclick=async()=>{
  finally{archiveBusy=false;button.disabled=!document.querySelector('[data-past]:checked')}
 };
 
-async function refreshMembers(){const generation=accountGeneration;const rows=await cloud.members();if(generation!==accountGeneration)return;members=rows;$('member-list').innerHTML=members.map(m=>`<div class="admin-member"><span>${esc(m.name)} ／ ${{admin:'管理者',editor:'編集担当',viewer:'会員'}[m.role]}${m.active?'':'（停止中）'}</span>${m.owner?'':`<button type="button" data-member="${esc(m.id)}">編集</button>`}</div>`).join('');$('member-form').elements.role.querySelector('[value="admin"]').disabled=!cloud.state.owner;}
-$('member-list').onclick=e=>{const button=e.target.closest('[data-member]');if(!button)return;const m=members.find(m=>m.id===button.dataset.member),f=$('member-form');f.elements.id.value=m.id;f.elements.name.value=m.name;f.elements.role.value=m.role;f.elements.active.checked=m.active;f.elements.pin.value='';f.scrollIntoView({behavior:'smooth'})};
-$('new-member').onclick=()=>$('member-form').reset();
-$('member-form').onsubmit=async e=>{e.preventDefault();const f=e.target,b=f.querySelector('button');b.disabled=true;try{await cloud.memberSave({id:f.elements.id.value,name:f.elements.name.value.trim(),role:f.elements.role.value,active:f.elements.active.checked,pin:f.elements.pin.value});f.reset();$('member-result').textContent='会員情報を保存しました。';await refreshAfterSave(refreshMembers,$('member-result'))}catch(error){$('member-result').textContent=error.message}finally{b.disabled=false}};
-$('migrate-local').onclick=async()=>{const b=$('migrate-local');b.disabled=true;try{if(!confirm('この端末の予定・記録・出欠を共通保存へ追加しますか？'))return;const response=await fetch('./history-data.json?v=20261122-checklist2');if(!response.ok)throw Error('原記録を読み込めません。');const history=await response.json(),events=JSON.parse(localStorage.getItem('yuitei.events.v1')||'[]'),rehearsals=JSON.parse(localStorage.getItem('yuitei.rehearsals.v1')||'{"items":[],"attendance":{}}');await cloud.importLocal({documents:{events,rehearsals:rehearsals.items,history:[...new Map([...history.records,...readRecords()].map(record=>[record.id,record])).values()]},attendance:rehearsals.attendance});$('migrate-result').textContent='共通保存へ追加しました。別のスマホでも確認してください。';await refreshAfterSave(refresh,$('migrate-result'))}catch(e){$('migrate-result').textContent=e.message}finally{b.disabled=false}};
-$('pin-form').onsubmit=async e=>{e.preventDefault();try{await cloud.changePin(e.target.elements.pin.value);e.target.reset();e.target.querySelector('p').textContent='変更しました。新しい暗証番号でログインしてください。'}catch(error){e.target.querySelector('p').textContent=error.message}};
+async function refreshMembers(){const generation=accountGeneration;const rows=await cloud.members();if(generation!==accountGeneration)return;members=rows;$('member-list').innerHTML=members.map(m=>`<div class="admin-member"><span>${esc(m.name)} ／ ${{admin:'管理者',editor:'編集担当',viewer:'会員'}[m.role]}${m.active?'':'（停止中）'}</span>${m.owner?'':`<button type="button" data-member="${esc(m.id)}">編集する</button>`}</div>`).join('');$('member-form').elements.role.querySelector('[value="admin"]').disabled=!cloud.state.owner;}
+let memberDirty=false,memberBusy=false;
+function leaveMember(){
+ if(memberBusy){$('member-result').textContent='保存中です。結果が出るまでお待ちください。';return false}
+ if(memberDirty&&!confirm('変更が保存されていません。変更を破棄しますか？'))return false;
+ return true;
+}
+function openMember(member){
+ if(!leaveMember())return;
+ const f=$('member-form');f.reset();
+ if(member){f.elements.id.value=member.id;f.elements.name.value=member.name;f.elements.role.value=member.role;f.elements.active.checked=member.active}
+ f.elements.pin.value='';memberDirty=false;f.hidden=false;$('member-feedback').textContent='';
+ $('member-result').textContent='編集中';f.scrollIntoView({behavior:'smooth'});
+}
+$('member-list').onclick=e=>{const button=e.target.closest('[data-member]');if(!button)return;const m=members.find(m=>m.id===button.dataset.member);if(m)openMember(m)};
+$('new-member').onclick=()=>openMember(null);
+$('cancel-member').onclick=()=>{if(leaveMember()){$('member-form').reset();$('member-form').hidden=true;memberDirty=false}};
+$('member-form').addEventListener('input',()=>{memberDirty=true;$('member-result').textContent='未保存'});
+$('member-form').addEventListener('change',()=>{memberDirty=true;$('member-result').textContent='未保存'});
+window.addEventListener('beforeunload',event=>{if(memberDirty||memberBusy){event.preventDefault();event.returnValue=''}});
+$('member-form').onsubmit=async e=>{
+ e.preventDefault();if(memberBusy)return;
+ const f=e.target,b=f.querySelector('button[type=submit]'),generation=accountGeneration;
+ memberBusy=true;b.disabled=true;$('member-result').textContent='保存中…';
+ try{
+  await cloud.memberSave({id:f.elements.id.value,name:f.elements.name.value.trim(),role:f.elements.role.value,active:f.elements.active.checked,pin:f.elements.pin.value});
+  if(generation!==accountGeneration)return;
+  f.reset();memberDirty=false;f.hidden=true;$('member-result').textContent='保存しました。';$('member-feedback').textContent='保存しました。';
+  await refreshAfterSave(refreshMembers,$('member-feedback'));
+ }catch(error){if(generation===accountGeneration)$('member-result').textContent='保存できませんでした。'+error.message+' 入力はそのままです。'}
+ finally{memberBusy=false;b.disabled=false}
+};
+$('migrate-local').onclick=async()=>{const b=$('migrate-local');b.disabled=true;try{if(!confirm('この端末の予定・記録・出欠を共通保存へ追加しますか？'))return;const response=await fetch('./history-data.json?v=20261122-workflow1');if(!response.ok)throw Error('原記録を読み込めません。');const history=await response.json(),events=JSON.parse(localStorage.getItem('yuitei.events.v1')||'[]'),rehearsals=JSON.parse(localStorage.getItem('yuitei.rehearsals.v1')||'{"items":[],"attendance":{}}');await cloud.importLocal({documents:{events,rehearsals:rehearsals.items,history:[...new Map([...history.records,...readRecords()].map(record=>[record.id,record])).values()]},attendance:rehearsals.attendance});$('migrate-result').textContent='共通保存へ追加しました。別のスマホでも確認してください。';await refreshAfterSave(refresh,$('migrate-result'))}catch(e){$('migrate-result').textContent=e.message}finally{b.disabled=false}};
+$('pin-form').onsubmit=async e=>{e.preventDefault();const f=e.target,b=f.querySelector('button');if(b.disabled)return;b.disabled=true;f.querySelector('p').textContent='保存中…';try{await cloud.changePin(f.elements.pin.value);f.reset();f.querySelector('p').textContent='保存しました。新しい番号でログインしてください。'}catch(error){f.querySelector('p').textContent='保存できませんでした。'+error.message}finally{b.disabled=false}};
 $('data-open').onclick=()=>$('data-dialog').showModal();$('data-close').onclick=()=>$('data-dialog').close();
-cloud.onState(s=>{backupOwner=s.user?.uid||'';backupExpected='';$('backup-panel').hidden=!(s.configured&&s.provider==='apps-script'&&s.role==='admin');$('backup-choice').replaceChildren(new Option('一覧を確認してください',''));$('backup-restore').disabled=true;$('backup-status').textContent='';accountGeneration++;docs={};past=[];members=[];$('past-items').replaceChildren();$('member-list').replaceChildren();$('member-form').reset();$('pin-form').reset();if($('data-dialog').open)$('data-dialog').close();const ready=s.configured&&s.provider==='apps-script';$('admin-tools').hidden=s.ready===false||s.configured&&(!ready||s.role!=='admin');$('member-tools').hidden=!ready||s.role!=='admin';$('pin-form').querySelector('button').disabled=!ready||!s.user;if(s.ready===false)return;if(!s.configured){status.textContent='現在は端末内保存です。下で選んだ予定を、この端末の記録へ移せます。共通保存と会員・管理者の認証はまだ設定されていません。';refresh().catch(e=>status.textContent=e.message)}else if(!ready)status.textContent='この接続では管理者機能を利用できません。';else if(!s.user)status.textContent='登録名と暗証番号でログインしてください。';else if(s.role!=='admin')status.textContent='会員としてログインしています。管理者の操作は利用できません。';else{status.textContent=s.stageName+'：管理者としてログイン中';Promise.all([refresh(),refreshMembers()]).catch(e=>status.textContent=e.message)}});mountAccount();startCloud();
+cloud.onState(s=>{backupOwner=s.user?.uid||'';backupExpected='';$('backup-panel').hidden=!(s.configured&&s.provider==='apps-script'&&s.role==='admin');$('backup-choice').replaceChildren(new Option('一覧を確認してください',''));$('backup-restore').disabled=true;$('backup-status').textContent='';accountGeneration++;memberDirty=false;$('member-form').hidden=true;$('member-feedback').textContent='';docs={};past=[];members=[];$('past-items').replaceChildren();$('member-list').replaceChildren();$('member-form').reset();$('pin-form').reset();if($('data-dialog').open)$('data-dialog').close();const ready=s.configured&&s.provider==='apps-script';$('admin-tools').hidden=s.ready===false||s.configured&&(!ready||s.role!=='admin');$('member-tools').hidden=!ready||s.role!=='admin';$('pin-form').querySelector('button').disabled=!ready||!s.user;if(s.ready===false)return;if(!s.configured){status.textContent='現在は端末内保存です。下で選んだ予定を、この端末の記録へ移せます。共通保存と会員・管理者の認証はまだ設定されていません。';refresh().catch(e=>status.textContent=e.message)}else if(!ready)status.textContent='この接続では管理者機能を利用できません。';else if(!s.user)status.textContent='登録名と暗証番号でログインしてください。';else if(s.role!=='admin')status.textContent='会員としてログインしています。管理者の操作は利用できません。';else{status.textContent=s.stageName+'：管理者としてログイン中';Promise.all([refresh(),refreshMembers()]).catch(e=>status.textContent=e.message)}});mountAccount();startCloud();
 
 function backupAllowed(){return cloud.state.configured&&cloud.state.provider==='apps-script'&&cloud.state.role==='admin'}
 function showBackups(result){

@@ -1,0 +1,27 @@
+const {JSDOM}=require('jsdom'),fs=require('node:fs'),assert=require('node:assert/strict');
+const clean=file=>fs.readFileSync(file,'utf8').replace(/^import .*;\n/gm,'').replace(/export /g,'').replace(/await applyConfirmedSchedule\(\)/g,'void 0');
+const tick=()=>new Promise(r=>setImmediate(r));
+(async()=>{
+ const w=new JSDOM(fs.readFileSync('index.html','utf8'),{url:'https://example.test/',runScripts:'outside-only'}).window;
+ w.structuredClone=structuredClone;w.confirm=()=>true;w.setTimeout=()=>0;
+ w.mountMemberHome=w.mountAccount=w.startCloud=()=>{};
+ w.cloud={state:{configured:false,ready:true},onState(fn){fn(this.state)}};
+ w.HTMLDialogElement.prototype.showModal=function(){this.open=true};w.HTMLDialogElement.prototype.close=function(){this.open=false};
+ const source={id:'tool-fixture',title:'定期落語会',kind:'定期落語会',date:'2099-01-01',time:'14:00',venue:'和室',memo:'管理用',performers:[],checklist:[{label:'会場予約',done:true,assignees:['勇水'],dueDate:'2098-12-01'},{label:'広報申込み',done:false,excluded:true,assignees:['勇水'],dueDate:''},{label:'番組表',done:false,assignees:['勇水'],dueDate:''}]};
+ w.localStorage.setItem('yuitei.events.v1',JSON.stringify([source]));w.fetch=async()=>({ok:true,json:async()=>({names:['勇水','ぐう'],records:[]})});
+ w.eval(['editor-dialog.js','categories.js','schedule-import.js','record-transfer.js','performer-picker.js','app.js'].map(clean).join('\n'));await tick();
+ const original=structuredClone(source);assert.equal(w.assignedPreparation([source],'勇水','2098-01-01').length,1);assert.equal(w.assignedPreparation([source],'ぐう','2098-01-01').length,0);assert.equal(w.assignedPreparation([{...source,archivedAt:'yes'}],'勇水','2098-01-01').length,0);
+ w.document.querySelector('[data-event]').click();w.document.querySelector('[data-edit]').click();
+ let form=w.document.querySelector('#event-form');assert.match(form.querySelector('[data-editor-status]').textContent,/編集中/);
+ form.elements.venue.value='大広間';form.elements.venue.dispatchEvent(new w.Event('input',{bubbles:true}));assert.match(form.querySelector('[data-editor-status]').textContent,/未保存/);
+ form.querySelector('[data-template-name]').value='定期落語会用';form.querySelector('[data-template-create]').click();assert(!JSON.parse(w.localStorage.getItem('yuitei.events.v1'))[0].preparationTemplate);
+ await form.onsubmit({preventDefault(){},currentTarget:form});
+ let saved=JSON.parse(w.localStorage.getItem('yuitei.events.v1'))[0];assert.equal(saved.preparationTemplate.name,'定期落語会用');assert.deepEqual(saved.preparationTemplate.labels,source.checklist.map(t=>t.label));assert.deepEqual(saved.checklist.map(t=>[t.label,t.done,t.excluded||false,t.dueDate,t.assignees]),source.checklist.map(t=>[t.label,t.done,t.excluded||false,t.dueDate,t.assignees]));assert.deepEqual(saved.scheduleChange.fields,['会場']);assert.match(w.document.querySelector('#event-dialog').textContent,/変更あり：会場/);
+ const at=new Date('2026-11-22T00:00:00Z');const update=w.scheduleChange(source,{...source,date:'2099-02-02',time:'15:00',venue:'別会場'},at);assert.equal(update.fields.join(','),'日時,会場');assert.match(w.scheduleChangeBadge({scheduleChange:update},s=>s,at.getTime()),/変更あり/);assert.equal(w.scheduleChangeBadge({scheduleChange:update},s=>s,at.getTime()+8*86400000),'');assert.equal(w.scheduleChangeBadge({scheduleChange:{at:'bad',fields:['会場']}},s=>s),'');assert.equal(w.scheduleChange(saved,{...saved,memo:'別メモ'}).at,saved.scheduleChange.at);
+ const second={...saved,preparationTemplate:{...saved.preparationTemplate,updatedAt:'2099-01-01T00:00:00Z',labels:['新版']}};
+ assert.equal(w.preparationTemplates([saved,second]).length,1);assert.equal(w.preparationTemplates([saved,second])[0].labels[0],'新版');assert.equal(w.preparationTemplates([{preparationTemplate:{name:'不正',labels:['項目'],updatedAt:'bad'}}]).length,0);
+ w.document.querySelector('[data-edit]').click();form=w.document.querySelector('#event-form');form.querySelector('[data-template-choice]').value='0';form.querySelector('[data-template-apply]').click();assert.equal(form.querySelectorAll('[data-done]:checked,[data-excluded]:checked,[data-owner]:checked').length,0);assert([...form.querySelectorAll('[data-due]')].every(el=>el.value===''));assert.equal(form.elements.venue.value,'大広間');await form.onsubmit({preventDefault(){},currentTarget:form});
+ saved=JSON.parse(w.localStorage.getItem('yuitei.events.v1'))[0];assert.equal(saved.checklist.length,3);assert(saved.checklist.every(t=>!t.done&&!t.excluded&&!t.dueDate&&!t.assignees.length));assert.deepEqual(source,original);
+ w.document.querySelector('[data-edit]').click();form=w.document.querySelector('#event-form');form.elements.venue.value='破棄する会場';form.elements.venue.dispatchEvent(new w.Event('input',{bubbles:true}));w.document.querySelector('#cancel-edit').click();assert(w.document.querySelector('.discard-dialog').open);w.document.querySelector('.discard-dialog .secondary').click();assert.equal(JSON.parse(w.localStorage.getItem('yuitei.events.v1'))[0].venue,'大広間');
+ console.log('PASS own tasks, shared template metadata and reset, date/venue changes and expiry, consistent dirty feedback and cancellation');
+})().catch(error=>{console.error(error);process.exitCode=1});
