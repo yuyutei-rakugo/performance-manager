@@ -1,4 +1,4 @@
-import {cloud} from './cloud.js?v=20261122-checklist1';
+import {cloud} from './cloud.js?v=20261122-checklist2';
 export const historyKey='yuitei.history.v1';
 export const validRecord=r=>r&&typeof r.id==='string'&&typeof r.date==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(r.date)&&typeof r.kind==='string'&&typeof r.occasion==='string'&&typeof r.note==='string'&&r.pieces&&typeof r.pieces==='object'&&!Array.isArray(r.pieces)&&Object.values(r.pieces).every(v=>typeof v==='string');
 export function readRecords(){const raw=JSON.parse(localStorage.getItem(historyKey)||'{"version":1,"items":[]}');if(raw.version!==1||!Array.isArray(raw.items)||!raw.items.every(validRecord))throw Error('保存済みの記録を読み込めません。上書きを停止しています。');return raw.items;}
@@ -38,9 +38,11 @@ export function toRecord(type,source,names=[],responses={}){const pieces=Object.
 }
 export async function transferRecord(record){if(!validRecord(record))throw Error('記録の形式を確認してください。');if(!cloud.state.configured){mergeRecords([record]);return}if(!['admin','editor'].includes(cloud.state.role))throw Error('記録を移すには編集権限が必要です。');let stop;const doc=await new Promise((resolve,reject)=>{stop=cloud.watch('history',resolve,reject)});stop?.();const items=doc?.items||[];if(!items.every(validRecord))throw Error('共通記録の形式を確認してください。');const map=new Map(items.map(r=>[r.id,r]));map.set(record.id,record);if(map.size>500)throw Error('記録は500件までです。');await cloud.save('history',{items:[...map.values()]},doc?.revision||0);}
 
+export function draftTask(label){return {label,done:false,excluded:false,assignees:[],dueDate:''}}
+
 export function duplicateSchedule(type,source){
  const copy={title:source.title,date:'',time:source.time||'',venue:source.venue};
- if(type==='event')Object.assign(copy,{kind:source.kind||'その他公演',memo:source.memo||'',performers:[],checklist:(source.checklist||[]).map(task=>({label:task.label,done:false,assignees:[],dueDate:''}))});
+ if(type==='event')Object.assign(copy,{kind:source.kind||'その他公演',memo:source.memo||'',performers:[],checklist:(source.checklist||[]).map(task=>draftTask(task.label))});
  else Object.assign(copy,{otherContent:source.otherContent||'',notes:source.notes||'',practices:[]});
  return copy;
 }

@@ -153,10 +153,21 @@ async function main(){
     await page.setViewportSize({width:393,height:740});
     assert.equal(await form.locator('[name=minutes]').inputValue(),'10');
     assert.equal(await form.locator('[name=seconds]').inputValue(),'30');
-    await form.locator('[data-done]').first().check();
+    await form.getByRole('button',{name:'変更を保存する',exact:true}).waitFor();
+    const task=form.locator('.task-edit-row').first();
+    await task.locator('[data-task-title]').click();
+    assert(await task.locator('[data-done]').isChecked());
+    await task.locator('[data-excluded]').check();
+    assert(!await task.locator('[data-done]').isChecked());
+    await task.locator('[data-task-title]').click();
+    assert(!await task.locator('[data-excluded]').isChecked());
+    await form.locator('[data-excluded]').nth(1).check();
     await form.locator('[type=submit]').click();
     await page.locator('#event-dialog').getByText('公演を保存しました。').waitFor();
     assert.equal(docs.events.items[0].checklist[0].done,true);
+    assert.equal(docs.events.items[0].checklist[1].excluded,true);
+    await page.locator('#event-dialog .progress').getByText('1／'+(docs.events.items[0].checklist.length-1)+'件 完了',{exact:true}).waitFor();
+    await page.locator('#event-dialog .progress').getByText('対象外 1件',{exact:true}).waitFor();
     await page.locator('#event-dialog [data-close]').click();
     await page.goto(new URL('rehearsals.html',base).href);
     await page.locator('#add').click();
@@ -227,6 +238,11 @@ async function main(){
     await page.getByRole('button',{name:'記録を編集する',exact:true}).click();
     await page.locator('[data-record-edit=history-old]').click();
     const history=page.locator('.record-dialog[open] form');
+    await history.getByRole('button',{name:'＋ 区分を追加'}).click();
+    await history.locator('.category-adder input').fill('試験用の独自区分');
+    await history.locator('[data-cancel-category]').click();
+    assert.equal(await history.locator('[name=kind]').inputValue(),'定期落語会');
+    assert.equal(await history.locator('[data-cancel]').count(),1);
     const note='\n全角「日本語」\n'+ '長い注記 '.repeat(80);
     await history.locator('[name=note]').fill(note);
     const historySave=hold('history');
@@ -466,6 +482,19 @@ async function main(){
     await editorPage.goto(new URL('history.html',base).href);
     await editorPage.getByRole('button',{name:'記録を編集する',exact:true}).click();
     await editorPage.locator('[data-record-edit=history-old]').waitFor();
+
+    const checklistViewer=await session('viewer');
+    await checklistViewer.goto(base.href);
+    await checklistViewer.locator('[data-event]').click();
+    await checklistViewer.locator('#event-dialog .task-summary.is-excluded').getByText('対象外',{exact:true}).waitFor();
+    const committedTasks=structuredClone(docs.events.items[0].checklist);
+    docs.events.items[0].checklist=committedTasks.map(task=>({...task,done:false,excluded:true}));
+    docs.events.revision++;
+    await checklistViewer.reload();
+    await checklistViewer.locator('[data-event]').click();
+    await checklistViewer.locator('#event-dialog').getByText('対象作業なし',{exact:true}).waitFor();
+    docs.events.items[0].checklist=committedTasks;
+    docs.events.revision++;
 
     const invited=await session('viewer');
     const invitation=new URL(base);

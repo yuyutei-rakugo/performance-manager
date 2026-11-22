@@ -51,11 +51,16 @@ assert(call('backupRestore',{token,id:withOldName.backups[0].id,expected:withOld
 assert.equal(call('attendanceRead',{token,id:'practice-rename'}).rows[0].stageName,'新しい名');
 assert(call('login',{name:'新しい名',pin:'9753'}).ok);
 expectError(call('session',{token:viewer}),/期限/);
+const eventRevision=call('read',{token,name:'events'}).doc.revision;
+const withExcluded={...event,checklist:[{label:'会場予約',done:false,excluded:true,assignees:[],dueDate:''}]};
+assert(call('save',{token,name:'events',items:[withExcluded],revision:eventRevision}).ok);
+assert.deepEqual(call('read',{token,name:'events'}).doc.items[0].checklist,withExcluded.checklist);
+expectError(call('save',{token,name:'events',items:[{...withExcluded,checklist:[{label:'会場予約',done:true,excluded:true}]}],revision:eventRevision+1}),/準備項目/);
 console.log('PASS private rolling backups, failed backup preserves source, restore conflict and role checks, pre-restore recovery, revisions, member credentials');
 const {JSDOM}=require('jsdom');const w=new JSDOM('<main></main>',{url:'https://example.test/performance-manager/rehearsals.html?v=old',runScripts:'outside-only'}).window;
 w.structuredClone=structuredClone;w.eval(fs.readFileSync(path.join(root,'record-transfer.js'),'utf8').replace(/^import .*;\n/gm,'').replace(/export /g,'')+'\nwindow.features={duplicateSchedule,scheduleInvite,copyScheduleInvite};');
-const input={...event,id:'original',archivedAt:'old',checklist:[{label:'会場予約',done:true,dueDate:'2026-11-21',assignees:['勇水']}],performers:[{stageName:'勇水',piece:'宗論',minutes:12}]};
-const clone=w.features.duplicateSchedule('event',input);assert.equal(clone.date,'');assert.equal(clone.id,undefined);assert.equal(clone.archivedAt,undefined);assert.equal(clone.performers.length,0);assert.equal(clone.checklist[0].done,false);assert.equal(clone.checklist[0].assignees.length,0);assert.equal(input.checklist[0].done,true);
+const input={...event,id:'original',archivedAt:'old',checklist:[{label:'会場予約',done:true,excluded:true,dueDate:'2026-11-21',assignees:['勇水']}],performers:[{stageName:'勇水',piece:'宗論',minutes:12}]};
+const clone=w.features.duplicateSchedule('event',input);assert.equal(clone.date,'');assert.equal(clone.id,undefined);assert.equal(clone.archivedAt,undefined);assert.equal(clone.performers.length,0);assert.equal(clone.checklist[0].done,false);assert.equal(clone.checklist[0].excluded,false);assert.equal(clone.checklist[0].assignees.length,0);assert.equal(input.checklist[0].done,true);
 const rehearsal={id:'practice-1',title:'通常稽古',date:'2026-11-21',time:'17:00',venue:'和室',notes:'連絡',practices:[{stageName:'勇水',piece:'宗論'}],attendance:{勇水:'出席'}};
 const copy=w.features.duplicateSchedule('rehearsal',rehearsal);assert.equal(copy.practices.length,0);assert.equal(copy.attendance,undefined);
 const text=w.features.scheduleInvite('rehearsal',rehearsal);assert.match(text,/2026年11月21日/);assert.match(text,/17:00/);assert.match(text,/detail=practice-1/);assert(!text.includes('v=old'));assert(!text.includes('宗論'));assert(!text.includes('連絡'));assert.match(text,/場所：和室/);
