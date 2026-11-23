@@ -1,9 +1,754 @@
 [
-  {"name":"イオン銚子店","region":"銚子市","category":"スーパー・商店","url":"https://www.aeon.com/store/イオン/イオン銚子店/","date":"2026-11-23","reading":"いおんちょうしてん"},
-  {"name":"公正図書館","region":"銚子市","category":"公共施設","url":"https://www.city.choshi.chiba.jp/edu/sg-guide/index0151.html","date":"2026-11-23","reading":"こうせいとしょかん"},
-  {"name":"カスミ 波崎店","region":"神栖市","category":"スーパー・商店","url":"https://www.kasumi.co.jp/tenpotop/ibaraki-rokko/kamisu/332/","date":"2026-11-23","reading":"かすみはさきてん"},
-  {"name":"カスミ フードスクエアライフガーデン神栖店","region":"神栖市","category":"スーパー・商店","url":"https://www.kasumi.co.jp/tenpotop/ibaraki-rokko/kamisu/330/","date":"2026-11-23","reading":"かすみふーどすくえあらいふがーでんかみすてん"},
-  {"name":"神栖市文化センター","region":"神栖市","category":"公共施設","url":"https://www.city.kamisu.ibaraki.jp/kodomo/cul_facility/1001871.html","date":"2026-11-23","reading":"かみすしぶんかせんたー"},
-  {"name":"中央図書館","region":"神栖市","category":"公共施設","url":"https://www.city.kamisu.ibaraki.jp/kodomo/cul_facility/1001824/1001825/1001826.html","date":"2026-11-23","reading":"ちゅうおうとしょかん"},
-  {"name":"うずも図書館","region":"神栖市","category":"公共施設","url":"https://www.city.kamisu.ibaraki.jp/kodomo/cul_facility/1001824/1001825/1001827.html","date":"2026-11-23","reading":"うずもとしょかん"}
+  {
+    "name": "イオン銚子店",
+    "region": "銚子市",
+    "category": "スーパー・商店",
+    "url": "https://www.aeon.com/store/イオン/イオン銚子店/",
+    "date": "2026-11-23",
+    "reading": "いおんちょうしてん"
+  },
+  {
+    "name": "公正図書館",
+    "region": "銚子市",
+    "category": "公共施設",
+    "url": "https://www.city.choshi.chiba.jp/edu/sg-guide/index0151.html",
+    "date": "2026-11-23",
+    "reading": "こうせいとしょかん"
+  },
+  {
+    "name": "カスミ 波崎店",
+    "region": "神栖市",
+    "category": "スーパー・商店",
+    "url": "https://www.kasumi.co.jp/tenpotop/ibaraki-rokko/kamisu/332/",
+    "date": "2026-11-23",
+    "reading": "かすみはさきてん"
+  },
+  {
+    "name": "カスミ フードスクエアライフガーデン神栖店",
+    "region": "神栖市",
+    "category": "スーパー・商店",
+    "url": "https://www.kasumi.co.jp/tenpotop/ibaraki-rokko/kamisu/330/",
+    "date": "2026-11-23",
+    "reading": "かすみふーどすくえあらいふがーでんかみすてん"
+  },
+  {
+    "name": "神栖市文化センター",
+    "region": "神栖市",
+    "category": "公共施設",
+    "url": "https://www.city.kamisu.ibaraki.jp/kodomo/cul_facility/1001871.html",
+    "date": "2026-11-23",
+    "reading": "かみすしぶんかせんたー"
+  },
+  {
+    "name": "中央図書館",
+    "region": "神栖市",
+    "category": "公共施設",
+    "url": "https://www.city.kamisu.ibaraki.jp/kodomo/cul_facility/1001824/1001825/1001826.html",
+    "date": "2026-11-23",
+    "reading": "ちゅうおうとしょかん"
+  },
+  {
+    "name": "うずも図書館",
+    "region": "神栖市",
+    "category": "公共施設",
+    "url": "https://www.city.kamisu.ibaraki.jp/kodomo/cul_facility/1001824/1001825/1001827.html",
+    "date": "2026-11-23",
+    "reading": "うずもとしょかん"
+  },
+  {
+    "name": "セブンイレブン 銚子愛宕店",
+    "region": "銚子市",
+    "category": "コンビニ",
+    "url": "https://www.city.choshi.chiba.jp/shisei/page010015.html",
+    "date": "2026-11-23",
+    "reading": "せぶんいれぶんちょうしあたごてん"
+  },
+  {
+    "name": "セブンイレブン 銚子新生店",
+    "region": "銚子市",
+    "category": "コンビニ",
+    "url": "https://www.city.choshi.chiba.jp/shisei/page010015.html",
+    "date": "2026-11-23",
+    "reading": "せぶんいれぶんちょうしあらおいてん"
+  },
+  {
+    "name": "セブンイレブン 銚子笠上町店",
+    "region": "銚子市",
+    "category": "コンビニ",
+    "url": "https://www.city.choshi.chiba.jp/shisei/page010015.html",
+    "date": "2026-11-23",
+    "reading": "せぶんいれぶんちょうしかさがみちょうてん"
+  },
+  {
+    "name": "セブンイレブン 銚子清川町店",
+    "region": "銚子市",
+    "category": "コンビニ",
+    "url": "https://www.city.choshi.chiba.jp/shisei/page010015.html",
+    "date": "2026-11-23",
+    "reading": "せぶんいれぶんちょうしきよかわちょうてん"
+  },
+  {
+    "name": "セブンイレブン 銚子忍町店",
+    "region": "銚子市",
+    "category": "コンビニ",
+    "url": "https://www.city.choshi.chiba.jp/shisei/page010015.html",
+    "date": "2026-11-23",
+    "reading": "せぶんいれぶんちょうししのびちょうてん"
+  },
+  {
+    "name": "セブンイレブン 銚子高神西町店",
+    "region": "銚子市",
+    "category": "コンビニ",
+    "url": "https://www.city.choshi.chiba.jp/shisei/page010015.html",
+    "date": "2026-11-23",
+    "reading": "せぶんいれぶんちょうしたかがみにしまちてん"
+  },
+  {
+    "name": "セブンイレブン 銚子豊里台店",
+    "region": "銚子市",
+    "category": "コンビニ",
+    "url": "https://www.city.choshi.chiba.jp/shisei/page010015.html",
+    "date": "2026-11-23",
+    "reading": "せぶんいれぶんちょうしとよさとだいてん"
+  },
+  {
+    "name": "セブンイレブン 銚子松岸店",
+    "region": "銚子市",
+    "category": "コンビニ",
+    "url": "https://www.city.choshi.chiba.jp/shisei/page010015.html",
+    "date": "2026-11-23",
+    "reading": "せぶんいれぶんちょうしまつぎしてん"
+  },
+  {
+    "name": "セブンイレブン 銚子本城町店",
+    "region": "銚子市",
+    "category": "コンビニ",
+    "url": "https://www.city.choshi.chiba.jp/shisei/page010015.html",
+    "date": "2026-11-23",
+    "reading": "せぶんいれぶんちょうしほんじょうちょうてん"
+  },
+  {
+    "name": "セブンイレブン 銚子三崎町1丁目店",
+    "region": "銚子市",
+    "category": "コンビニ",
+    "url": "https://www.city.choshi.chiba.jp/shisei/page010015.html",
+    "date": "2026-11-23",
+    "reading": "せぶんいれぶんちょうしみさきちょういっちょうめてん"
+  },
+  {
+    "name": "セブンイレブン 銚子ドーバーライン店",
+    "region": "銚子市",
+    "category": "コンビニ",
+    "url": "https://www.city.choshi.chiba.jp/shisei/page010015.html",
+    "date": "2026-11-23",
+    "reading": "せぶんいれぶんちょうしどーばーらいんてん"
+  },
+  {
+    "name": "セブンイレブン 銚子中央町店",
+    "region": "銚子市",
+    "category": "コンビニ",
+    "url": "https://www.city.choshi.chiba.jp/shisei/page010015.html",
+    "date": "2026-11-23",
+    "reading": "せぶんいれぶんちょうしちゅうおうちょうてん"
+  },
+  {
+    "name": "ファミリーマート 銚子川口町店",
+    "region": "銚子市",
+    "category": "コンビニ",
+    "url": "https://www.city.choshi.chiba.jp/shisei/page010015.html",
+    "date": "2026-11-23",
+    "reading": "ふぁみりーまーとちょうしかわぐちちょうてん"
+  },
+  {
+    "name": "ファミリーマート 銚子四日市場店",
+    "region": "銚子市",
+    "category": "コンビニ",
+    "url": "https://www.city.choshi.chiba.jp/shisei/page010015.html",
+    "date": "2026-11-23",
+    "reading": "ふぁみりーまーとちょうしよっかいちばてん"
+  },
+  {
+    "name": "ファミリーマート 銚子駅前店",
+    "region": "銚子市",
+    "category": "コンビニ",
+    "url": "https://www.city.choshi.chiba.jp/shisei/page010015.html",
+    "date": "2026-11-23",
+    "reading": "ふぁみりーまーとちょうしえきまえてん"
+  },
+  {
+    "name": "ミニストップ 銚子小浜店",
+    "region": "銚子市",
+    "category": "コンビニ",
+    "url": "https://www.city.choshi.chiba.jp/shisei/page010015.html",
+    "date": "2026-11-23",
+    "reading": "みにすとっぷちょうしこはまてん"
+  },
+  {
+    "name": "ローソン 銚子新生店",
+    "region": "銚子市",
+    "category": "コンビニ",
+    "url": "https://www.city.choshi.chiba.jp/shisei/page010015.html",
+    "date": "2026-11-23",
+    "reading": "ろーそんちょうしあらおいてん"
+  },
+  {
+    "name": "ローソン 銚子川口町店",
+    "region": "銚子市",
+    "category": "コンビニ",
+    "url": "https://www.city.choshi.chiba.jp/shisei/page010015.html",
+    "date": "2026-11-23",
+    "reading": "ろーそんちょうしかわぐちちょうてん"
+  },
+  {
+    "name": "ローソン 銚子清川町店",
+    "region": "銚子市",
+    "category": "コンビニ",
+    "url": "https://www.city.choshi.chiba.jp/shisei/page010015.html",
+    "date": "2026-11-23",
+    "reading": "ろーそんちょうしきよかわちょうてん"
+  },
+  {
+    "name": "ローソン 銚子小畑町店",
+    "region": "銚子市",
+    "category": "コンビニ",
+    "url": "https://www.city.choshi.chiba.jp/shisei/page010015.html",
+    "date": "2026-11-23",
+    "reading": "ろーそんちょうしこばたけちょうてん"
+  },
+  {
+    "name": "ローソン 銚子本城町店",
+    "region": "銚子市",
+    "category": "コンビニ",
+    "url": "https://www.city.choshi.chiba.jp/shisei/page010015.html",
+    "date": "2026-11-23",
+    "reading": "ろーそんちょうしほんじょうちょうてん"
+  },
+  {
+    "name": "ローソン 銚子南小川町店",
+    "region": "銚子市",
+    "category": "コンビニ",
+    "url": "https://www.city.choshi.chiba.jp/shisei/page010015.html",
+    "date": "2026-11-23",
+    "reading": "ろーそんちょうしみなみおがわちょうてん"
+  },
+  {
+    "name": "ローソン 銚子長塚店",
+    "region": "銚子市",
+    "category": "コンビニ",
+    "url": "https://www.city.choshi.chiba.jp/shisei/page010015.html",
+    "date": "2026-11-23",
+    "reading": "ろーそんちょうしながつかてん"
+  },
+  {
+    "name": "ローソン 銚子小船木店",
+    "region": "銚子市",
+    "category": "コンビニ",
+    "url": "https://www.city.choshi.chiba.jp/shisei/page010015.html",
+    "date": "2026-11-23",
+    "reading": "ろーそんちょうしこぶなきてん"
+  },
+  {
+    "name": "カスミ 銚子松岸店",
+    "region": "銚子市",
+    "category": "スーパー・商店",
+    "url": "https://www.city.choshi.chiba.jp/shisei/page010015.html",
+    "date": "2026-11-23",
+    "reading": "かすみちょうしまつぎしてん"
+  },
+  {
+    "name": "カスミ フードスクエア南小川店",
+    "region": "銚子市",
+    "category": "スーパー・商店",
+    "url": "https://www.city.choshi.chiba.jp/shisei/page010015.html",
+    "date": "2026-11-23",
+    "reading": "かすみふーどすくえあみなみおがわてん"
+  },
+  {
+    "name": "セイミヤ 銚子四日市場店",
+    "region": "銚子市",
+    "category": "スーパー・商店",
+    "url": "https://www.city.choshi.chiba.jp/shisei/page010015.html",
+    "date": "2026-11-23",
+    "reading": "せいみやちょうしよっかいちばてん"
+  },
+  {
+    "name": "タイヨー 銚子店",
+    "region": "銚子市",
+    "category": "スーパー・商店",
+    "url": "https://www.city.choshi.chiba.jp/shisei/page010015.html",
+    "date": "2026-11-23",
+    "reading": "たいよーちょうしてん"
+  },
+  {
+    "name": "フレッシュ マルトモ",
+    "region": "銚子市",
+    "category": "スーパー・商店",
+    "url": "https://www.city.choshi.chiba.jp/shisei/page010015.html",
+    "date": "2026-11-23",
+    "reading": "ふれっしゅまるとも"
+  },
+  {
+    "name": "コメリ 小畑店",
+    "region": "銚子市",
+    "category": "スーパー・商店",
+    "url": "https://www.city.choshi.chiba.jp/shisei/page010015.html",
+    "date": "2026-11-23",
+    "reading": "こめりこばたけてん"
+  },
+  {
+    "name": "カインズホーム 銚子店",
+    "region": "銚子市",
+    "category": "スーパー・商店",
+    "url": "https://www.city.choshi.chiba.jp/shisei/page010015.html",
+    "date": "2026-11-23",
+    "reading": "かいんずほーむちょうしてん"
+  },
+  {
+    "name": "わくわく広場 銚子小畑町店",
+    "region": "銚子市",
+    "category": "スーパー・商店",
+    "url": "https://www.city.choshi.chiba.jp/shisei/page010015.html",
+    "date": "2026-11-23",
+    "reading": "わくわくひろばちょうしこばたけちょうてん"
+  },
+  {
+    "name": "銚子市役所",
+    "region": "銚子市",
+    "category": "公共施設",
+    "url": "https://www.city.choshi.chiba.jp/shisei/page010015.html",
+    "date": "2026-11-23",
+    "reading": "ちょうししやくしょ"
+  },
+  {
+    "name": "豊里出張所",
+    "region": "銚子市",
+    "category": "公共施設",
+    "url": "https://www.city.choshi.chiba.jp/shisei/page010015.html",
+    "date": "2026-11-23",
+    "reading": "とよさとしゅっちょうじょ"
+  },
+  {
+    "name": "豊岡出張所",
+    "region": "銚子市",
+    "category": "公共施設",
+    "url": "https://www.city.choshi.chiba.jp/shisei/page010015.html",
+    "date": "2026-11-23",
+    "reading": "とよおかしゅっちょうじょ"
+  },
+  {
+    "name": "しおさいプラザ",
+    "region": "銚子市",
+    "category": "公共施設",
+    "url": "https://www.city.choshi.chiba.jp/shisei/page010015.html",
+    "date": "2026-11-23",
+    "reading": "しおさいぷらざ"
+  },
+  {
+    "name": "銚子市市民センター",
+    "region": "銚子市",
+    "category": "公共施設",
+    "url": "https://www.city.choshi.chiba.jp/shisei/page010015.html",
+    "date": "2026-11-23",
+    "reading": "ちょうしししみんせんたー"
+  },
+  {
+    "name": "保健福祉センターすこやかなまなびの城",
+    "region": "銚子市",
+    "category": "公共施設",
+    "url": "https://www.city.choshi.chiba.jp/shisei/page010015.html",
+    "date": "2026-11-23",
+    "reading": "ほけんふくしせんたーすこやかなまなびのしろ"
+  },
+  {
+    "name": "セブンイレブン 神栖須田店",
+    "region": "神栖市",
+    "category": "コンビニ",
+    "url": "https://www.city.kamisu.ibaraki.jp/shisei/koho/1003013/1003028/1003030.html",
+    "date": "2026-11-23",
+    "reading": "せぶんいれぶんかみすすだてん"
+  },
+  {
+    "name": "セブンイレブン 神栖太田店",
+    "region": "神栖市",
+    "category": "コンビニ",
+    "url": "https://www.city.kamisu.ibaraki.jp/shisei/koho/1003013/1003028/1003030.html",
+    "date": "2026-11-23",
+    "reading": "せぶんいれぶんかみすおおたてん"
+  },
+  {
+    "name": "セブンイレブン 波崎植松店",
+    "region": "神栖市",
+    "category": "コンビニ",
+    "url": "https://www.city.kamisu.ibaraki.jp/shisei/koho/1003013/1003028/1003030.html",
+    "date": "2026-11-23",
+    "reading": "せぶんいれぶんはさきうえまつてん"
+  },
+  {
+    "name": "セブンイレブン 神栖矢田部店",
+    "region": "神栖市",
+    "category": "コンビニ",
+    "url": "https://www.city.kamisu.ibaraki.jp/shisei/koho/1003013/1003028/1003030.html",
+    "date": "2026-11-23",
+    "reading": "せぶんいれぶんかみすやたべてん"
+  },
+  {
+    "name": "セブンイレブン 波崎土合南店",
+    "region": "神栖市",
+    "category": "コンビニ",
+    "url": "https://www.city.kamisu.ibaraki.jp/shisei/koho/1003013/1003028/1003030.html",
+    "date": "2026-11-23",
+    "reading": "せぶんいれぶんはさきどあいみなみてん"
+  },
+  {
+    "name": "セブンイレブン 茨城波崎本郷店",
+    "region": "神栖市",
+    "category": "コンビニ",
+    "url": "https://www.city.kamisu.ibaraki.jp/shisei/koho/1003013/1003028/1003030.html",
+    "date": "2026-11-23",
+    "reading": "せぶんいれぶんいばらきはさきほんごうてん"
+  },
+  {
+    "name": "セブンイレブン 波崎海岸店",
+    "region": "神栖市",
+    "category": "コンビニ",
+    "url": "https://www.city.kamisu.ibaraki.jp/shisei/koho/1003013/1003028/1003030.html",
+    "date": "2026-11-23",
+    "reading": "せぶんいれぶんはさきかいがんてん"
+  },
+  {
+    "name": "ファミリーマート 神栖若松店",
+    "region": "神栖市",
+    "category": "コンビニ",
+    "url": "https://www.city.kamisu.ibaraki.jp/shisei/koho/1003013/1003028/1003030.html",
+    "date": "2026-11-23",
+    "reading": "ふぁみりーまーとかみすわかまつてん"
+  },
+  {
+    "name": "ファミリーマート 神栖土合本町店",
+    "region": "神栖市",
+    "category": "コンビニ",
+    "url": "https://www.city.kamisu.ibaraki.jp/shisei/koho/1003013/1003028/1003030.html",
+    "date": "2026-11-23",
+    "reading": "ふぁみりーまーとかみすどあいほんちょうてん"
+  },
+  {
+    "name": "ファミリーマート 神栖波崎小玉台店",
+    "region": "神栖市",
+    "category": "コンビニ",
+    "url": "https://www.city.kamisu.ibaraki.jp/shisei/koho/1003013/1003028/1003030.html",
+    "date": "2026-11-23",
+    "reading": "ふぁみりーまーとかみすはさきこだまだいてん"
+  },
+  {
+    "name": "ローソン 神栖若松中央店",
+    "region": "神栖市",
+    "category": "コンビニ",
+    "url": "https://www.city.kamisu.ibaraki.jp/shisei/koho/1003013/1003028/1003030.html",
+    "date": "2026-11-23",
+    "reading": "ろーそんかみすわかまつちゅうおうてん"
+  },
+  {
+    "name": "ローソン 神栖太田店",
+    "region": "神栖市",
+    "category": "コンビニ",
+    "url": "https://www.city.kamisu.ibaraki.jp/shisei/koho/1003013/1003028/1003030.html",
+    "date": "2026-11-23",
+    "reading": "ろーそんかみすおおたてん"
+  },
+  {
+    "name": "ローソン 波崎別所店",
+    "region": "神栖市",
+    "category": "コンビニ",
+    "url": "https://www.city.kamisu.ibaraki.jp/shisei/koho/1003013/1003028/1003030.html",
+    "date": "2026-11-23",
+    "reading": "ろーそんはさきべっしょてん"
+  },
+  {
+    "name": "ローソン 神栖波崎浜新田店",
+    "region": "神栖市",
+    "category": "コンビニ",
+    "url": "https://www.city.kamisu.ibaraki.jp/shisei/koho/1003013/1003028/1003030.html",
+    "date": "2026-11-23",
+    "reading": "ろーそんかみすはさきはましんでんてん"
+  },
+  {
+    "name": "ミニストップ 波崎宝山店",
+    "region": "神栖市",
+    "category": "コンビニ",
+    "url": "https://www.city.kamisu.ibaraki.jp/shisei/koho/1003013/1003028/1003030.html",
+    "date": "2026-11-23",
+    "reading": "みにすとっぷはさきたからやまてん"
+  },
+  {
+    "name": "ミニストップ 波崎砂山店",
+    "region": "神栖市",
+    "category": "コンビニ",
+    "url": "https://www.city.kamisu.ibaraki.jp/shisei/koho/1003013/1003028/1003030.html",
+    "date": "2026-11-23",
+    "reading": "みにすとっぷはさきすなやまてん"
+  },
+  {
+    "name": "セブンイレブン 神栖息栖店",
+    "region": "神栖市",
+    "category": "コンビニ",
+    "url": "https://www.city.kamisu.ibaraki.jp/shisei/koho/1003013/1003028/1003029.html",
+    "date": "2026-11-23",
+    "reading": "せぶんいれぶんかみすいきすてん"
+  },
+  {
+    "name": "セブンイレブン 神栖知手店",
+    "region": "神栖市",
+    "category": "コンビニ",
+    "url": "https://www.city.kamisu.ibaraki.jp/shisei/koho/1003013/1003028/1003029.html",
+    "date": "2026-11-23",
+    "reading": "せぶんいれぶんかみすしっててん"
+  },
+  {
+    "name": "セブンイレブン 神栖平泉店",
+    "region": "神栖市",
+    "category": "コンビニ",
+    "url": "https://www.city.kamisu.ibaraki.jp/shisei/koho/1003013/1003028/1003029.html",
+    "date": "2026-11-23",
+    "reading": "せぶんいれぶんかみすひらいずみてん"
+  },
+  {
+    "name": "ファミリーマート 神栖深芝店",
+    "region": "神栖市",
+    "category": "コンビニ",
+    "url": "https://www.city.kamisu.ibaraki.jp/shisei/koho/1003013/1003028/1003029.html",
+    "date": "2026-11-23",
+    "reading": "ふぁみりーまーとかみすふかしばてん"
+  },
+  {
+    "name": "ファミリーマート 神栖筒井店",
+    "region": "神栖市",
+    "category": "コンビニ",
+    "url": "https://www.city.kamisu.ibaraki.jp/shisei/koho/1003013/1003028/1003029.html",
+    "date": "2026-11-23",
+    "reading": "ふぁみりーまーとかみすつついてん"
+  },
+  {
+    "name": "ローソン 神栖二丁目店",
+    "region": "神栖市",
+    "category": "コンビニ",
+    "url": "https://www.city.kamisu.ibaraki.jp/shisei/koho/1003013/1003028/1003029.html",
+    "date": "2026-11-23",
+    "reading": "ろーそんかみすにちょうめてん"
+  },
+  {
+    "name": "ローソン 神栖知手東店",
+    "region": "神栖市",
+    "category": "コンビニ",
+    "url": "https://www.city.kamisu.ibaraki.jp/shisei/koho/1003013/1003028/1003029.html",
+    "date": "2026-11-23",
+    "reading": "ろーそんかみすしってひがしてん"
+  },
+  {
+    "name": "ミニストップ 神栖日川店",
+    "region": "神栖市",
+    "category": "コンビニ",
+    "url": "https://www.city.kamisu.ibaraki.jp/shisei/koho/1003013/1003028/1003029.html",
+    "date": "2026-11-23",
+    "reading": "みにすとっぷかみすにっかわてん"
+  },
+  {
+    "name": "カスミ 神栖店",
+    "region": "神栖市",
+    "category": "スーパー・商店",
+    "url": "https://www.city.kamisu.ibaraki.jp/shisei/koho/1003013/1003028/1003029.html",
+    "date": "2026-11-23",
+    "reading": "かすみかみすてん"
+  },
+  {
+    "name": "セイミヤ 神栖店",
+    "region": "神栖市",
+    "category": "スーパー・商店",
+    "url": "https://www.city.kamisu.ibaraki.jp/shisei/koho/1003013/1003028/1003029.html",
+    "date": "2026-11-23",
+    "reading": "せいみやかみすてん"
+  },
+  {
+    "name": "スーパータイヨー オークビレッジ店",
+    "region": "神栖市",
+    "category": "スーパー・商店",
+    "url": "https://www.city.kamisu.ibaraki.jp/shisei/koho/1003013/1003028/1003029.html",
+    "date": "2026-11-23",
+    "reading": "すーぱーたいよーおーくびれっじてん"
+  },
+  {
+    "name": "スーパータイヨー 神栖店",
+    "region": "神栖市",
+    "category": "スーパー・商店",
+    "url": "https://www.city.kamisu.ibaraki.jp/shisei/koho/1003013/1003028/1003029.html",
+    "date": "2026-11-23",
+    "reading": "すーぱーたいよーかみすてん"
+  },
+  {
+    "name": "スーパータイヨー 知手店",
+    "region": "神栖市",
+    "category": "スーパー・商店",
+    "url": "https://www.city.kamisu.ibaraki.jp/shisei/koho/1003013/1003028/1003029.html",
+    "date": "2026-11-23",
+    "reading": "すーぱーたいよーしっててん"
+  },
+  {
+    "name": "フーズマーケットさえき 知手店",
+    "region": "神栖市",
+    "category": "スーパー・商店",
+    "url": "https://www.city.kamisu.ibaraki.jp/shisei/koho/1003013/1003028/1003029.html",
+    "date": "2026-11-23",
+    "reading": "ふーずまーけっとさえきしっててん"
+  },
+  {
+    "name": "カスミ 土合店",
+    "region": "神栖市",
+    "category": "スーパー・商店",
+    "url": "https://www.city.kamisu.ibaraki.jp/shisei/koho/1003013/1003028/1003030.html",
+    "date": "2026-11-23",
+    "reading": "かすみどあいてん"
+  },
+  {
+    "name": "スーパータイヨー フーデリア店",
+    "region": "神栖市",
+    "category": "スーパー・商店",
+    "url": "https://www.city.kamisu.ibaraki.jp/shisei/koho/1003013/1003028/1003030.html",
+    "date": "2026-11-23",
+    "reading": "すーぱーたいよーふーでりあてん"
+  },
+  {
+    "name": "スーパータイヨー 波崎店",
+    "region": "神栖市",
+    "category": "スーパー・商店",
+    "url": "https://www.city.kamisu.ibaraki.jp/shisei/koho/1003013/1003028/1003030.html",
+    "date": "2026-11-23",
+    "reading": "すーぱーたいよーはさきてん"
+  },
+  {
+    "name": "ウエルシア 神栖土合本町店",
+    "region": "神栖市",
+    "category": "スーパー・商店",
+    "url": "https://www.city.kamisu.ibaraki.jp/shisei/koho/1003013/1003028/1003030.html",
+    "date": "2026-11-23",
+    "reading": "うえるしあかみすどあいほんちょうてん"
+  },
+  {
+    "name": "波崎総合支所・防災センター",
+    "region": "神栖市",
+    "category": "公共施設",
+    "url": "https://www.city.kamisu.ibaraki.jp/shisei/koho/1003013/1003028/1003030.html",
+    "date": "2026-11-23",
+    "reading": "はさきそうごうししょぼうさいせんたー"
+  },
+  {
+    "name": "矢田部公民館",
+    "region": "神栖市",
+    "category": "公共施設",
+    "url": "https://www.city.kamisu.ibaraki.jp/shisei/koho/1003013/1003028/1003030.html",
+    "date": "2026-11-23",
+    "reading": "やたべこうみんかん"
+  },
+  {
+    "name": "若松公民館",
+    "region": "神栖市",
+    "category": "公共施設",
+    "url": "https://www.city.kamisu.ibaraki.jp/shisei/koho/1003013/1003028/1003030.html",
+    "date": "2026-11-23",
+    "reading": "わかまつこうみんかん"
+  },
+  {
+    "name": "はさき生涯学習センター",
+    "region": "神栖市",
+    "category": "公共施設",
+    "url": "https://www.city.kamisu.ibaraki.jp/shisei/koho/1003013/1003028/1003030.html",
+    "date": "2026-11-23",
+    "reading": "はさきしょうがいがくしゅうせんたー"
+  },
+  {
+    "name": "波崎東ふれあいセンター",
+    "region": "神栖市",
+    "category": "公共施設",
+    "url": "https://www.city.kamisu.ibaraki.jp/shisei/koho/1003013/1003028/1003030.html",
+    "date": "2026-11-23",
+    "reading": "はさきひがしふれあいせんたー"
+  },
+  {
+    "name": "土合体育館",
+    "region": "神栖市",
+    "category": "公共施設",
+    "url": "https://www.city.kamisu.ibaraki.jp/shisei/koho/1003013/1003028/1003030.html",
+    "date": "2026-11-23",
+    "reading": "どあいたいいくかん"
+  },
+  {
+    "name": "矢田部ふれあい館",
+    "region": "神栖市",
+    "category": "公共施設",
+    "url": "https://www.city.kamisu.ibaraki.jp/shisei/koho/1003013/1003028/1003030.html",
+    "date": "2026-11-23",
+    "reading": "やたべふれあいかん"
+  },
+  {
+    "name": "はさき保健・交流センター",
+    "region": "神栖市",
+    "category": "公共施設",
+    "url": "https://www.city.kamisu.ibaraki.jp/shisei/koho/1003013/1003028/1003030.html",
+    "date": "2026-11-23",
+    "reading": "はさきほけんこうりゅうせんたー"
+  },
+  {
+    "name": "神栖市役所本庁舎",
+    "region": "神栖市",
+    "category": "公共施設",
+    "url": "https://www.city.kamisu.ibaraki.jp/shisei/koho/1003013/1003028/1003029.html",
+    "date": "2026-11-23",
+    "reading": "かみすしやくしょほんちょうしゃ"
+  },
+  {
+    "name": "中央公民館",
+    "region": "神栖市",
+    "category": "公共施設",
+    "url": "https://www.city.kamisu.ibaraki.jp/shisei/koho/1003013/1003028/1003029.html",
+    "date": "2026-11-23",
+    "reading": "ちゅうおうこうみんかん"
+  },
+  {
+    "name": "かみす防災アリーナ",
+    "region": "神栖市",
+    "category": "公共施設",
+    "url": "https://www.city.kamisu.ibaraki.jp/shisei/koho/1003013/1003028/1003029.html",
+    "date": "2026-11-23",
+    "reading": "かみすぼうさいありーな"
+  },
+  {
+    "name": "平泉コミュニティセンター",
+    "region": "神栖市",
+    "category": "公共施設",
+    "url": "https://www.city.kamisu.ibaraki.jp/shisei/koho/1003013/1003028/1003029.html",
+    "date": "2026-11-23",
+    "reading": "ひらいずみこみゅにてぃせんたー"
+  },
+  {
+    "name": "大野原コミュニティセンター",
+    "region": "神栖市",
+    "category": "公共施設",
+    "url": "https://www.city.kamisu.ibaraki.jp/shisei/koho/1003013/1003028/1003029.html",
+    "date": "2026-11-23",
+    "reading": "おおのはらこみゅにてぃせんたー"
+  },
+  {
+    "name": "歴史民俗資料館",
+    "region": "神栖市",
+    "category": "公共施設",
+    "url": "https://www.city.kamisu.ibaraki.jp/shisei/koho/1003013/1003028/1003029.html",
+    "date": "2026-11-23",
+    "reading": "れきしみんぞくしりょうかん"
+  },
+  {
+    "name": "息栖にぎわいテラス",
+    "region": "神栖市",
+    "category": "公共施設",
+    "url": "https://www.city.kamisu.ibaraki.jp/shisei/koho/1003013/1003028/1003029.html",
+    "date": "2026-11-23",
+    "reading": "いきすにぎわいてらす"
+  }
 ]
