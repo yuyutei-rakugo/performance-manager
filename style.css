@@ -72,10 +72,10 @@ dialog{border:1px solid var(--line);border-radius:14px;width:min(680px,calc(100%
 .flyer-item{padding:10px;margin-block:8px;border:1px solid var(--line);border-radius:8px;overflow-wrap:anywhere}
 .flyer-item h3{margin:0}
 .flyer-item p{margin:6px 0}
-.flyer-item[data-status="0"],.flyer-choice[data-status="0"]{--flyer-color:#4b5563;--flyer-bg:#f0f1f3;--flyer-selected:#dce0e5}
-.flyer-item[data-status="1"],.flyer-choice[data-status="1"]{--flyer-color:#174d80;--flyer-bg:#eef5ff;--flyer-selected:#cfe4ff}
-.flyer-item[data-status="2"],.flyer-choice[data-status="2"]{--flyer-color:#285b40;--flyer-bg:#edf7ef;--flyer-selected:#c9e9d2}
-.flyer-item[data-status="3"],.flyer-choice[data-status="3"]{--flyer-color:#79512e;--flyer-bg:#faf2e8;--flyer-selected:#eedcc6}
+.flyer-item[data-status="0"],.flyer-choice[data-status="0"]{--flyer-color:#4b5563;--flyer-bg:#f0f1f3;--flyer-selected:#4b5563}
+.flyer-item[data-status="1"],.flyer-choice[data-status="1"]{--flyer-color:#174d80;--flyer-bg:#bddcff;--flyer-selected:#174d80}
+.flyer-item[data-status="2"],.flyer-choice[data-status="2"]{--flyer-color:#285b40;--flyer-bg:#b8e5c2;--flyer-selected:#285b40}
+.flyer-item[data-status="3"],.flyer-choice[data-status="3"]{--flyer-color:#79512e;--flyer-bg:#f3dfc6;--flyer-selected:#79512e}
 .flyer-item[data-status]{border-left:5px solid var(--flyer-color);background:var(--flyer-bg)}
 .flyer-status{border-radius:5px}
 
@@ -88,10 +88,7 @@ dialog{border:1px solid var(--line);border-radius:14px;width:min(680px,calc(100%
 .flyer-choices legend{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 .flyer-choice{display:flex;align-items:center;gap:5px;min-height:36px;padding:3px 5px;cursor:pointer;line-height:1.4;border:1px solid transparent;font-size:.92rem}
 .flyer-choice input[type=checkbox]{width:18px;height:18px;flex:0 0 18px;margin:0;accent-color:var(--flyer-color,#285b40)}
-.flyer-status.flyer-choice{background:var(--flyer-bg);color:var(--flyer-color);border-color:var(--flyer-color);font-weight:400}
-.flyer-status.flyer-choice.is-selected{background:var(--flyer-selected);font-weight:700;box-shadow:inset 0 0 0 2px var(--flyer-color)}
+.flyer-status.flyer-choice{background:#ffffffd9;color:var(--flyer-color);border-color:var(--flyer-color);font-weight:400}
+.flyer-status.flyer-choice.is-selected{background:var(--flyer-selected);color:#fff;font-weight:700;box-shadow:inset 0 0 0 2px var(--flyer-color)}
 .flyer-choice span{overflow-wrap:anywhere}.flyer-item [data-row-message]:empty{display:none}
 @media(max-width:360px){.flyer-choice{padding:3px;gap:4px;font-size:.9rem}}
-
-.flyer-candidate{display:flex;align-items:flex-start;gap:10px;padding:12px 4px;border-bottom:1px solid var(--line);cursor:pointer;overflow-wrap:anywhere}
-.flyer-candidate input{width:24px;height:24px;flex:0 0 24px;margin-top:4px}.flyer-candidate small{display:block;font-size:.9rem;line-height:1.6}
