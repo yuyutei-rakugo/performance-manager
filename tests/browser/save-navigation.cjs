@@ -515,6 +515,7 @@ async function main(){
 
     await invited.locator('[data-flyers]').click();
     const flyerPanel=invited.getByRole('dialog',{name:'チラシの掲示先',exact:true});
+    await flyerPanel.getByText('追加・絞り込み・引き継ぎ',{exact:true}).click();
     await flyerPanel.getByRole('button',{name:'掲示先を追加'}).click();
     const flyerForm=invited.getByRole('dialog',{name:'掲示先を編集',exact:true});
     await flyerForm.getByLabel('施設名').fill('模擬施設');

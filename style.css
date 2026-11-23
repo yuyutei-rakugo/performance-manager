@@ -76,3 +76,10 @@ dialog{border:1px solid var(--line);border-radius:14px;width:min(680px,calc(100%
 .flyer-status[data-status="1"]{background:#d9ebff;color:#143d6c}
 .flyer-status[data-status="2"]{background:#d6efdc;color:#1d4b2b}
 .flyer-status[data-status="3"]{background:#f0e4d5;color:#5d432e}
+
+.flyer-item .flyer-check{display:flex;gap:10px;align-items:center;min-height:48px;font-size:1.05rem;line-height:1.6;cursor:pointer}
+.flyer-check input[type=checkbox]{width:26px;height:26px;flex:0 0 26px;accent-color:#285b40;margin:0}
+.flyer-check span{overflow-wrap:anywhere}.flyer-meta{font-size:.94rem;line-height:1.7}
+.flyer-row-details{margin-top:8px}.flyer-row-details summary,.flyer-tools summary{min-height:36px;cursor:pointer;line-height:1.7}
+.flyer-tools{margin-block:10px;padding:10px;border:1px solid var(--line);border-radius:8px}
+.flyer-item .memo{font-size:1rem;line-height:1.65}.flyer-row-details button{margin-block:8px}
