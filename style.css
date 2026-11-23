@@ -77,9 +77,15 @@ dialog{border:1px solid var(--line);border-radius:14px;width:min(680px,calc(100%
 .flyer-status[data-status="2"]{background:#d6efdc;color:#1d4b2b}
 .flyer-status[data-status="3"]{background:#f0e4d5;color:#5d432e}
 
-.flyer-item .flyer-check{display:flex;gap:10px;align-items:center;min-height:48px;font-size:1.05rem;line-height:1.6;cursor:pointer}
-.flyer-check input[type=checkbox]{width:26px;height:26px;flex:0 0 26px;accent-color:#285b40;margin:0}
-.flyer-check span{overflow-wrap:anywhere}.flyer-meta{font-size:.94rem;line-height:1.7}
+.flyer-meta{font-size:.94rem;line-height:1.7}
 .flyer-row-details{margin-top:8px}.flyer-row-details summary,.flyer-tools summary{min-height:36px;cursor:pointer;line-height:1.7}
 .flyer-tools{margin-block:10px;padding:10px;border:1px solid var(--line);border-radius:8px}
 .flyer-item .memo{font-size:1rem;line-height:1.65}.flyer-row-details button{margin-block:8px}
+
+.flyer-choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;border:0;padding:0;margin:10px 0}
+.flyer-choices legend{font-size:.94rem;margin-bottom:4px}
+.flyer-choice{display:flex;align-items:center;gap:8px;min-height:46px;padding:8px;cursor:pointer;line-height:1.6;border:1px solid transparent;font-size:1rem}
+.flyer-choice input[type=checkbox]{width:24px;height:24px;flex:0 0 24px;margin:0;accent-color:#285b40}
+.flyer-status.flyer-choice:not(.is-selected){background:transparent;color:var(--ink);border-color:var(--line);font-weight:400}
+.flyer-choice span{overflow-wrap:anywhere}.flyer-item [data-row-message]:empty{display:none}
+@media(max-width:360px){.flyer-choice{padding:6px;gap:6px;font-size:.95rem}}
