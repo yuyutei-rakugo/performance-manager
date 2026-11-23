@@ -84,7 +84,8 @@ assert(call('flyerSave',{token:member.token,eventId:first,id:row.id,revision:1,e
 expectError(call('flyerSave',{token:editor.token,eventId:first,id:row.id,revision:1,entry}),/更新/);
 expectError(call('flyerSave',{token:member.token,eventId:first,entry:{...entry,name:'試験 商店'}}),/登録済み/);
 const candidates=require('../flyer-candidates.json');
-const imported=call('flyerImport',{token:member.token,eventId:first,entries:candidates});
+assert(!call('flyerImport',{token:member.token,eventId:first,entries:candidates.slice(0,51)}).ok);
+let imported;for(let i=0;i<candidates.length;i+=50){imported=call('flyerImport',{token:member.token,eventId:first,entries:candidates.slice(i,i+50)});assert(imported.ok)}
 assert(imported.ok);assert.equal(imported.rows.length,candidates.length+2);
 assert.equal(imported.rows.find(row=>row.source).status,'未依頼');
 const refusal=call('flyerRefuse',{token:member.token,eventId:first,id:row.id,revision:2});

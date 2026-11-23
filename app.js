@@ -1,12 +1,12 @@
-import {openFlyerVenues} from './flyer-venues.js?v=20261123-flyers3';
-import {startEditor,finishEditor,leaveEditor,guardEditor,editorState,saveRecovery,recoveryScope,recoveredEditState} from './editor-dialog.js?v=20261123-flyers3';
-import {performerPicker,updatePerformerPickers,readPerformer,showPerformerRoster} from './performer-picker.js?v=20261123-flyers3';
-import {mountMemberHome} from './member-home.js?v=20261123-flyers3';
-import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261123-flyers3';
-import {readCategories,saveCategories,validCategories,categoryOptions,mountCategories,mountCategoryAdder} from './categories.js?v=20261123-flyers3';
-import {mountScheduleImport} from './schedule-import.js?v=20261123-flyers3';
-import {scheduleChange,scheduleChangeBadge,preparationTemplates,draftTask,duplicateSchedule,copyScheduleInvite,validPerformer,timeline,formatDuration,toRecord,transferRecord,readRecords,mergeRecords,mergedRecords} from './record-transfer.js?v=20261123-flyers3';
-import {cloud,startCloud,mountAccount} from './cloud.js?v=20261123-flyers3';
+import {openFlyerVenues} from './flyer-venues.js?v=20261123-flyers4';
+import {startEditor,finishEditor,leaveEditor,guardEditor,editorState,saveRecovery,recoveryScope,recoveredEditState} from './editor-dialog.js?v=20261123-flyers4';
+import {performerPicker,updatePerformerPickers,readPerformer,showPerformerRoster} from './performer-picker.js?v=20261123-flyers4';
+import {mountMemberHome} from './member-home.js?v=20261123-flyers4';
+import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261123-flyers4';
+import {readCategories,saveCategories,validCategories,categoryOptions,mountCategories,mountCategoryAdder} from './categories.js?v=20261123-flyers4';
+import {mountScheduleImport} from './schedule-import.js?v=20261123-flyers4';
+import {scheduleChange,scheduleChangeBadge,preparationTemplates,draftTask,duplicateSchedule,copyScheduleInvite,validPerformer,timeline,formatDuration,toRecord,transferRecord,readRecords,mergeRecords,mergedRecords} from './record-transfer.js?v=20261123-flyers4';
+import {cloud,startCloud,mountAccount} from './cloud.js?v=20261123-flyers4';
 'use strict';
 
 const key = 'yuitei.events.v1';
@@ -434,7 +434,7 @@ $('schedule').onclick = async click => {
   }
 };
 $('list-tab').onclick = () => {tab = 'list'; render();};
-$('calendar-tab').onclick = () => {location.href = 'rehearsals.html?v=20261123-flyers3';};
+$('calendar-tab').onclick = () => {location.href = 'rehearsals.html?v=20261123-flyers4';};
 $('new-event').onclick = () => renderForm();
 $('data-open').onclick = () => $('data-dialog').showModal();
 guardEditor(eventDialog);
