@@ -67,17 +67,22 @@ export function leaveEditor(dialog,leave){
 }
 
 export function guardEditor(dialog){
- dialog.addEventListener('cancel',event=>{
+ const onCancel=event=>{
   if(!hasEditorDraft(dialog))return;
   event.preventDefault();
   leaveEditor(dialog,()=>dialog.close());
- });
- // Also cover reload, history navigation and browser close when supported.
- window.addEventListener('beforeunload',event=>{
+ };
+ const onUnload=event=>{
   if(!hasEditorDraft(dialog))return;
   event.preventDefault();
   event.returnValue='';
- });
+ };
+ dialog.addEventListener('cancel',onCancel);
+ window.addEventListener('beforeunload',onUnload);
+ return ()=>{
+  dialog.removeEventListener('cancel',onCancel);
+  window.removeEventListener('beforeunload',onUnload);
+ };
 }
 
 // Drafts stay in this browser tab and are visible only to the account that started the save.

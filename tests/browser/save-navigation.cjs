@@ -13,7 +13,8 @@ const docs = {
     occasion:'同名の記録', pieces:{'試験会員':'寿限無'}, note:''
   }]}
 };
-const attendance=new Map();
+const attendance=new Map(),flyerRows=[];
+let failFlyer=false;
 let pending,delayedHistory;
 const hold = (collection,commitEarly=false) => {
   let release, started;
@@ -60,6 +61,14 @@ async function main(){
             docs.history={items:[...docs.history.items,transfer.record],revision:docs.history.revision+1};
             docs.rehearsals={items:docs.rehearsals.items.map(r=>r.id===transfer.id?{...r,archivedAt:'2026-11-21T08:00:00Z'}:r),revision:docs.rehearsals.revision+1};
             return ok({count:1,rehearsals:docs.rehearsals});
+          }
+          case 'flyerRead':return ok({rows:flyerRows,refused:[],categories:['公共施設'],sources:[],archived:false});
+          case 'flyerSave':{
+            assert.equal(role,'viewer');
+            assert.equal(request.eventId,docs.events.items[0].id);
+            if(failFlyer){failFlyer=false;return answer({ok:false,error:'模擬掲示先保存失敗'})}
+            flyerRows.push({...request.entry,id:'test-flyer',revision:1});
+            return ok({rows:flyerRows,refused:[],categories:['公共施設'],sources:[],archived:false});
           }
           case 'save':{
             assert.notEqual(role,'viewer');
@@ -503,6 +512,25 @@ async function main(){
     invitation.searchParams.set('detail',docs.events.items[0].id);
     await invited.goto(invitation.href);
     await invited.locator('#event-dialog[open] #event-heading').getByText('翌日の公演').waitFor();
+
+    await invited.locator('[data-flyers]').click();
+    const flyerPanel=invited.getByRole('dialog',{name:'チラシの掲示先',exact:true});
+    await flyerPanel.getByRole('button',{name:'掲示先を追加'}).click();
+    const flyerForm=invited.getByRole('dialog',{name:'掲示先を編集',exact:true});
+    await flyerForm.getByLabel('施設名').fill('模擬施設');
+    await flyerForm.getByLabel('地域').fill('銚子市');
+    await flyerForm.getByLabel('区分').fill('公共施設');
+    await flyerForm.getByLabel('自由メモ（任意）').fill('入力を保持');
+    failFlyer=true;
+    await flyerForm.getByRole('button',{name:'変更を保存する'}).click();
+    await flyerForm.getByText(/模擬掲示先保存失敗/).waitFor();
+    assert.equal(await flyerForm.getByLabel('自由メモ（任意）').inputValue(),'入力を保持');
+    await flyerForm.getByRole('button',{name:'変更を保存する'}).click();
+    await flyerPanel.getByText('掲示先を保存しました。').waitFor();
+    await flyerPanel.getByText('未依頼',{exact:true}).waitFor();
+    await page.goto(invitation.href);
+    await page.locator('[data-flyers]').click();
+    await page.getByRole('dialog',{name:'チラシの掲示先',exact:true}).getByText('模擬施設',{exact:true}).waitFor();
 
     const sample=docs.events.items[0];
     docs.events={revision:docs.events.revision+1,items:Array.from({length:500},(_,i)=>({...sample,id:'bulk-'+i}))};
