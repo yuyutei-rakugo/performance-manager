@@ -1,5 +1,5 @@
-import {startEditor,finishEditor,leaveEditor,guardEditor,editorState} from './editor-dialog.js?v=20261123-flyers5';
-import {cloud} from './cloud.js?v=20261123-flyers5';
+import {startEditor,finishEditor,leaveEditor,guardEditor,editorState} from './editor-dialog.js?v=20261123-flyers6';
+import {cloud} from './cloud.js?v=20261123-flyers6';
 
 const statuses=['未依頼','依頼済み','掲示済み','今回は見送り'];
 const compare=new Intl.Collator('ja',{numeric:true,sensitivity:'base'}).compare;
@@ -91,7 +91,7 @@ export function openFlyerVenues(event){
   busy=true;updateControls();message.textContent='施設候補を読み込み中…';
   let candidates;
   try{
-   const response=await fetch('./flyer-candidates.json?v=20261123-flyers5');
+   const response=await fetch('./flyer-candidates.json?v=20261123-flyers6');
    if(!response.ok)throw Error('施設候補を読み込めませんでした');
    candidates=await response.json();
   }catch(error){message.textContent=error.message+' もう一度お試しください。';return}
