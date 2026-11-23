@@ -1,6 +1,6 @@
-import {cloud} from './cloud.js?v=20261123-flyers1';
-import {validRehearsal,validAttendance,japanDate,untilJapanMidnight,featuredRehearsal,rehearsalBadge,rehearsalDateTime} from './rehearsal-model.js?v=20261123-flyers1';
-import {scheduleChangeBadge,rehearsalTitle} from './record-transfer.js?v=20261123-flyers1';
+import {cloud} from './cloud.js?v=20261123-flyers2';
+import {validRehearsal,validAttendance,japanDate,untilJapanMidnight,featuredRehearsal,rehearsalBadge,rehearsalDateTime} from './rehearsal-model.js?v=20261123-flyers2';
+import {scheduleChangeBadge,rehearsalTitle} from './record-transfer.js?v=20261123-flyers2';
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const label=s=>s==='未回答'||!s?'未登録':s;
 export function mountMemberHome(){
@@ -32,7 +32,7 @@ export function mountMemberHome(){
   // Keep the actual buttons connected while polling updates the displayed answer.
   if(key!==renderedKey){
    renderedKey=key;
-   panel.innerHTML=`<h2>${practicePage?'次回の稽古':'次回の公演'}</h2><div data-next-plan></div>${p?`<div class="quick-attendance">${!shared?`<label>自分の名前<select id="quick-person"><option value="">選んでください</option>${names.map(n=>`<option value="${esc(n)}" ${n===self?'selected':''}>${esc(n)}</option>`).join('')}</select></label><p class="muted">名前をこのブラウザに覚えます。共有端末では自分の名前に切り替えてください。現在は端末内保存で、本人認証・端末間の同期は未接続です。</p>`:''}<p>自分の回答${self?'（'+esc(self)+'）':''}：<strong></strong></p><p class="sync-warning" hidden>出欠を更新できませんでした。</p><div class="rsvp-buttons">${['出席','欠席','未定'].map(s=>`<button type="button" class="secondary" data-quick-status="${s}">${s}</button>`).join('')}</div><a data-open-rehearsal="${esc(p.id)}" href="rehearsals.html?v=20261123-flyers1&detail=${encodeURIComponent(p.id)}">出欠一覧・稽古の詳細を見る</a></div>`:''}<p class="save-feedback" role="status"></p>`;
+   panel.innerHTML=`<h2>${practicePage?'次回の稽古':'次回の公演'}</h2><div data-next-plan></div>${p?`<div class="quick-attendance">${!shared?`<label>自分の名前<select id="quick-person"><option value="">選んでください</option>${names.map(n=>`<option value="${esc(n)}" ${n===self?'selected':''}>${esc(n)}</option>`).join('')}</select></label><p class="muted">名前をこのブラウザに覚えます。共有端末では自分の名前に切り替えてください。現在は端末内保存で、本人認証・端末間の同期は未接続です。</p>`:''}<p>自分の回答${self?'（'+esc(self)+'）':''}：<strong></strong></p><p class="sync-warning" hidden>出欠を更新できませんでした。</p><div class="rsvp-buttons">${['出席','欠席','未定'].map(s=>`<button type="button" class="secondary" data-quick-status="${s}">${s}</button>`).join('')}</div><a data-open-rehearsal="${esc(p.id)}" href="rehearsals.html?v=20261123-flyers2&detail=${encodeURIComponent(p.id)}">出欠一覧・稽古の詳細を見る</a></div>`:''}<p class="save-feedback" role="status"></p>`;
   }
   panel.querySelector('h2').textContent=practicePage?(p?.date===today?'今日の稽古':'次回の稽古'):'次回の公演';
   panel.querySelector('[data-next-plan]').innerHTML=!authorized?
