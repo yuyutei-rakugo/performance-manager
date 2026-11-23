@@ -202,6 +202,7 @@ export function createPinClient(endpoint,state,emit){
   },
   async login(name,pin,keep=true){const result=await call('login',{name,pin,remember:keep});clear();token=result.token;remember=keep;persist();rememberMember(result.member);identity(result.member)},
   async logout(){const request=call('logout');signOut();await request},
+  reservation(action,data){return call(action,data,true)},
   flyer(action,data){return call(action,data,true)},
   backups(){return call('backupList',{},true)},
   createBackup(){return call('backupCreate',{},true)},

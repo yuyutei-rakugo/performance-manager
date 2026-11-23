@@ -5,6 +5,8 @@ const { chromium, devices } = require('playwright');
 const base = new URL(process.env.AUDIT_URL || 'http://127.0.0.1:8151/');
 assert.equal(base.hostname, '127.0.0.1', 'The audit must run against a local copy.');
 const endpoint = 'https://script.google.com/macros/s/audit-fixture/exec';
+const reservationRows=[];
+let failReservation=true;
 const docs = {
   events: {revision:1, items:[]},
   rehearsals: {revision:1, items:[]},
@@ -62,13 +64,20 @@ async function main(){
             docs.rehearsals={items:docs.rehearsals.items.map(r=>r.id===transfer.id?{...r,archivedAt:'2026-11-21T08:00:00Z'}:r),revision:docs.rehearsals.revision+1};
             return ok({count:1,rehearsals:docs.rehearsals});
           }
-          case 'flyerRead':return ok({rows:flyerRows,refused:[],categories:['公共施設'],sources:[],archived:false});
+          case 'flyerRead':case 'flyerImport':return ok({rows:flyerRows,refused:[],categories:['公共施設'],sources:[],archived:false});
           case 'flyerSave':{
             assert.equal(role,'viewer');
             assert.equal(request.eventId,docs.events.items[0].id);
             if(failFlyer){failFlyer=false;return answer({ok:false,error:'模擬掲示先保存失敗'})}
             flyerRows.push({...request.entry,id:'test-flyer',revision:1});
             return ok({rows:flyerRows,refused:[],categories:['公共施設'],sources:[],archived:false});
+          }
+          case 'reservationList':return ok({documents:reservationRows,schedules:[],canReview:false});
+          case 'reservationAdd':{
+            assert.equal(role,'viewer');assert(request.photo.startsWith('/9j/'));
+            if(failReservation){failReservation=false;return answer({ok:false,error:'模擬写真保存失敗'})}
+            reservationRows.push({id:'test-photo',fields:request.fields,status:'確認待ち',reasons:['候補なし']});
+            return ok({documents:reservationRows,schedules:[],canReview:false});
           }
           case 'save':{
             assert.notEqual(role,'viewer');
@@ -516,7 +525,7 @@ async function main(){
     await invited.locator('[data-flyers]').click();
     const flyerPanel=invited.getByRole('dialog',{name:'チラシの掲示先',exact:true});
     await flyerPanel.getByText('追加・絞り込み・引き継ぎ',{exact:true}).click();
-    await flyerPanel.getByRole('button',{name:'掲示先を追加'}).click();
+    await flyerPanel.getByRole('button',{name:'施設を追加'}).click();
     const flyerForm=invited.getByRole('dialog',{name:'掲示先を編集',exact:true});
     await flyerForm.getByLabel('施設名').fill('模擬施設');
     await flyerForm.getByLabel('地域').fill('銚子市');
@@ -528,10 +537,32 @@ async function main(){
     assert.equal(await flyerForm.getByLabel('自由メモ（任意）').inputValue(),'入力を保持');
     await flyerForm.getByRole('button',{name:'変更を保存する'}).click();
     await flyerPanel.getByText('掲示先を保存しました。').waitFor();
-    await flyerPanel.getByText('未依頼',{exact:true}).waitFor();
+    await flyerPanel.getByText('未依頼',{exact:true}).first().waitFor();
+    await flyerPanel.locator('[data-close-flyers]').click();
     await page.goto(invitation.href);
     await page.locator('[data-flyers]').click();
     await page.getByRole('dialog',{name:'チラシの掲示先',exact:true}).getByText('模擬施設',{exact:true}).waitFor();
+
+    await invited.setViewportSize({width:320,height:680});
+    await invited.locator('#event-dialog [data-close]').click();
+    await invited.getByRole('button',{name:'予約書類を追加'}).click();
+    const reservations=invited.getByRole('dialog',{name:'予約書類',exact:true});
+    await reservations.getByText('保存済みの予約書類はありません。').waitFor();
+    await invited.evaluate(()=>{window.TextDetector=class {
+      async detect(){return [{rawValue:'利用日：2026年12月20日\n施設名：試験会場\n部屋：第1室\n予約開始：15:00\n予約終了：21:00\n発行日：2026年11月23日'}]}
+    }});
+    const tiny=Buffer.from(await invited.evaluate(()=>document.createElement('canvas').toDataURL('image/png').split(',')[1]),'base64');
+    await reservations.locator('input[type=file]').setInputFiles({name:'test.png',mimeType:'image/png',buffer:tiny});
+    await reservations.getByText('読み取り内容を開く').click();
+    assert.equal(await reservations.getByLabel('利用日',{exact:true}).inputValue(),'2026-12-20');
+    assert.equal(await reservations.getByLabel('部屋',{exact:true}).inputValue(),'第1室');
+    await reservations.getByRole('button',{name:'写真を保存する'}).click();
+    await reservations.getByText(/模擬写真保存失敗/).waitFor();
+    assert.equal(await reservations.getByLabel('予約終了',{exact:true}).inputValue(),'21:00');
+    await reservations.getByRole('button',{name:'写真を保存する'}).click();
+    await reservations.getByText(/写真を保存しました/).waitFor();
+    await reservations.locator('summary').getByText('確認待ち',{exact:true}).waitFor();
+    assert(await reservations.evaluate(dialog=>dialog.scrollWidth<=dialog.clientWidth));
 
     const sample=docs.events.items[0];
     docs.events={revision:docs.events.revision+1,items:Array.from({length:500},(_,i)=>({...sample,id:'bulk-'+i}))};

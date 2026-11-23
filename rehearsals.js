@@ -1,12 +1,12 @@
-import {startEditor,finishEditor,leaveEditor,guardEditor,editorState,hasEditorDraft,saveRecovery,recoveryScope,recoveredEditState} from './editor-dialog.js?v=20261123-flyers8';
-import {performerPicker,updatePerformerPickers,readPerformer,showPerformerRoster} from './performer-picker.js?v=20261123-flyers8';
-import {mountMemberHome} from './member-home.js?v=20261123-flyers8';
-import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261123-flyers8';
-import {readCategories,saveCategories,validCategories} from './categories.js?v=20261123-flyers8';
-import {mountScheduleImport} from './schedule-import.js?v=20261123-flyers8';
-import {scheduleChange,scheduleChangeBadge,duplicateSchedule,copyScheduleInvite,toRecord,formatDuration,rehearsalTitle,readRecords,mergeRecords,mergedRecords} from './record-transfer.js?v=20261123-flyers8';
-import {cloud,startCloud,mountAccount} from './cloud.js?v=20261123-flyers8';
-import {statuses,rehearsalNames,validRehearsal,validAttendance,attendanceSummary,japanDate,rehearsalBadge,rehearsalDateTime} from './rehearsal-model.js?v=20261123-flyers8';
+import {startEditor,finishEditor,leaveEditor,guardEditor,editorState,hasEditorDraft,saveRecovery,recoveryScope,recoveredEditState} from './editor-dialog.js?v=20261123-reservations1';
+import {performerPicker,updatePerformerPickers,readPerformer,showPerformerRoster} from './performer-picker.js?v=20261123-reservations1';
+import {mountMemberHome} from './member-home.js?v=20261123-reservations1';
+import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261123-reservations1';
+import {readCategories,saveCategories,validCategories} from './categories.js?v=20261123-reservations1';
+import {mountScheduleImport} from './schedule-import.js?v=20261123-reservations1';
+import {scheduleChange,scheduleChangeBadge,duplicateSchedule,copyScheduleInvite,toRecord,formatDuration,rehearsalTitle,readRecords,mergeRecords,mergedRecords} from './record-transfer.js?v=20261123-reservations1';
+import {cloud,startCloud,mountAccount} from './cloud.js?v=20261123-reservations1';
+import {statuses,rehearsalNames,validRehearsal,validAttendance,attendanceSummary,japanDate,rehearsalBadge,rehearsalDateTime} from './rehearsal-model.js?v=20261123-reservations1';
 const $=id=>document.getElementById(id),esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const key='yuitei.rehearsals.v1';let items=[],attendance={},names=[],revision=0,loaded=false,storageOK=true,stop,stopAttendance,opened=null,detailRevision=0,busy=false,archiving=false;
 let noticeTimer;
@@ -60,7 +60,7 @@ const practiceRecovery=saveRecovery('practices',()=>recoveryScope(cloud.state),d
  detail(draft.id);
  practiceView(draft.id,true,draft);
 },canEdit);
-function form(existing,onCancel=()=>dialog.close(),recovery){if(!canEdit())return;stopAttendance?.();opened=null;const version=revision,r=recovery?.value||(existing?{...existing,title:existing.title==='その他稽古'?'その他':existing.title}:{title:rehearsalNames[0],date:new Date().toLocaleDateString('sv-SE'),time:'14:00',venue:'',notes:''});dialog.innerHTML=`<div class="dialog-body"><div class="dialog-head"><h2>${existing?'稽古を編集':'稽古を登録'}</h2><button type="button" data-close aria-label="閉じる">×</button></div><form id="rehearsal-form"><div class="editor-bar"><div class="form-actions"><button class="primary">変更を保存する</button><button class="secondary" type="button" data-cancel-edit>キャンセル</button></div><p role="status" data-editor-status hidden></p></div><div class="fields"><label class="wide">稽古名<select name="title" required>${[...new Set([...rehearsalNames,...(r.title&&!rehearsalNames.includes(r.title)?[r.title]:[])])].map(n=>`<option value="${esc(n)}" ${n===r.title?'selected':''}>${esc(n)}</option>`).join('')}</select></label><label class="wide" id="other-content-field">その他の内容<input name="otherContent" value="${esc(r.otherContent||'')}" placeholder="例：交流会、打ち合わせ"></label><label>開催日<input name="date" type="date" required value="${r.date}"></label><label>開演・開始時刻<input name="time" type="time" required value="${r.time}"></label><label class="wide">会場・場所<input name="venue" required value="${esc(r.venue)}"></label></div><label>内容・連絡事項（任意）<textarea name="notes" rows="4"></textarea></label>${existing?'<details class="delete-zone"><summary>この稽古を削除する</summary><label><input type="checkbox" id="delete-confirm">削除することを確認しました</label><button class="danger" type="button" id="delete-rehearsal" disabled>削除する</button></details>':''}</form></div>`;dialog.querySelector('textarea').value=r.notes;const toggleOther=()=>{const yes=$('rehearsal-form').elements.title.value==='その他';$('other-content-field').hidden=!yes;$('rehearsal-form').elements.otherContent.required=yes};$('rehearsal-form').elements.title.onchange=toggleOther;toggleOther();
+function form(existing,onCancel=()=>dialog.close(),recovery){if(!canEdit())return;stopAttendance?.();opened=null;const version=revision,r=recovery?.value||(existing?{...existing,title:existing.title==='その他稽古'?'その他':existing.title}:{title:rehearsalNames[0],date:new Date().toLocaleDateString('sv-SE'),time:'14:00',venue:'',notes:''});dialog.innerHTML=`<div class="dialog-body"><div class="dialog-head"><h2>${existing?'稽古を編集':'稽古を登録'}</h2><button type="button" data-close aria-label="閉じる">×</button></div><form id="rehearsal-form"><div class="editor-bar"><div class="form-actions"><button class="primary">変更を保存する</button><button class="secondary" type="button" data-cancel-edit>キャンセル</button></div><p role="status" data-editor-status hidden></p></div><div class="fields"><label class="wide">稽古名<select name="title" required>${[...new Set([...rehearsalNames,...(r.title&&!rehearsalNames.includes(r.title)?[r.title]:[])])].map(n=>`<option value="${esc(n)}" ${n===r.title?'selected':''}>${esc(n)}</option>`).join('')}</select></label><label class="wide" id="other-content-field">その他の内容<input name="otherContent" value="${esc(r.otherContent||'')}" placeholder="例：交流会、打ち合わせ"></label><label>開催日<input name="date" type="date" required value="${r.date}"></label><label>開演・開始時刻<input name="time" type="time" required value="${r.time}"></label><label class="wide">会場・場所<input name="venue" required value="${esc(r.venue)}"></label><label>部屋（任意）<input name="room" maxlength="100" value="${esc(r.room||'')}"></label><label>利用終了時刻（任意）<input type="time" name="endTime" value="${esc(r.endTime||'')}"></label></div><label>内容・連絡事項（任意）<textarea name="notes" rows="4"></textarea></label>${existing?'<details class="delete-zone"><summary>この稽古を削除する</summary><label><input type="checkbox" id="delete-confirm">削除することを確認しました</label><button class="danger" type="button" id="delete-rehearsal" disabled>削除する</button></details>':''}</form></div>`;dialog.querySelector('textarea').value=r.notes;const toggleOther=()=>{const yes=$('rehearsal-form').elements.title.value==='その他';$('other-content-field').hidden=!yes;$('rehearsal-form').elements.otherContent.required=yes};$('rehearsal-form').elements.title.onchange=toggleOther;toggleOther();
  const editor=$('rehearsal-form'),submissionId=existing?.id||recovery?.id||crypto.randomUUID();
  editor.querySelector('[data-cancel-edit]').onclick=()=>leaveEditor(dialog,onCancel);
  startEditor(dialog,editor);
@@ -487,3 +487,13 @@ cloud.onState(s=>{
 mountMemberHome();mountAccount();startCloud();
 
 mountScheduleImport(document.querySelector('#data-dialog .dialog-body'),'rehearsals',()=>items,save,notify);
+
+const reservationsButton=document.createElement('button');
+reservationsButton.type='button';reservationsButton.className='secondary reservation-launch';
+reservationsButton.textContent='予約書類を追加';reservationsButton.hidden=true;
+document.querySelector('main .tabs')?.after(reservationsButton);
+cloud.onState(state=>{reservationsButton.hidden=state.provider!=='apps-script'||!state.role});
+reservationsButton.onclick=async()=>{
+ const {openReservationDocuments}=await import('./reservation-documents.js?v=20261123-reservations1');
+ if(cloud.state.role)openReservationDocuments();
+};

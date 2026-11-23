@@ -7,11 +7,12 @@ function initializeOwner(){
  const lock=LockService.getScriptLock();lock.waitLock(20000);
  try{const props=PropertiesService.getScriptProperties();if(props.getProperty('DB_FILE_ID'))throw Error('初期設定済みです。');const pin=props.getProperty('OWNER_PIN')||'1111';checkPin_(pin);const secret=Utilities.getUuid()+Utilities.getUuid();props.setProperty('AUTH_SECRET',secret);const owner={id:'owner',name:'勇水',role:'admin',active:true,epoch:1,salt:Utilities.getUuid(),owner:true};owner.pinHash=hashPin_(owner,pin);const file=Drive.Files.create({name:'結友亭の帳面-共通データ.json',mimeType:'application/json'},Utilities.newBlob(JSON.stringify({version:1,members:[owner],shared:{},attendance:{}}),'application/json'),{fields:'id'});props.setProperty('DB_FILE_ID',file.id);props.deleteProperty('OWNER_PIN');return '勇水を最初の管理者として登録しました。'}finally{lock.releaseLock()}
 }
-function doGet(){return output_({ok:true,service:'yuyutei-members',version:1,attendanceProxy:true,rehearsalArchiveToday:true,automaticBackup:true,backupRecoveryRevision:2,checklistExclusion:true,flyerVenues:true})}
+function doGet(){return output_({reservationDocuments:true,ok:true,service:'yuyutei-members',version:1,attendanceProxy:true,rehearsalArchiveToday:true,automaticBackup:true,backupRecoveryRevision:2,checklistExclusion:true,flyerVenues:true})}
 function doPost(event){
  const lock=LockService.getScriptLock();let locked=false;
  try{if(!event||!event.postData||event.postData.contents.length>1500000)throw Error('リクエストを確認してください。');const req=JSON.parse(event.postData.contents);if(!req||typeof req!=='object')throw Error('リクエストを確認してください。');lock.waitLock(20000);locked=true;const db=readDb_();if(req.action==='login')return output_({ok:true,...login_(db,req)});const member=authorize_(db,req.token);let data;
  switch(req.action){
+ case 'reservationList':case 'reservationPhoto':case 'reservationAdd':case 'reservationReview':case 'reservationContact':data=reservationRequest_(db,member,req);break;
  case 'flyerRead':case 'flyerSave':case 'flyerRefuse':case 'flyerCarry':case 'flyerImport':data=flyerRequest_(db,req);break;
  case 'roster':data={members:db.members.filter(m=>m.active).map(m=>({name:m.name}))};break;
  case 'archivePast':admin_(member);data=archivePast_(db,req,member);if(data.count)writeDb_(db);break;
@@ -260,5 +261,141 @@ function flyerRequest_(db,req){
  if(rows.length!==saved.length||rows.some((row,i)=>row!==saved[i])){
   flyers.events[event.id]=rows;db.flyers=flyers;writeDb_(db);
  }
+ return view();
+}
+
+function reservationFields_(input){
+ const result={};
+ for(const [key,limit] of Object.entries({date:10,venue:100,room:100,start:5,end:5,issued:10})){
+  const value=input?.[key]??'';
+  if(typeof value!=='string'||value.length>limit)throw Error('読み取り内容を確認してください。');
+  const text=value.trim();
+  if(text&&(key==='date'||key==='issued')){
+   const day=new Date(text+'T00:00:00Z');
+   if(!/^\d{4}-\d{2}-\d{2}$/.test(text)||isNaN(day)||day.toISOString().slice(0,10)!==text)throw Error('日付を確認してください。');
+  }
+  if(text&&['start','end'].includes(key)&&!/^([01]\d|2[0-3]):[0-5]\d$/.test(text))throw Error('時刻を確認してください。');
+  result[key]=text;
+ }
+ return result;
+}
+function reservationNormalize_(value){return (value||'').normalize('NFKC').replace(/\s+/g,'')}
+function reservationSchedules_(db,today){
+ return ['events','rehearsals'].flatMap(type=>(db.shared[type]?.items||[])
+  .filter(row=>!row.archivedAt&&row.date>=today)
+  .map(row=>({type,id:row.id,title:row.title,date:row.date,venue:row.venue,room:row.room||'',start:row.time,end:row.endTime||''})));
+}
+function reservationMatch_(fields,schedules,needed){
+ const sameDate=schedules.filter(row=>row.date===fields.date);
+ const candidates=sameDate.filter(row=>fields.venue&&reservationNormalize_(row.venue)===reservationNormalize_(fields.venue));
+ const reasons=[];
+ if(!fields.issued)reasons.push('発行日が分かりません。');
+ if(!fields.date||!fields.venue)reasons.push('利用日または施設名が分かりません。');
+ if(candidates.length!==1){
+  if(fields.date&&fields.venue)reasons.push(candidates.length>1?'候補が複数あります。':sameDate.length?'同じ日の予定と施設名が異なります。':'該当する予定がありません。');
+  return {reasons};
+ }
+ const target=candidates[0];
+ if(!fields.room||!target.room)reasons.push('部屋を比較できません。');
+ else if(reservationNormalize_(target.room)!==reservationNormalize_(fields.room))reasons.push('予約書類と予定の部屋が異なります。');
+ const start=needed?.start||target.start,end=needed?.end||target.end;
+ const minutes=time=>Number(time.slice(0,2))*60+Number(time.slice(3));
+ const elapsed=total=>[Math.floor(total/60)?Math.floor(total/60)+'時間':'',total%60?total%60+'分':''].join('');
+ if(!fields.start||!fields.end||!start||!end||fields.start>=fields.end||start>=end)reasons.push('予約時間と必要な利用時間を比較できません。');
+ else{
+  const starts=minutes(fields.start)-minutes(start),ends=minutes(fields.end)-minutes(end);
+  if(starts)reasons.push('予約開始が必要な利用開始より'+elapsed(Math.abs(starts))+(starts<0?'早くなっています。':'遅くなっています。'));
+  if(ends)reasons.push('予約終了が必要な利用終了より'+elapsed(Math.abs(ends))+(ends<0?'早くなっています。':'遅くなっています。'));
+ }
+ return {target:reasons.length?null:{type:target.type,id:target.id},reasons};
+}
+function reservationCanReview_(db,member){
+ if(['admin','editor'].includes(member.role))return true;
+ const props=PropertiesService.getScriptProperties();
+ return ['ICHIGO','YASUE'].some((key,i)=>{
+  const id=props.getProperty('RESERVATION_REVIEWER_'+key+'_ID');
+  if(id)return id===member.id;
+  return member.name===['一悟','やすゑ'][i]&&db.members.filter(row=>row.name===member.name).length===1;
+ });
+}
+function reservationSignature_(fields){
+ return JSON.stringify([fields.date,reservationNormalize_(fields.venue),reservationNormalize_(fields.room)]);
+}
+function reservationView_(book,schedules){
+ const resolved=book.map(row=>{
+  const match=reservationMatch_(row.fields,schedules,row.needed);
+  const resolvedLink=row.review?.link||row.initialLink||match.target;
+  const schedule=resolvedLink&&schedules.find(item=>item.type===resolvedLink.type&&item.id===resolvedLink.id);
+  // Facility, room and use date identify each reservation independently of upload time.
+  const identified=!!(row.fields.date&&row.fields.venue&&row.fields.room);
+  const group=identified?reservationSignature_(row.fields):row.id;
+  return {row,match,group,identified,schedule,resolvedLink};
+ });
+ const groups=new Map();
+ for(const entry of resolved){
+  if(!groups.has(entry.group))groups.set(entry.group,[]);
+  groups.get(entry.group).push(entry);
+ }
+ return resolved.map(({row,match,group,identified,schedule,resolvedLink})=>{
+  const {photoId,hash,originalFields,...visible}=row;
+  const peers=groups.get(group);
+  const newest=peers.reduce((date,entry)=>entry.row.fields.issued>date?entry.row.fields.issued:date,'');
+  const sameDay=peers.filter(entry=>entry.row.fields.issued&&entry.row.fields.issued===row.fields.issued);
+  const conflict=sameDay.some(entry=>JSON.stringify(entry.row.fields)!==JSON.stringify(row.fields));
+  const reasons=[...match.reasons];
+  if(conflict)reasons.push('同じ発行日の書類で内容が異なります。');
+  if(resolvedLink&&!schedule&&!row.review)reasons.push('保存時の予定を再確認してください。');
+  return {...visible,latest:identified&&!!newest&&row.fields.issued===newest&&!conflict,older:!!row.fields.issued&&row.fields.issued<newest,
+   status:row.review&&(!conflict||sameDay.every(entry=>entry.row.id===row.id||row.review.comparedIds?.includes(entry.row.id)))?'確認済み':reasons.length?'確認待ち':'一致',
+   reasons,link:resolvedLink||null};
+ });
+}
+function reservationRequest_(db,member,req){
+ const book=db.reservationDocuments||[];
+ const today=Utilities.formatDate(new Date(),'Asia/Tokyo','yyyy-MM-dd');
+ const schedules=reservationSchedules_(db,today),canReview=reservationCanReview_(db,member);
+ const view=()=>({documents:reservationView_(book,schedules),schedules,canReview});
+ if(req.action==='reservationList')return view();
+ const row=book.find(item=>item.id===req.id);
+ if(req.action==='reservationPhoto'){
+  if(!row)throw Error('書類が見つかりません。');
+  const response=UrlFetchApp.fetch('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(row.photoId)+'?alt=media',{headers:{Authorization:'Bearer '+ScriptApp.getOAuthToken()},muteHttpExceptions:true});
+  if(response.getResponseCode()!==200)throw Error('写真を読み込めませんでした。');
+  return {photo:Utilities.base64Encode(response.getBlob().getBytes())};
+ }
+ if(req.action==='reservationAdd'){
+  if(typeof req.photo!=='string'||req.photo.length>1200000||!/^\/9j\/[A-Za-z0-9+/]*={0,2}$/.test(req.photo))throw Error('写真の形式または容量を確認してください。');
+  const hash=digest_(req.photo);
+  if(book.some(item=>item.hash===hash))return {...view(),duplicate:true};
+  if(book.length>=350)throw Error('書類の保存上限に達しました。管理者にご確認ください。');
+  const fields=reservationFields_(req.fields),match=reservationMatch_(fields,schedules);
+  const id=Utilities.getUuid();
+  const file=Drive.Files.create({name:'結友亭-予約書類-'+id+'.jpg',mimeType:'image/jpeg'},Utilities.newBlob(Utilities.base64Decode(req.photo),'image/jpeg'),{fields:'id'});
+  book.push({id,photoId:file.id,hash,fields,originalFields:{...fields},revision:1,initialLink:match.target||null});
+  db.reservationDocuments=book;
+  try{writeDb_(db)}catch(error){try{Drive.Files.update({trashed:true},file.id,null,{fields:'id'})}catch{}throw error}
+  return view();
+ }
+ if(!canReview)throw Error('この書類を確認する権限がありません。');
+ if(!row||row.revision!==req.revision)throw Error('書類が更新されました。最新の内容を確認してください。');
+ const now=new Date().toISOString();
+ if(req.action==='reservationContact'){
+  if(typeof req.contacted!=='boolean')throw Error('連絡状況を確認してください。');
+  row.contact={done:req.contacted,by:member.id,name:member.name,at:now};
+ }else{
+  const fields=reservationFields_(req.fields);
+  const needed=reservationFields_({start:req.needed?.start,end:req.needed?.end});
+  if(needed.start&&needed.end&&needed.start>=needed.end)throw Error('必要な利用時間を確認してください。');
+  const target=schedules.find(item=>item.type===req.link?.type&&item.id===req.link?.id);
+  const reason=typeof req.reason==='string'?req.reason.trim():'';
+  if(!target||!reason||reason.length>600)throw Error('対象の予定と確認理由を入力してください。');
+  const comparedIds=book.filter(item=>item.fields.issued===fields.issued&&reservationSignature_(item.fields)===reservationSignature_(fields)).map(item=>item.id);
+  if(comparedIds.some(id=>id!==row.id&&(!Array.isArray(req.seen)||!req.seen.includes(id))))throw Error('同じ発行日の書類が追加されました。最新の一覧を確認してください。');
+  const review={by:member.id,name:member.name,at:now,reason,link:{type:target.type,id:target.id},comparedIds};
+  row.reviewHistory=[...(row.reviewHistory||[]),{...review,fields,needed}];
+  row.review=review;row.fields=fields;row.needed={start:needed.start,end:needed.end};
+ }
+ row.revision++;
+ writeDb_(db);
  return view();
 }
