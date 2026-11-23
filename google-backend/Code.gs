@@ -7,11 +7,12 @@ function initializeOwner(){
  const lock=LockService.getScriptLock();lock.waitLock(20000);
  try{const props=PropertiesService.getScriptProperties();if(props.getProperty('DB_FILE_ID'))throw Error('初期設定済みです。');const pin=props.getProperty('OWNER_PIN')||'1111';checkPin_(pin);const secret=Utilities.getUuid()+Utilities.getUuid();props.setProperty('AUTH_SECRET',secret);const owner={id:'owner',name:'勇水',role:'admin',active:true,epoch:1,salt:Utilities.getUuid(),owner:true};owner.pinHash=hashPin_(owner,pin);const file=Drive.Files.create({name:'結友亭の帳面-共通データ.json',mimeType:'application/json'},Utilities.newBlob(JSON.stringify({version:1,members:[owner],shared:{},attendance:{}}),'application/json'),{fields:'id'});props.setProperty('DB_FILE_ID',file.id);props.deleteProperty('OWNER_PIN');return '勇水を最初の管理者として登録しました。'}finally{lock.releaseLock()}
 }
-function doGet(){return output_({ok:true,service:'yuyutei-members',version:1,attendanceProxy:true,rehearsalArchiveToday:true,automaticBackup:true,backupRecoveryRevision:2,checklistExclusion:true})}
+function doGet(){return output_({ok:true,service:'yuyutei-members',version:1,attendanceProxy:true,rehearsalArchiveToday:true,automaticBackup:true,backupRecoveryRevision:2,checklistExclusion:true,flyerVenues:true})}
 function doPost(event){
  const lock=LockService.getScriptLock();let locked=false;
  try{if(!event||!event.postData||event.postData.contents.length>1500000)throw Error('リクエストを確認してください。');const req=JSON.parse(event.postData.contents);if(!req||typeof req!=='object')throw Error('リクエストを確認してください。');lock.waitLock(20000);locked=true;const db=readDb_();if(req.action==='login')return output_({ok:true,...login_(db,req)});const member=authorize_(db,req.token);let data;
  switch(req.action){
+ case 'flyerRead':case 'flyerSave':case 'flyerRefuse':case 'flyerCarry':case 'flyerImport':data=flyerRequest_(db,req);break;
  case 'roster':data={members:db.members.filter(m=>m.active).map(m=>({name:m.name}))};break;
  case 'archivePast':admin_(member);data=archivePast_(db,req,member);if(data.count)writeDb_(db);break;
  case 'importLocal':admin_(member);data=importLocal_(db,req,member);writeDb_(db);break;
@@ -185,4 +186,79 @@ function isBackupMap_(value){return value&&typeof value==='object'&&!Array.isArr
 function backupNow(){
  const lock=LockService.getScriptLock();lock.waitLock(20000);
  try{createDataBackup_(readDb_(),true);return '現在の内容をバックアップしました。'}finally{lock.releaseLock()}
+}
+
+const flyerStatuses_=['未依頼','依頼済み','掲示済み','今回は見送り'];
+const flyerCategories_=['コンビニ','スーパー・商店','公共施設','飲食店','その他のお店・施設','その他'];
+
+function flyerText_(value,max,optional=false){
+ if(typeof value!=='string'||value.length>max||!optional&&!value.trim())throw Error('掲示先の入力内容を確認してください。');
+ return optional?value:value.trim();
+}
+function flyerKey_(name,region){
+ return JSON.stringify([region,name].map(value=>value.normalize('NFKC').toLowerCase().replace(/\s+/g,'')));
+}
+function flyerEntry_(input){
+ if(!input||!flyerStatuses_.includes(input.status))throw Error('掲示先の状況を選んでください。');
+ const name=flyerText_(input.name,120),region=flyerText_(input.region,80);
+ return {name,region,category:flyerText_(input.category,80),status:input.status,memo:flyerText_(input.memo,2000,true)};
+}
+function flyerRequest_(db,req){
+ checkId_(req.eventId);
+ const events=db.shared.events?.items||[];
+ const event=events.find(item=>item.id===req.eventId);
+ if(!event)throw Error('公演が見つかりません。');
+ const flyers=db.flyers||{events:{},refused:[]};
+ const saved=flyers.events[event.id]||[],rows=saved.slice();
+ const scheduleKey=item=>item.date+(item.time||'23:59');
+ const sources=events.filter(item=>scheduleKey(item)<scheduleKey(event)&&flyers.events[item.id]?.length);
+ const view=()=>({
+  rows,
+  refused:flyers.refused,
+  categories:[...new Set([...flyerCategories_,...Object.values(flyers.events).flat().map(row=>row.category),...rows.map(row=>row.category)])],
+  sources:sources.map(({id,title,date})=>({id,title,date})),
+  archived:!!event.archivedAt
+ });
+ if(req.action==='flyerRead')return view();
+ if(event.archivedAt)throw Error('記録へ移動済みの公演は閲覧のみです。');
+ const blocked=new Set(flyers.refused.flatMap(row=>row.keys));
+ const keys=row=>row.keys||[flyerKey_(row.name,row.region)];
+ const indexOf=key=>rows.findIndex(row=>keys(row).includes(key));
+ const push=(entry,related=[],source)=>{
+  const key=flyerKey_(entry.name,entry.region),aliases=[...new Set([key,...related])];
+  if(aliases.some(value=>blocked.has(value)||indexOf(value)>=0))return false;
+  rows.push({...entry,id:Utilities.getUuid(),revision:1,keys:aliases,...(source?{source}:{})});
+  return true;
+ };
+ if(req.action==='flyerSave'){
+  const value=flyerEntry_(req.entry),key=flyerKey_(value.name,value.region);
+  if(req.id){
+   const index=rows.findIndex(row=>row.id===req.id);
+   if(index<0||rows[index].revision!==req.revision)throw Error('この掲示先は更新されました。最新の内容を確認してください。');
+   const current=rows[index];
+   if(key!==flyerKey_(current.name,current.region)&&(blocked.has(key)||rows.some((row,i)=>i!==index&&keys(row).includes(key))))throw Error('同じ施設が登録済み、または一覧から除外済みです。');
+   rows[index]={...current,...value,revision:current.revision+1,keys:[...new Set([...keys(current),key])]};
+  }else if(!push(value))throw Error('同じ施設が登録済み、または一覧から除外済みです。');
+ }else if(req.action==='flyerRefuse'){
+  const index=rows.findIndex(row=>row.id===req.id);
+  if(index<0||rows[index].revision!==req.revision)throw Error('この掲示先は更新されました。最新の内容を確認してください。');
+  const [row]=rows.splice(index,1);
+  flyers.refused.push({...row,keys:keys(row),eventId:event.id,eventTitle:event.title,refusedOn:Utilities.formatDate(new Date(),'Asia/Tokyo','yyyy-MM-dd')});
+ }else if(req.action==='flyerCarry'){
+  const source=sources.find(item=>item.id===req.from);
+  if(!source)throw Error('引き継ぎ元の公演を選んでください。');
+  for(const row of flyers.events[source.id])push({...flyerEntry_(row),status:'未依頼'},keys(row),row.source);
+ }else if(req.action==='flyerImport'){
+  if(!Array.isArray(req.entries)||req.entries.length>50)throw Error('施設候補を確認してください。');
+  for(const row of req.entries){
+   const url=flyerText_(row?.url,500),date=flyerText_(row?.date,10);
+   if(!/^https:\/\/[^\s]+$/.test(url)||!/^\d{4}-\d{2}-\d{2}$/.test(date))throw Error('候補の確認元を確認してください。');
+   push(flyerEntry_({...row,memo:'',status:'未依頼'}),[],{url,date,reading:flyerText_(row.reading||'',120,true),name:row.name});
+  }
+ }
+ if(rows.length>200)throw Error('掲示先は公演ごとに200件までです。');
+ if(rows.length!==saved.length||rows.some((row,i)=>row!==saved[i])){
+  flyers.events[event.id]=rows;db.flyers=flyers;writeDb_(db);
+ }
+ return view();
 }

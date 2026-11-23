@@ -1,4 +1,4 @@
-import {loadCloudConfig} from './schedule-bootstrap.js?v=20261122-workflow3';
+import {loadCloudConfig} from './schedule-bootstrap.js?v=20261123-flyers1';
 // Configuration is enabled only after the Firebase project and access rules are ready.
 const listeners = new Set();
 const state = {ready:false, configured:false, connectionIssue:null, user:null, role:null,stageName:null, message:'共通保存は設定準備中です。現在はこの端末に保存します。'};
@@ -18,6 +18,11 @@ const emit=()=>{
  document.body?.classList.toggle('member-view',!state.ready||(state.configured&&!['admin','editor'].includes(state.role)));listeners.forEach(fn=>fn({...state}));window.dispatchEvent(new CustomEvent('cloud-state',{detail:{...state}}));};
 const errorMessage=e=>e?.code==='permission-denied'?'閲覧・編集の権限がありません。管理者に確認してください。':e?.message==='conflict'?'ほかの端末で更新されています。最新の内容を確認し、もう一度編集してください。':'通信または保存に失敗しました。接続を確認して再度お試しください。';
 export const cloud={
+ async flyer(action,data){
+  if(!pinClient||!state.role)throw Error('会員ログインが必要です。');
+  try{return await pinClient.flyer(action,data)}
+  catch(error){if(/この操作は利用できません/.test(error.message))throw Error('掲示先を利用するには共通保存の更新が必要です。');throw error}
+ },
  async backups(){if(!pinClient)throw Error('共通保存に接続してください。');return pinClient.backups()},
  async createBackup(){if(!pinClient)throw Error('共通保存に接続してください。');return pinClient.createBackup()},
  async restoreBackup(id,expected){if(!pinClient)throw Error('共通保存に接続してください。');return pinClient.restoreBackup(id,expected)},
@@ -80,7 +85,7 @@ export async function startCloud(){
   state.configured=true;state.provider=config.provider||'firebase';state.message='ログイン状態を確認しています。';emit();
   if(config.provider==='apps-script'){if(!/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec$/.test(config.endpoint||'')){
    state.connectionIssue='configuration';state.ready=true;state.message='共通保存の接続先設定を確認してください。';emit();return
-  }const {createPinClient}=await import('./pin-cloud.js?v=20261122-workflow3');pinClient=createPinClient(config.endpoint,state,emit);await pinClient.start();return}
+  }const {createPinClient}=await import('./pin-cloud.js?v=20261123-flyers1');pinClient=createPinClient(config.endpoint,state,emit);await pinClient.start();return}
   const base='https://www.gstatic.com/firebasejs/12.6.0/';
   const [app,authApi,store]=await Promise.all([import(base+'firebase-app.js'),import(base+'firebase-auth.js'),import(base+'firebase-firestore.js')]);
   api={...authApi,...store};const firebase=app.initializeApp(config.firebase);auth=api.getAuth(firebase);db=api.getFirestore(firebase);
@@ -108,7 +113,7 @@ export function mountAccount(){
  <div class="settings-actions">
   <button type="button" class="secondary" data-install>ホーム画面に追加</button>
   <button type="button" class="secondary" data-share>LINEで共有</button>
-  <a class="secondary" id="settings-admin" href="./admin.html?v=20261122-workflow3" hidden>管理者ページ</a>
+  <a class="secondary" id="settings-admin" href="./admin.html?v=20261123-flyers1" hidden>管理者ページ</a>
   <button type="button" class="secondary" id="cloud-logout" hidden>ログアウト</button>
  </div>
  <details class="quick-help"><summary>帳面の使い方</summary>

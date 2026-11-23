@@ -67,3 +67,12 @@ dialog{border:1px solid var(--line);border-radius:14px;width:min(680px,calc(100%
 @media print{.quick-help,.template-tools,.editor-bar{display:none!important}}
 
 .save-feedback[data-save-phase="error"]{border-left-color:#a10f26;background:#fff0f0}.save-feedback[data-save-phase="saved"]{border-left-color:#285b40;background:#edf4ef}
+
+.flyer-dialog button,.flyer-dialog select{min-height:44px}
+.flyer-item{padding:12px;margin-block:10px;border:1px solid var(--line);border-radius:8px;overflow-wrap:anywhere}
+.flyer-item h3{margin:0}
+.flyer-item p{margin:6px 0}
+.flyer-status{display:inline-block;padding:2px 8px;border-radius:5px;background:#e5e7eb;color:#303641;font-weight:700}
+.flyer-status[data-status="1"]{background:#d9ebff;color:#143d6c}
+.flyer-status[data-status="2"]{background:#d6efdc;color:#1d4b2b}
+.flyer-status[data-status="3"]{background:#f0e4d5;color:#5d432e}

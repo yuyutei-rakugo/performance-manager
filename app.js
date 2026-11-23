@@ -1,11 +1,12 @@
-import {startEditor,finishEditor,leaveEditor,guardEditor,editorState,saveRecovery,recoveryScope,recoveredEditState} from './editor-dialog.js?v=20261122-workflow3';
-import {performerPicker,updatePerformerPickers,readPerformer,showPerformerRoster} from './performer-picker.js?v=20261122-workflow3';
-import {mountMemberHome} from './member-home.js?v=20261122-workflow3';
-import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261122-workflow3';
-import {readCategories,saveCategories,validCategories,categoryOptions,mountCategories,mountCategoryAdder} from './categories.js?v=20261122-workflow3';
-import {mountScheduleImport} from './schedule-import.js?v=20261122-workflow3';
-import {scheduleChange,scheduleChangeBadge,preparationTemplates,draftTask,duplicateSchedule,copyScheduleInvite,validPerformer,timeline,formatDuration,toRecord,transferRecord,readRecords,mergeRecords,mergedRecords} from './record-transfer.js?v=20261122-workflow3';
-import {cloud,startCloud,mountAccount} from './cloud.js?v=20261122-workflow3';
+import {openFlyerVenues} from './flyer-venues.js?v=20261123-flyers1';
+import {startEditor,finishEditor,leaveEditor,guardEditor,editorState,saveRecovery,recoveryScope,recoveredEditState} from './editor-dialog.js?v=20261123-flyers1';
+import {performerPicker,updatePerformerPickers,readPerformer,showPerformerRoster} from './performer-picker.js?v=20261123-flyers1';
+import {mountMemberHome} from './member-home.js?v=20261123-flyers1';
+import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261123-flyers1';
+import {readCategories,saveCategories,validCategories,categoryOptions,mountCategories,mountCategoryAdder} from './categories.js?v=20261123-flyers1';
+import {mountScheduleImport} from './schedule-import.js?v=20261123-flyers1';
+import {scheduleChange,scheduleChangeBadge,preparationTemplates,draftTask,duplicateSchedule,copyScheduleInvite,validPerformer,timeline,formatDuration,toRecord,transferRecord,readRecords,mergeRecords,mergedRecords} from './record-transfer.js?v=20261123-flyers1';
+import {cloud,startCloud,mountAccount} from './cloud.js?v=20261123-flyers1';
 'use strict';
 
 const key = 'yuitei.events.v1';
@@ -183,7 +184,7 @@ function renderDetails(id,message='') {
 
   eventDialog.innerHTML = `<div class="dialog-body"><div class="dialog-head"><h2 id="event-heading">${esc(event.title)}</h2><button type="button" data-close="event-dialog" aria-label="閉じる">×</button></div>
     ${scheduleChangeBadge(event,esc)}<p>${dateLabel(event.date)} ${esc(event.time||'時間未定')}<br>会場　${esc(event.venue)}<br>区分　${esc(event.kind||'その他公演')}</p>${editable()?'<div class="form-actions"><button class="primary" data-edit>編集する</button><button type="button" class="secondary" data-duplicate>予定を複製</button></div>':''}<p class="save-feedback" role="status">${esc(message)}</p>
-    <div class="form-actions"><button type="button" class="secondary" data-copy-invite>LINE案内文をコピー</button></div><section class="block" id="event-program"><h3>出演順・演目</h3>${program}${rows.length?'<button type="button" class="secondary" id="print-program">番組表を印刷</button>':''}</section>
+    <div class="form-actions"><button type="button" class="secondary" data-copy-invite>LINE案内文をコピー</button>${cloud.state.provider==='apps-script'&&cloud.state.role?'<button type="button" class="secondary" data-flyers>チラシの掲示先</button>':''}</div><section class="block" id="event-program"><h3>出演順・演目</h3>${program}${rows.length?'<button type="button" class="secondary" id="print-program">番組表を印刷</button>':''}</section>
     <section class="block"><h3>準備チェックリスト</h3>${progressMarkup(event)}${event.checklist.map(item => `<div class="check-row task-summary ${item.excluded?'is-excluded':item.done?'is-complete':'is-pending'}"><span class="task-status">${item.excluded?'対象外':item.done?'✓ 完了':'未完了'}</span><strong>${esc(item.label)}</strong><small>担当：${esc((item.assignees||[]).join('・')||'未設定')} ／ 完了予定：${esc(item.dueDate||'未設定')}</small></div>`).join('')}</section>
     <section class="block"><h3>メモ</h3><p class="memo">${esc(event.memo) || 'メモはありません。'}</p></section><section class="block" hidden><button type="button" class="primary" id="transfer-event" ${editable()?'':'disabled'}>${event.archivedAt?'記録を更新する':'終了して記録へ移す'}</button><p class="muted">終了した内容を記録に保存します。元データは転記済みの一覧に残ります。</p>${event.archivedAt?'<button type="button" class="secondary" id="unarchive-event">公演一覧に戻す</button>':''}</section></div>`;
   if($('print-program'))$('print-program').onclick=()=>{
@@ -194,6 +195,7 @@ function renderDetails(id,message='') {
   $('transfer-event').onclick=async()=>{if(cloud.state.role!=='admin'||event.date>=today()||!confirm('終了した公演を稽古・公演記録へ移しますか？同じ公演は重複せず更新されます。'))return;try{await transferRecord(toRecord('event',event,memberNames));if(await save(events.map(e=>e.id===id?{...e,archivedAt:new Date().toISOString()}:e))){eventDialog.close();notify('稽古・公演記録へ移しました。')}else notify('記録への保存は完了しましたが、転記済み表示を保存できませんでした。再実行しても重複しません。')}catch(e){notify(e.message)}};
   if($('unarchive-event'))$('unarchive-event').onclick=async()=>{if(await save(events.map(e=>e.id===id?{...e,archivedAt:null}:e))){eventDialog.close();notify('公演一覧に戻しました。転記した記録は残しています。')}};
   eventDialog.querySelector('[data-edit]')?.addEventListener('click',()=>renderForm(events.find(item=>item.id===id)));
+  eventDialog.querySelector('[data-flyers]')?.addEventListener('click',()=>openFlyerVenues(event));
   eventDialog.querySelector('[data-copy-invite]').onclick=()=>copyScheduleInvite('event',event,notify);
   eventDialog.querySelector('[data-duplicate]')?.addEventListener('click',()=>{const value=duplicateSchedule('event',event);renderForm(null,{value,duplicated:true});notify('日時を確認して保存してください。演目と出欠は引き継ぎません。')});
   showEvent();
@@ -432,7 +434,7 @@ $('schedule').onclick = async click => {
   }
 };
 $('list-tab').onclick = () => {tab = 'list'; render();};
-$('calendar-tab').onclick = () => {location.href = 'rehearsals.html?v=20261122-workflow3';};
+$('calendar-tab').onclick = () => {location.href = 'rehearsals.html?v=20261123-flyers1';};
 $('new-event').onclick = () => renderForm();
 $('data-open').onclick = () => $('data-dialog').showModal();
 guardEditor(eventDialog);

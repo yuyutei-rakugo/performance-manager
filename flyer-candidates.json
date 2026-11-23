@@ -1,0 +1,9 @@
+[
+  {"name":"イオン銚子店","region":"銚子市","category":"スーパー・商店","url":"https://www.aeon.com/store/イオン/イオン銚子店/","date":"2026-11-23","reading":"いおんちょうしてん"},
+  {"name":"公正図書館","region":"銚子市","category":"公共施設","url":"https://www.city.choshi.chiba.jp/edu/sg-guide/index0151.html","date":"2026-11-23","reading":"こうせいとしょかん"},
+  {"name":"カスミ 波崎店","region":"神栖市","category":"スーパー・商店","url":"https://www.kasumi.co.jp/tenpotop/ibaraki-rokko/kamisu/332/","date":"2026-11-23","reading":"かすみはさきてん"},
+  {"name":"カスミ フードスクエアライフガーデン神栖店","region":"神栖市","category":"スーパー・商店","url":"https://www.kasumi.co.jp/tenpotop/ibaraki-rokko/kamisu/330/","date":"2026-11-23","reading":"かすみふーどすくえあらいふがーでんかみすてん"},
+  {"name":"神栖市文化センター","region":"神栖市","category":"公共施設","url":"https://www.city.kamisu.ibaraki.jp/kodomo/cul_facility/1001871.html","date":"2026-11-23","reading":"かみすしぶんかせんたー"},
+  {"name":"中央図書館","region":"神栖市","category":"公共施設","url":"https://www.city.kamisu.ibaraki.jp/kodomo/cul_facility/1001824/1001825/1001826.html","date":"2026-11-23","reading":"ちゅうおうとしょかん"},
+  {"name":"うずも図書館","region":"神栖市","category":"公共施設","url":"https://www.city.kamisu.ibaraki.jp/kodomo/cul_facility/1001824/1001825/1001827.html","date":"2026-11-23","reading":"うずもとしょかん"}
+]
