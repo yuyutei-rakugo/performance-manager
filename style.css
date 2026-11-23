@@ -92,3 +92,10 @@ dialog{border:1px solid var(--line);border-radius:14px;width:min(680px,calc(100%
 .flyer-status.flyer-choice.is-selected{background:var(--flyer-selected);color:#fff;font-weight:700;box-shadow:inset 0 0 0 2px var(--flyer-color)}
 .flyer-choice span{overflow-wrap:anywhere}.flyer-item [data-row-message]:empty{display:none}
 @media(max-width:360px){.flyer-choice{padding:3px;gap:4px;font-size:.9rem}}
+
+.flyer-heading{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:start;gap:10px}
+.flyer-heading h3{font-size:1.05rem;line-height:1.5}
+.flyer-badge{display:inline-block;padding:4px 8px;border-radius:5px;background:var(--flyer-color);color:#fff;font-weight:700;font-size:.82rem;line-height:1.5;white-space:nowrap}
+.flyer-map{font-size:.9rem;line-height:1.5;min-height:36px;display:flex;align-items:center;text-underline-offset:3px;color:var(--ink)}
+.flyer-row-details summary{font-size:.9rem;min-height:30px}.flyer-row-details{margin-top:4px}
+@media(max-width:360px){.flyer-heading{gap:6px}.flyer-badge{padding:4px;font-size:.78rem}}
