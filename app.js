@@ -1,12 +1,12 @@
-import {openFlyerVenues} from './flyer-venues.js?v=20261123-flyers8';
-import {startEditor,finishEditor,leaveEditor,guardEditor,editorState,saveRecovery,recoveryScope,recoveredEditState} from './editor-dialog.js?v=20261123-flyers8';
-import {performerPicker,updatePerformerPickers,readPerformer,showPerformerRoster} from './performer-picker.js?v=20261123-flyers8';
-import {mountMemberHome} from './member-home.js?v=20261123-flyers8';
-import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261123-flyers8';
-import {readCategories,saveCategories,validCategories,categoryOptions,mountCategories,mountCategoryAdder} from './categories.js?v=20261123-flyers8';
-import {mountScheduleImport} from './schedule-import.js?v=20261123-flyers8';
-import {scheduleChange,scheduleChangeBadge,preparationTemplates,draftTask,duplicateSchedule,copyScheduleInvite,validPerformer,timeline,formatDuration,toRecord,transferRecord,readRecords,mergeRecords,mergedRecords} from './record-transfer.js?v=20261123-flyers8';
-import {cloud,startCloud,mountAccount} from './cloud.js?v=20261123-flyers8';
+import {openFlyerVenues} from './flyer-venues.js?v=20261123-reservations1';
+import {startEditor,finishEditor,leaveEditor,guardEditor,editorState,saveRecovery,recoveryScope,recoveredEditState} from './editor-dialog.js?v=20261123-reservations1';
+import {performerPicker,updatePerformerPickers,readPerformer,showPerformerRoster} from './performer-picker.js?v=20261123-reservations1';
+import {mountMemberHome} from './member-home.js?v=20261123-reservations1';
+import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261123-reservations1';
+import {readCategories,saveCategories,validCategories,categoryOptions,mountCategories,mountCategoryAdder} from './categories.js?v=20261123-reservations1';
+import {mountScheduleImport} from './schedule-import.js?v=20261123-reservations1';
+import {scheduleChange,scheduleChangeBadge,preparationTemplates,draftTask,duplicateSchedule,copyScheduleInvite,validPerformer,timeline,formatDuration,toRecord,transferRecord,readRecords,mergeRecords,mergedRecords} from './record-transfer.js?v=20261123-reservations1';
+import {cloud,startCloud,mountAccount} from './cloud.js?v=20261123-reservations1';
 'use strict';
 
 const key = 'yuitei.events.v1';
@@ -263,7 +263,7 @@ function renderForm(existing,recovery) {
   const event = recovery?.value || existing || {title:'',date:tab === 'calendar' ? selected : today(),time:'14:00',venue:'',memo:'',performers:[],checklist:copiedTasks()};
   eventDialog.onchange = null;
   eventDialog.innerHTML = `<div class="dialog-body"><div class="dialog-head"><h2 id="event-heading">${existing ? '公演を編集' : '公演を登録'}</h2><button type="button" data-close="event-dialog" aria-label="閉じる">×</button></div>
-    <form id="event-form"><div class="editor-bar"><div class="form-actions"><button class="primary" type="submit">変更を保存する</button><button class="secondary" type="button" id="cancel-edit">キャンセル</button></div><p id="form-feedback" role="status" data-editor-status hidden></p></div><div class="fields"><label class="wide">公演名<input name="title" value="${esc(event.title)}" required></label><label>区分<select name="kind">${categoryOptions(event.kind||'その他公演',events.map(e=>e.kind))}</select></label><label>開催日<input name="date" type="date" value="${event.date}" required></label><label>開始時刻（空欄は時間未定）<input name="time" type="time" value="${esc(event.time)}"></label><label class="wide">会場<input name="venue" value="${esc(event.venue)}" required></label></div>
+    <form id="event-form"><div class="editor-bar"><div class="form-actions"><button class="primary" type="submit">変更を保存する</button><button class="secondary" type="button" id="cancel-edit">キャンセル</button></div><p id="form-feedback" role="status" data-editor-status hidden></p></div><div class="fields"><label class="wide">公演名<input name="title" value="${esc(event.title)}" required></label><label>区分<select name="kind">${categoryOptions(event.kind||'その他公演',events.map(e=>e.kind))}</select></label><label>開催日<input name="date" type="date" value="${event.date}" required></label><label>開始時刻（空欄は時間未定）<input name="time" type="time" value="${esc(event.time)}"></label><label class="wide">会場<input name="venue" value="${esc(event.venue)}" required></label><label>部屋（任意）<input name="reservationRoom" maxlength="100" value="${esc(event.room||'')}"></label><label>利用終了時刻（任意）<input type="time" name="reservationEnd" value="${esc(event.endTime||'')}"></label></div>
     <section class="block"><h3>出演順・演目</h3><p class="muted">会員を選ぶか、「ゲスト演者を入力」から高座名を入力できます。終了予定は開演時刻と持ち時間から計算します。</p><p class="muted" role="status" data-roster-status></p><button type="button" class="secondary" data-roster-retry hidden>名簿を更新</button><div id="performers"></div><button type="button" class="secondary" id="add-performer">＋ 出演者を追加</button> <button type="button" class="secondary" id="add-break">＋ 仲入りを追加</button></section>
     <section class="block"><h3>準備チェックリスト</h3>${!existing?'<p class="muted">最新のリストの項目をコピーしました。完了・対象外・担当者・完了予定日はリセットしています。</p>':''}<div id="task-rows"></div><button type="button" class="secondary" id="add-task">＋ 末尾に項目を追加</button></section>
     <section class="block"><label>公演メモ<textarea name="memo" rows="4"></textarea></label></section>${existing?'<section class="delete-zone"><button type="button" class="secondary" id="show-delete" aria-expanded="false" aria-controls="delete-confirmation">この公演を削除する…</button><div id="delete-confirmation" hidden><p>削除すると、この公演の出演者・準備リスト・メモも削除されます。</p><label><input type="checkbox" id="confirm-delete">この公演を削除することを確認しました</label><button type="button" class="danger" id="delete-event" disabled>公演を削除する</button></div></section>':''}</form></div>`;
@@ -362,11 +362,11 @@ function renderForm(existing,recovery) {
     submit.preventDefault();
     if(saving||!canRetry)return;
     const form = new FormData(submit.currentTarget);
-    const text = field => form.get(field).trim();
+    const text = field => (form.get(field)||'').trim();
     const next = {
       ...existing,
       id:submissionId,
-      kind:text('kind'),title:text('title'),date:text('date'),time:text('time'),venue:text('venue'),memo:form.get('memo'),
+      kind:text('kind'),title:text('title'),date:text('date'),time:text('time'),venue:text('venue'),memo:form.get('memo'),room:text('reservationRoom'),endTime:text('reservationEnd'),
       performers:[...list.children].map(row => {
         const input=name=>row.querySelector(`[name=${name}]`);
         const type=input('type').value;
@@ -434,7 +434,7 @@ $('schedule').onclick = async click => {
   }
 };
 $('list-tab').onclick = () => {tab = 'list'; render();};
-$('calendar-tab').onclick = () => {location.href = 'rehearsals.html?v=20261123-flyers8';};
+$('calendar-tab').onclick = () => {location.href = 'rehearsals.html?v=20261123-reservations1';};
 $('new-event').onclick = () => renderForm();
 $('data-open').onclick = () => $('data-dialog').showModal();
 guardEditor(eventDialog);
@@ -504,3 +504,13 @@ cloud.onState(state=>{
 startCloud();
 
 const organize=document.createElement('div');organize.className='record-filters';organize.innerHTML='<label>区分<select id="event-kind-filter"><option value="">全区分</option></select></label><label>表示順<select id="event-sort"><option value="date">日付順</option><option value="kind">区分順</option></select></label>';$('schedule').before(organize);mountCategories(organize,()=>events.map(e=>e.kind));organize.onchange=()=>render();window.addEventListener('categories-changed',()=>render());mountScheduleImport(document.querySelector('#data-dialog .dialog-body')||organize,'events',()=>events,save,notify,copiedTasks);render();
+
+const reservationsButton=document.createElement('button');
+reservationsButton.type='button';reservationsButton.className='secondary reservation-launch';
+reservationsButton.textContent='予約書類を追加';reservationsButton.hidden=true;
+document.querySelector('main .tabs')?.after(reservationsButton);
+cloud.onState(state=>{reservationsButton.hidden=state.provider!=='apps-script'||!state.role});
+reservationsButton.onclick=async()=>{
+ const {openReservationDocuments}=await import('./reservation-documents.js?v=20261123-reservations1');
+ if(cloud.state.role)openReservationDocuments();
+};
