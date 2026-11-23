@@ -72,10 +72,12 @@ dialog{border:1px solid var(--line);border-radius:14px;width:min(680px,calc(100%
 .flyer-item{padding:12px;margin-block:10px;border:1px solid var(--line);border-radius:8px;overflow-wrap:anywhere}
 .flyer-item h3{margin:0}
 .flyer-item p{margin:6px 0}
-.flyer-status{display:inline-block;padding:2px 8px;border-radius:5px;background:#e5e7eb;color:#303641;font-weight:700}
-.flyer-status[data-status="1"]{background:#d9ebff;color:#143d6c}
-.flyer-status[data-status="2"]{background:#d6efdc;color:#1d4b2b}
-.flyer-status[data-status="3"]{background:#f0e4d5;color:#5d432e}
+.flyer-item[data-status="0"],.flyer-choice[data-status="0"]{--flyer-color:#4b5563;--flyer-bg:#f0f1f3;--flyer-selected:#dce0e5}
+.flyer-item[data-status="1"],.flyer-choice[data-status="1"]{--flyer-color:#174d80;--flyer-bg:#eef5ff;--flyer-selected:#cfe4ff}
+.flyer-item[data-status="2"],.flyer-choice[data-status="2"]{--flyer-color:#285b40;--flyer-bg:#edf7ef;--flyer-selected:#c9e9d2}
+.flyer-item[data-status="3"],.flyer-choice[data-status="3"]{--flyer-color:#79512e;--flyer-bg:#faf2e8;--flyer-selected:#eedcc6}
+.flyer-item[data-status]{border-left:5px solid var(--flyer-color)}
+.flyer-status{border-radius:5px}
 
 .flyer-meta{font-size:.94rem;line-height:1.7}
 .flyer-row-details{margin-top:8px}.flyer-row-details summary,.flyer-tools summary{min-height:36px;cursor:pointer;line-height:1.7}
@@ -85,8 +87,9 @@ dialog{border:1px solid var(--line);border-radius:14px;width:min(680px,calc(100%
 .flyer-choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;border:0;padding:0;margin:10px 0}
 .flyer-choices legend{font-size:.94rem;margin-bottom:4px}
 .flyer-choice{display:flex;align-items:center;gap:8px;min-height:46px;padding:8px;cursor:pointer;line-height:1.6;border:1px solid transparent;font-size:1rem}
-.flyer-choice input[type=checkbox]{width:24px;height:24px;flex:0 0 24px;margin:0;accent-color:#285b40}
-.flyer-status.flyer-choice:not(.is-selected){background:transparent;color:var(--ink);border-color:var(--line);font-weight:400}
+.flyer-choice input[type=checkbox]{width:24px;height:24px;flex:0 0 24px;margin:0;accent-color:var(--flyer-color,#285b40)}
+.flyer-status.flyer-choice{background:var(--flyer-bg);color:var(--flyer-color);border-color:var(--flyer-color);font-weight:400}
+.flyer-status.flyer-choice.is-selected{background:var(--flyer-selected);font-weight:700;box-shadow:inset 0 0 0 2px var(--flyer-color)}
 .flyer-choice span{overflow-wrap:anywhere}.flyer-item [data-row-message]:empty{display:none}
 @media(max-width:360px){.flyer-choice{padding:6px;gap:6px;font-size:.95rem}}
 

@@ -1,5 +1,5 @@
-import {startEditor,finishEditor,leaveEditor,guardEditor,editorState} from './editor-dialog.js?v=20261123-flyers4';
-import {cloud} from './cloud.js?v=20261123-flyers4';
+import {startEditor,finishEditor,leaveEditor,guardEditor,editorState} from './editor-dialog.js?v=20261123-flyers5';
+import {cloud} from './cloud.js?v=20261123-flyers5';
 
 const statuses=['未依頼','依頼済み','掲示済み','今回は見送り'];
 const compare=new Intl.Collator('ja',{numeric:true,sensitivity:'base'}).compare;
@@ -28,7 +28,7 @@ export function openFlyerVenues(event){
   source.replaceChildren(new Option('公演を選択',''),...(data?.sources||[]).map(row=>new Option(row.date+' '+row.title,row.id)));
   for(const [select,value] of [[region,selectedRegion],[category,selectedCategory],[source,selectedSource]])if([...select.options].some(option=>option.value===value))select.value=value;
   const match=rows.filter(row=>(!region.value||row.region===region.value)&&(!category.value||row.category===category.value));
-  q('[data-list]').innerHTML=match.sort((left,right)=>compare(orderName(left),orderName(right))||compare(left.region,right.region)).map(row=>`<article class="flyer-item"><h3>${esc(row.name)}</h3><fieldset class="flyer-choices"><legend>状況</legend>${statuses.map((status,i)=>`<label class="flyer-choice flyer-status ${row.status===status?'is-selected':''}" data-status="${i}"><input type="checkbox" data-status-choice="${esc(row.id)}" value="${esc(status)}" ${row.status===status?'checked':''}><span>${esc(status)}</span></label>`).join('')}</fieldset><p data-row-message role="status"></p><details class="flyer-row-details"><summary>メモ・その他</summary><p class="flyer-meta">${esc(row.region)} ／ ${esc(row.category)}</p>${row.memo?`<p class="memo">${esc(row.memo)}</p>`:''}${data.archived?'':`<button type="button" class="secondary" data-edit-flyer="${esc(row.id)}">編集する</button> <button type="button" class="secondary" data-refuse-flyer="${esc(row.id)}">断られたため一覧から外す</button>`}${row.source?`<p><a href="${esc(row.source.url)}" target="_blank" rel="noopener noreferrer">確認元</a> <time>${esc(row.source.date)}</time></p>`:''}</details></article>`).join('')||(data?'<p>表示する掲示先はありません。「追加・絞り込み・引き継ぎ」から登録できます。</p>':'');
+  q('[data-list]').innerHTML=match.sort((left,right)=>compare(orderName(left),orderName(right))||compare(left.region,right.region)).map(row=>`<article class="flyer-item" data-status="${statuses.indexOf(row.status)}"><h3>${esc(row.name)}</h3><fieldset class="flyer-choices"><legend>状況</legend>${statuses.map((status,i)=>`<label class="flyer-choice flyer-status ${row.status===status?'is-selected':''}" data-status="${i}"><input type="checkbox" data-status-choice="${esc(row.id)}" value="${esc(status)}" ${row.status===status?'checked':''}><span>${esc(status)}</span></label>`).join('')}</fieldset><p data-row-message role="status"></p><details class="flyer-row-details"><summary>メモ・その他</summary><p class="flyer-meta">${esc(row.region)} ／ ${esc(row.category)}</p>${row.memo?`<p class="memo">${esc(row.memo)}</p>`:''}${data.archived?'':`<button type="button" class="secondary" data-edit-flyer="${esc(row.id)}">編集する</button> <button type="button" class="secondary" data-refuse-flyer="${esc(row.id)}">断られたため一覧から外す</button>`}${row.source?`<p><a href="${esc(row.source.url)}" target="_blank" rel="noopener noreferrer">確認元</a> <time>${esc(row.source.date)}</time></p>`:''}</details></article>`).join('')||(data?'<p>表示する掲示先はありません。「追加・絞り込み・引き継ぎ」から登録できます。</p>':'');
   q('[data-refused]').innerHTML=(data?.refused||[]).map(row=>`<li><strong>${esc(row.name)}</strong> ／ ${esc(row.eventTitle)} ／ ${esc(row.refusedOn)}${row.memo?`<p class="memo">${esc(row.memo)}</p>`:''}</li>`).join('')||'<li>履歴はありません。</li>';
   updateControls();
  }
@@ -91,7 +91,7 @@ export function openFlyerVenues(event){
   busy=true;updateControls();message.textContent='施設候補を読み込み中…';
   let candidates;
   try{
-   const response=await fetch('./flyer-candidates.json?v=20261123-flyers4');
+   const response=await fetch('./flyer-candidates.json?v=20261123-flyers5');
    if(!response.ok)throw Error('施設候補を読み込めませんでした');
    candidates=await response.json();
   }catch(error){message.textContent=error.message+' もう一度お試しください。';return}
