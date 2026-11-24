@@ -132,3 +132,27 @@ export function exactAddressPosition(address,features){
  const xy=exact.length===1&&exact[0].geometry?.coordinates;
  if(Array.isArray(xy)&&xy.length===2&&xy.every(Number.isFinite)&&Math.abs(xy[0])<=180&&Math.abs(xy[1])<=90)return [xy[1],xy[0]];
 }
+
+export function flyerSearchUrl(row){
+ const address=flyerLocationInfo(row)?.address;
+ return 'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent([row.name,row.region,address].filter(Boolean).join(' '));
+}
+
+export function approximateAddressPosition(address,region,features){
+ const compact=value=>value.normalize('NFKC').replace(/\s+/g,'');
+ const city=compact(region);
+ const input=compact(address);
+ if(!city||!input.includes(city)||!Array.isArray(features))return;
+ const exact=exactAddressPosition(address,features);
+ if(exact)return exact;
+ const candidates=features.filter(feature=>{
+  const title=compact(String(feature.properties?.title||''));
+  const district=title.split(city)[1];
+  const fromCity=input.slice(input.indexOf(city));
+  const candidate=district&&city+district;
+  return candidate&&district.length>=2&&fromCity.startsWith(candidate)&&(!fromCity.slice(candidate.length)||(!/\d$/.test(candidate)&&/^\d/.test(fromCity.slice(candidate.length))));
+ });
+ if(candidates.length!==1)return;
+ const xy=candidates[0].geometry?.coordinates;
+ if(Array.isArray(xy)&&xy.length===2&&xy.every(Number.isFinite)&&Math.abs(xy[0])<=180&&Math.abs(xy[1])<=90)return [xy[1],xy[0]];
+}
