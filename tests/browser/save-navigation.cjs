@@ -530,7 +530,7 @@ async function main(){
     await invited.locator('#event-dialog[open] #event-heading').getByText('翌日の公演').waitFor();
 
     await invited.locator('[data-flyers]').click();
-    const flyerPanel=invited.getByRole('dialog',{name:'チラシの掲示先',exact:true});
+    const flyerPanel=invited.getByRole('dialog',{name:'チラシ配布・掲示',exact:true});
     await flyerPanel.getByText('追加・絞り込み・引き継ぎ',{exact:true}).click();
     await flyerPanel.getByRole('button',{name:'施設を追加'}).click();
     const flyerForm=invited.getByRole('dialog',{name:'掲示先を編集',exact:true});
@@ -562,7 +562,7 @@ async function main(){
     await flyerPanel.locator('[data-close-flyers]').click();
     await page.goto(invitation.href);
     await page.locator('[data-flyers]').click();
-    await page.getByRole('dialog',{name:'チラシの掲示先',exact:true}).getByRole('heading',{name: '模擬施設 位置未確認'}).waitFor();
+    await page.getByRole('dialog',{name:'チラシ配布・掲示',exact:true}).getByRole('heading',{name: '模擬施設 位置未確認'}).waitFor();
 
     flyerRows.push(
       {id:'known1',name:'中央図書館',region:'神栖市',category:'公共施設',status:'掲示済み',memo:'会員用の試験メモ',revision:1},
@@ -571,7 +571,7 @@ async function main(){
       {id:'refused',name:'神栖市文化センター',region:'神栖市',category:'公共施設',status:'依頼済み',memo:'',revision:1}
     );
     flyerRefused.push({name:'神栖市文化センター',region:'神栖市',keys:[]});
-    const mapPanel=page.getByRole('dialog',{name:'チラシの掲示先',exact:true});
+    const mapPanel=page.getByRole('dialog',{name:'チラシ配布・掲示',exact:true});
     let tiles=0;
     await page.route('https://cyberjapandata.gsi.go.jp/xyz/**',route=>{
       tiles++;assert(!decodeURIComponent(route.request().url()).includes('会員用の試験メモ'));
