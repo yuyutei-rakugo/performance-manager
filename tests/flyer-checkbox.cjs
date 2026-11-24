@@ -41,7 +41,7 @@ const tick=()=>new Promise(r=>setImmediate(r));
 })().catch(error=>{console.error(error);process.exitCode=1});
 
 const helpers=new JSDOM('',{runScripts:'outside-only'}).window;
-helpers.eval(clean('flyer-locations.js')+'\nwindow.position=positionFromUrl;window.addressPosition=exactAddressPosition;window.info=flyerLocationInfo;');
+helpers.eval(clean('flyer-locations.js')+'\nwindow.position=positionFromUrl;window.addressPosition=exactAddressPosition;window.info=flyerLocationInfo;window.approx=approximateAddressPosition;');
 const all=require('../flyer-candidates.json');
 assert.equal(all.filter(row=>Number.isFinite(helpers.info(row)?.lat)&&helpers.info(row)?.address?.includes(row.region)&&helpers.info(row)?.source?.startsWith('https://')).length,94);
 assert.equal(helpers.info({...all[0],location:null}),null);
@@ -53,4 +53,9 @@ const feature={properties:{title:'茨城県神栖市若松中央二丁目３０�
 assert.deepEqual(Array.from(helpers.addressPosition('茨城県神栖市若松中央2-30',[feature])),[35.836029,140.73584]);
 assert.equal(helpers.addressPosition('茨城県神栖市若松中央2-30-4',[feature]),undefined);
 assert.equal(helpers.addressPosition('茨城県神栖市若松中央2-30',[feature,feature]),undefined);
+const district={properties:{title:'茨城県神栖市知手'},geometry:{coordinates:[140.70,35.86]}};
+assert.deepEqual(Array.from(helpers.approx('茨城県神栖市知手123-4','神栖市',[district])),[35.86,140.70]);
+assert.equal(helpers.approx('茨城県神栖市知手中央123','神栖市',[district]),undefined);
+assert.equal(helpers.approx('茨城県神栖市知手123-4','神栖市',[district,district]),undefined);
+assert.equal(helpers.approx('茨城県神栖市','神栖市',[{...district,properties:{title:'茨城県神栖市'}}]),undefined);
 helpers.close();

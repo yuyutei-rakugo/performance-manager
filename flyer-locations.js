@@ -142,7 +142,7 @@ export function approximateAddressPosition(address,region,features){
  const compact=value=>value.normalize('NFKC').replace(/\s+/g,'');
  const city=compact(region);
  const input=compact(address);
- if(!city||!input.includes(city)||!Array.isArray(features))return;
+ if(!city||!input.includes(city)||input.endsWith(city)||!Array.isArray(features))return;
  const exact=exactAddressPosition(address,features);
  if(exact)return exact;
  const candidates=features.filter(feature=>{

@@ -198,7 +198,7 @@ export async function mountFlyerMap(host,actions){
    if(!userPosition&&idsKey!==previousIds&&located.length)view.fitBounds(latLngBounds(located.map(position)),{padding:[28,28],maxZoom:15,animate:false});
    previousIds=idsKey;
    const approximateCount=located.filter(row=>!flyerLocation(row)).length;
-   host.querySelector('[data-map-count]').textContent='全 '+rows.length+'件 ／ 位置確認済み '+(located.length-approximateCount)+'件 ／ 概略位置 '+approximateCount+'件 ／ 表示位置なし '+(rows.length-located.length)+'件';
+   host.querySelector('[data-map-count]').textContent='表示対象 '+rows.length+'件 ／ 位置確認済み '+(located.length-approximateCount)+'件 ／ 概略位置 '+approximateCount+'件 ／ 表示位置なし '+(rows.length-located.length)+'件';
    showUnlocated(rows);renderNearby();
  }
  return {focus,update,destroy(){active=false;view.remove();host.replaceChildren()}
