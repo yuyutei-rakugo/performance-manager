@@ -553,6 +553,7 @@ async function main(){
     flyerRows.push(
       {id:'known1',name:'中央図書館',region:'神栖市',category:'公共施設',status:'掲示済み',memo:'会員用の試験メモ',revision:1},
       {id:'known2',name:'うずも図書館',region:'神栖市',category:'公共施設',status:'依頼済み',memo:'',revision:1},
+      {id:'approx',name:'住所のみの施設',region:'神栖市',category:'公共施設',status:'未依頼',memo:'',location:{address:'茨城県神栖市知手123-4'},revision:1},
       {id:'refused',name:'神栖市文化センター',region:'神栖市',category:'公共施設',status:'依頼済み',memo:'',revision:1}
     );
     flyerRefused.push({name:'神栖市文化センター',region:'神栖市',keys:[]});
@@ -590,6 +591,31 @@ async function main(){
     await mapPanel.locator('[data-filter-status]').selectOption('掲示済み');
     assert.equal(await mapPanel.locator('.flyer-pin').count(),1);
     assert(tiles>0);
+    await mapPanel.locator('[data-filter-status]').selectOption('');
+    await page.route('https://msearch.gsi.go.jp/**',route=>route.fulfill({json:[
+      {properties:{title:'茨城県神栖市知手'},geometry:{coordinates:[140.70,35.86]}}
+    ]}));
+    await mapPanel.locator('[data-unlocated] summary').click();
+    await mapPanel.getByRole('button',{name:'住所から概略位置を探す'}).click();
+    await popup.getByText('概略位置（住所に基づく目安）').waitFor();
+    assert.equal(await mapPanel.locator('.flyer-pin-approx').count(),1);
+    const searchUrl=new URL(await popup.getByRole('link',{name:'Googleマップで探す'}).getAttribute('href'));
+    assert.equal(searchUrl.searchParams.get('query'),'住所のみの施設 神栖市 茨城県神栖市知手123-4');
+    await page.evaluate(()=>{
+      window.locationAttempts=0;
+      navigator.geolocation.getCurrentPosition=(success,error)=>{
+        if(++window.locationAttempts===1)error({code:1});
+        else success({coords:{latitude:35.86,longitude:140.701}});
+      };
+    });
+    await mapPanel.getByRole('button',{name:'現在地を表示'}).click();
+    await mapPanel.getByText(/位置情報の利用が許可されていません/).waitFor();
+    assert.equal(await mapPanel.locator('.flyer-pin').count(),3);
+    await mapPanel.getByRole('button',{name:'現在地を表示'}).click();
+    await mapPanel.getByText('青い丸が現在地です。').waitFor();
+    await mapPanel.getByRole('button',{name:'近い順に見る'}).click();
+    const nearest=mapPanel.locator('[data-nearby-list] button').first();
+    assert.match(await nearest.textContent(),/住所のみの施設.*概略位置.*距離の目安/);
     await mapPanel.getByRole('button',{name:'地図を閉じる'}).click();
     await mapPanel.locator('[data-filter-status]').selectOption('');
     const unknown=mapPanel.locator('[data-venue-id="test-flyer"]');

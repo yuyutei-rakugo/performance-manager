@@ -1,6 +1,6 @@
-import {flyerLocation,flyerLocationInfo,positionFromUrl,exactAddressPosition} from './flyer-locations.js?v=20261124-map2';
-import {startEditor,finishEditor,leaveEditor,guardEditor,editorState} from './editor-dialog.js?v=20261124-map2';
-import {cloud} from './cloud.js?v=20261124-map2';
+import {flyerLocation,flyerLocationInfo,positionFromUrl,exactAddressPosition} from './flyer-locations.js?v=20261124-map3';
+import {startEditor,finishEditor,leaveEditor,guardEditor,editorState} from './editor-dialog.js?v=20261124-map3';
+import {cloud} from './cloud.js?v=20261124-map3';
 
 const statuses=['未依頼','依頼済み','掲示済み','今回は見送り'];
 const compare=new Intl.Collator('ja',{numeric:true,sensitivity:'base'}).compare;
@@ -17,7 +17,7 @@ export function openFlyerVenues(event){
  const dialog=document.createElement('dialog');
  dialog.className='flyer-dialog';
  dialog.setAttribute('aria-label','チラシの掲示先');
- dialog.innerHTML='<div class="dialog-body"><div class="dialog-head"><h2>チラシの掲示先</h2><button type="button" data-close-flyers aria-label="閉じる">×</button></div><p></p><p class="muted">「状況を変更・メモ」を開いてチェック（自動保存）</p><div class="flyer-actions form-actions"><button type="button" class="secondary" data-open-map>地図で見る</button><button type="button" data-add>施設を追加</button><button type="button" data-refresh class="secondary">最新を取得</button></div><p data-message role="status"></p><div class="flyer-quick-filters"><label>施設名で検索<input type="search" data-search placeholder="施設名を入力"></label><label>状況<select data-filter-status><option value="">すべて</option><option>未依頼</option><option>依頼済み</option><option>掲示済み</option><option>今回は見送り</option></select></label></div><p data-count class="muted" role="status"></p><details class="flyer-tools"><summary>追加・絞り込み・引き継ぎ</summary><div class="record-filters flyer-filters"><label>地域<select data-region></select></label><label>区分<select data-category></select></label></div><div class="flyer-actions form-actions"><label>引き継ぎ元<select data-source></select></label><button type="button" data-carry>選んだ公演から引き継ぐ</button></div></details><section data-map-panel hidden></section><div data-list></div><details><summary>断られた施設の履歴</summary><ul data-refused></ul></details></div>';
+ dialog.innerHTML='<div class="dialog-body"><div class="dialog-head"><h2>チラシの掲示先</h2><button type="button" data-close-flyers aria-label="閉じる">×</button></div><p></p><p class="muted">「状況を変更・メモ」を開いてチェック（自動保存）</p><div class="flyer-actions form-actions"><button type="button" class="secondary" data-open-map>地図で見る</button><button type="button" data-add>施設を追加</button><button type="button" data-refresh class="secondary">最新を取得</button></div><p data-message role="status"></p><div class="flyer-quick-filters"><label>施設名で検索<input type="search" data-search placeholder="施設名を入力"></label><label>状況<select data-filter-status><option value="">すべて</option><option>未依頼</option><option>依頼済み</option><option>掲示済み</option><option>今回は見送り</option></select></label></div><p data-count class="muted" role="status"></p><p data-position-count class="muted"></p><details class="flyer-tools"><summary>追加・絞り込み・引き継ぎ</summary><div class="record-filters flyer-filters"><label>地域<select data-region></select></label><label>区分<select data-category></select></label></div><div class="flyer-actions form-actions"><label>引き継ぎ元<select data-source></select></label><button type="button" data-carry>選んだ公演から引き継ぐ</button></div></details><section data-map-panel hidden></section><div data-list></div><details><summary>断られた施設の履歴</summary><ul data-refused></ul></details></div>';
  dialog.querySelector('.dialog-head + p').textContent=event.title;
  const q=selector=>dialog.querySelector(selector);
  const message=q('[data-message]'),source=q('[data-source]'),region=q('[data-region]'),category=q('[data-category]');
@@ -26,12 +26,16 @@ export function openFlyerVenues(event){
  let data,busy=false,editor;
  const rowNodes=new Map(),groupNodes=new Map(),rowMessages=new Map();
  let mapView,mapOpening=false,refusedMarkup;
- const snapshotCatalog=()=>catalogPromise||(catalogPromise=fetch('./flyer-candidates.json?v=20261124-map2').then(response=>{if(!response.ok)throw Error('施設一覧を読み込めませんでした。');return response.json()}).catch(error=>{catalogPromise=null;throw error}));
+ const snapshotCatalog=()=>catalogPromise||(catalogPromise=fetch('./flyer-candidates.json?v=20261124-map3').then(response=>{if(!response.ok)throw Error('施設一覧を読み込めませんでした。');return response.json()}).catch(error=>{catalogPromise=null;throw error}));
  const normalize=value=>String(value||'').normalize('NFKC').toLowerCase().replace(/\s+/g,'');
  const request=(action,payload={})=>cloud.flyer(action,{eventId:event.id,...payload});
  function redraw(){
   const rows=data?.rows||[];
   const excluded=new Set((data?.refused||[]).flatMap(row=>[venueKey(row),...(row.keys||[])]));
+  const visibleOnMap=row=>![venueKey(row),...(row.keys||[])].some(key=>excluded.has(key));
+  const registered=rows.filter(visibleOnMap);
+  const confirmed=registered.filter(flyerLocation).length;
+  q('[data-position-count]').textContent=data?'掲示対象 '+registered.length+'件 ／ 位置確認済み '+confirmed+'件 ／ 位置未確認 '+(registered.length-confirmed)+'件':'';
   const nextOptions=(select,next)=>{
    const selected=select.value;
    if(JSON.stringify([...select.options].map(item=>[item.value,item.text]))===JSON.stringify(next.map(item=>[item.value,item.text])))return;
@@ -50,7 +54,7 @@ export function openFlyerVenues(event){
     if(!groupNodes.has(group)){const heading=document.createElement('h3');heading.className='flyer-group';heading.textContent=row.region+' ／ '+row.category;groupNodes.set(group,heading)}
     desired.push(groupNodes.get(group));lastGroup=group;
    }
-   const mapAllowed=![venueKey(row),...(row.keys||[])].some(key=>excluded.has(key));
+   const mapAllowed=visibleOnMap(row);
    const position=flyerLocationInfo(row);
    const signature=JSON.stringify([row,!!data.archived,mapAllowed]);
    let cached=rowNodes.get(row.id);
@@ -80,7 +84,7 @@ export function openFlyerVenues(event){
   q('[data-count]').textContent=data?match.length+'／'+rows.length+'施設':'';
   const refused=(data?.refused||[]).map(row=>`<li><strong>${esc(row.name)}</strong> ／ ${esc(row.eventTitle)} ／ ${esc(row.refusedOn)}${row.memo?`<p class="memo">${esc(row.memo)}</p>`:''}</li>`).join('')||'<li>履歴はありません。</li>';
   if(refused!==refusedMarkup){q('[data-refused]').innerHTML=refused;refusedMarkup=refused}
-  mapView?.update(match.filter(row=>![venueKey(row),...(row.keys||[])].some(key=>excluded.has(key))),!!data?.archived,busy,rowMessages);
+  mapView?.update(match.filter(visibleOnMap),!!data?.archived,busy,rowMessages);
   if(dialog.scrollTop!==scrollTop)dialog.scrollTop=scrollTop;
   updateControls();
  }
@@ -242,7 +246,7 @@ export function openFlyerVenues(event){
   if(mapView){mapView.destroy();mapView=null;host.hidden=true;button.textContent='地図で見る';return}
   mapOpening=true;host.hidden=false;host.textContent='地図を読み込み中…';
   try{
-   const {mountFlyerMap}=await import('./flyer-map.js?v=20261124-map2');
+   const {mountFlyerMap}=await import('./flyer-map.js?v=20261124-map3');
    if(!dialog.open)return;
    mapView=await mountFlyerMap(host,{
     edit:id=>{const row=data?.rows.find(row=>row.id===id);if(row)edit(row)},
