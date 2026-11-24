@@ -94,6 +94,8 @@ export async function mountFlyerMap(host,actions){
     }else node.bindPopup(content,{maxWidth:205,maxHeight:165});
     const element=node.getElement();
     element.setAttribute('aria-label',label);element.title=label;
+    // Pointer focus can scroll a clipped dialog between press and release.
+    element.onmousedown=event=>{if(event.button===0)event.preventDefault()};
     element.onclick=event=>{event.stopPropagation();node.openPopup()};
     element.onkeydown=event=>{
      if(event.key==='Enter'||event.key===' '){event.preventDefault();event.stopPropagation();node.openPopup()}

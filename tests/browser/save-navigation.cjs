@@ -15,7 +15,7 @@ const docs = {
     occasion:'同名の記録', pieces:{'試験会員':'寿限無'}, note:''
   }]}
 };
-const attendance=new Map(),flyerRows=[];
+const attendance=new Map(),flyerRows=[],flyerRefused=[];
 let failFlyer=false;
 let pending,delayedHistory;
 const hold = (collection,commitEarly=false) => {
@@ -64,9 +64,9 @@ async function main(){
             docs.rehearsals={items:docs.rehearsals.items.map(r=>r.id===transfer.id?{...r,archivedAt:'2026-11-21T08:00:00Z'}:r),revision:docs.rehearsals.revision+1};
             return ok({count:1,rehearsals:docs.rehearsals});
           }
-          case 'flyerRead':case 'flyerImport':return ok({rows:flyerRows,locationFields:true,refused:[],categories:['公共施設'],sources:[],archived:false});
+          case 'flyerRead':case 'flyerImport':return ok({rows:flyerRows,locationFields:true,refused:flyerRefused,categories:['公共施設'],sources:[],archived:false});
           case 'flyerSave':{
-            assert.equal(role,'viewer');
+            assert.equal(role,request.id?'admin':'viewer');
             assert.equal(request.eventId,docs.events.items[0].id);
             if(failFlyer){failFlyer=false;return answer({ok:false,error:'模擬掲示先保存失敗'})}
             if(request.id){
@@ -75,7 +75,7 @@ async function main(){
               assert.equal(request.revision,flyerRows[i].revision);
               flyerRows[i]={...flyerRows[i],...request.entry,revision:request.revision+1};
             }else flyerRows.push({...request.entry,id:'test-flyer',revision:1});
-            return ok({rows:flyerRows,locationFields:true,refused:[],categories:['公共施設'],sources:[],archived:false});
+            return ok({rows:flyerRows,locationFields:true,refused:flyerRefused,categories:['公共施設'],sources:[],archived:false});
           }
           case 'reservationList':return ok({documents:reservationRows,schedules:[],canReview:false});
           case 'reservationAdd':{
@@ -552,8 +552,10 @@ async function main(){
 
     flyerRows.push(
       {id:'known1',name:'中央図書館',region:'神栖市',category:'公共施設',status:'掲示済み',memo:'会員用の試験メモ',revision:1},
-      {id:'known2',name:'うずも図書館',region:'神栖市',category:'公共施設',status:'依頼済み',memo:'',revision:1}
+      {id:'known2',name:'うずも図書館',region:'神栖市',category:'公共施設',status:'依頼済み',memo:'',revision:1},
+      {id:'refused',name:'神栖市文化センター',region:'神栖市',category:'公共施設',status:'依頼済み',memo:'',revision:1}
     );
+    flyerRefused.push({name:'神栖市文化センター',region:'神栖市',keys:[]});
     const mapPanel=page.getByRole('dialog',{name:'チラシの掲示先',exact:true});
     let tiles=0;
     await page.route('https://cyberjapandata.gsi.go.jp/xyz/**',route=>{

@@ -251,7 +251,8 @@ export function openFlyerVenues(event){
    });
    if(!dialog.open){mapView.destroy();mapView=null;return}
    button.textContent='地図を閉じる';redraw();
-   if(focusId){mapView.focus(focusId);host.scrollIntoView({block:'nearest'})}
+   if(focusId)mapView.focus(focusId);
+   host.querySelector('.flyer-map-canvas').scrollIntoView({block:'center'});
   }catch{if(dialog.open)host.textContent='地図を読み込めませんでした。「地図で見る」で再試行できます。'}
   finally{mapOpening=false}
  };
