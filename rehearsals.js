@@ -1,12 +1,12 @@
-import {startEditor,finishEditor,leaveEditor,guardEditor,editorState,hasEditorDraft,saveRecovery,recoveryScope,recoveredEditState} from './editor-dialog.js?v=20261124-simple1';
-import {performerPicker,updatePerformerPickers,readPerformer,showPerformerRoster} from './performer-picker.js?v=20261124-simple1';
-import {mountMemberHome} from './member-home.js?v=20261124-simple1';
-import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261124-simple1';
-import {readCategories,saveCategories,validCategories} from './categories.js?v=20261124-simple1';
-import {mountScheduleImport} from './schedule-import.js?v=20261124-simple1';
-import {scheduleChange,scheduleChangeBadge,duplicateSchedule,copyScheduleInvite,toRecord,formatDuration,rehearsalTitle,readRecords,mergeRecords,mergedRecords} from './record-transfer.js?v=20261124-simple1';
-import {cloud,startCloud,mountAccount} from './cloud.js?v=20261124-simple1';
-import {statuses,rehearsalNames,validRehearsal,validAttendance,attendanceSummary,japanDate,rehearsalBadge,rehearsalDateTime} from './rehearsal-model.js?v=20261124-simple1';
+import {startEditor,finishEditor,leaveEditor,guardEditor,editorState,hasEditorDraft,saveRecovery,recoveryScope,recoveredEditState} from './editor-dialog.js?v=20261124-layout2';
+import {performerPicker,updatePerformerPickers,readPerformer,showPerformerRoster} from './performer-picker.js?v=20261124-layout2';
+import {mountMemberHome} from './member-home.js?v=20261124-layout2';
+import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261124-layout2';
+import {readCategories,saveCategories,validCategories} from './categories.js?v=20261124-layout2';
+import {mountScheduleImport} from './schedule-import.js?v=20261124-layout2';
+import {scheduleChange,scheduleChangeBadge,duplicateSchedule,copyScheduleInvite,toRecord,formatDuration,rehearsalTitle,readRecords,mergeRecords,mergedRecords} from './record-transfer.js?v=20261124-layout2';
+import {cloud,startCloud,mountAccount} from './cloud.js?v=20261124-layout2';
+import {statuses,rehearsalNames,validRehearsal,validAttendance,attendanceSummary,japanDate,rehearsalBadge,rehearsalDateTime} from './rehearsal-model.js?v=20261124-layout2';
 const $=id=>document.getElementById(id),esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const key='yuitei.rehearsals.v1';let items=[],attendance={},names=[],revision=0,loaded=false,storageOK=true,stop,stopAttendance,opened=null,detailRevision=0,busy=false,archiving=false;
 let noticeTimer;
@@ -491,9 +491,9 @@ mountScheduleImport(document.querySelector('#data-dialog .dialog-body'),'rehears
 const reservationsButton=document.createElement('button');
 reservationsButton.type='button';reservationsButton.className='secondary reservation-launch';
 reservationsButton.textContent='予約書類を追加';reservationsButton.hidden=true;
-document.querySelector('main .tabs')?.after(reservationsButton);
+document.querySelector('.workspace')?.append(reservationsButton);
 cloud.onState(state=>{reservationsButton.hidden=state.provider!=='apps-script'||!state.role});
 reservationsButton.onclick=async()=>{
- const {openReservationDocuments}=await import('./reservation-documents.js?v=20261124-simple1');
+ const {openReservationDocuments}=await import('./reservation-documents.js?v=20261124-layout2');
  if(cloud.state.role)openReservationDocuments();
 };

@@ -1,5 +1,5 @@
-import {startEditor,finishEditor,leaveEditor,guardEditor,editorState} from './editor-dialog.js?v=20261124-simple1';
-import {cloud} from './cloud.js?v=20261124-simple1';
+import {startEditor,finishEditor,leaveEditor,guardEditor,editorState} from './editor-dialog.js?v=20261124-layout2';
+import {cloud} from './cloud.js?v=20261124-layout2';
 
 const statuses=['未依頼','依頼済み','掲示済み','今回は見送り'];
 const compare=new Intl.Collator('ja',{numeric:true,sensitivity:'base'}).compare;
@@ -119,7 +119,7 @@ export function openFlyerVenues(event){
    if(!dialog.open)return;
    redraw();
    if(!data.archived){
-    const response=await fetch('./flyer-candidates.json?v=20261124-simple1');
+    const response=await fetch('./flyer-candidates.json?v=20261124-layout2');
     if(!response.ok)throw Error('施設一覧を読み込めませんでした。');
     const catalog=await response.json();
     if(!Array.isArray(catalog))throw Error('施設一覧を読み込めませんでした。');

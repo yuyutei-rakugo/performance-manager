@@ -1,12 +1,12 @@
-import {openFlyerVenues} from './flyer-venues.js?v=20261124-simple1';
-import {startEditor,finishEditor,leaveEditor,guardEditor,editorState,saveRecovery,recoveryScope,recoveredEditState} from './editor-dialog.js?v=20261124-simple1';
-import {performerPicker,updatePerformerPickers,readPerformer,showPerformerRoster} from './performer-picker.js?v=20261124-simple1';
-import {mountMemberHome} from './member-home.js?v=20261124-simple1';
-import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261124-simple1';
-import {readCategories,saveCategories,validCategories,categoryOptions,mountCategories,mountCategoryAdder} from './categories.js?v=20261124-simple1';
-import {mountScheduleImport} from './schedule-import.js?v=20261124-simple1';
-import {scheduleChange,scheduleChangeBadge,preparationTemplates,draftTask,duplicateSchedule,copyScheduleInvite,validPerformer,timeline,formatDuration,toRecord,transferRecord,readRecords,mergeRecords,mergedRecords} from './record-transfer.js?v=20261124-simple1';
-import {cloud,startCloud,mountAccount} from './cloud.js?v=20261124-simple1';
+import {openFlyerVenues} from './flyer-venues.js?v=20261124-layout2';
+import {startEditor,finishEditor,leaveEditor,guardEditor,editorState,saveRecovery,recoveryScope,recoveredEditState} from './editor-dialog.js?v=20261124-layout2';
+import {performerPicker,updatePerformerPickers,readPerformer,showPerformerRoster} from './performer-picker.js?v=20261124-layout2';
+import {mountMemberHome} from './member-home.js?v=20261124-layout2';
+import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261124-layout2';
+import {readCategories,saveCategories,validCategories,categoryOptions,mountCategories,mountCategoryAdder} from './categories.js?v=20261124-layout2';
+import {mountScheduleImport} from './schedule-import.js?v=20261124-layout2';
+import {scheduleChange,scheduleChangeBadge,preparationTemplates,draftTask,duplicateSchedule,copyScheduleInvite,validPerformer,timeline,formatDuration,toRecord,transferRecord,readRecords,mergeRecords,mergedRecords} from './record-transfer.js?v=20261124-layout2';
+import {cloud,startCloud,mountAccount} from './cloud.js?v=20261124-layout2';
 'use strict';
 
 const key = 'yuitei.events.v1';
@@ -131,9 +131,9 @@ function progressMarkup(event) {
   return `<div class="progress"><div class="progress-label"><span>${label}</span>${excluded?`<small>対象外 ${excluded}件</small>`:''}</div>${total?`<progress aria-label="準備進捗" value="${done}" max="${total}"></progress>`:''}</div>`;
 }
 let nextEventId;
-function card(event) {
+function card(event,featured=false) {
   const [year, mon, day] = event.date.split('-');
-  return `<article class="event-card"><div class="date-badge" aria-hidden="true"><small>${Number(mon)}月</small><strong>${Number(day)}</strong></div><div>${event.id===nextEventId?'<p class="next-event-label">次回の公演</p>':''}<h3>${esc(event.title)}</h3>${scheduleChangeBadge(event,esc)}<div class="meta"><span>${year}/${mon}/${day} ${esc(event.time||'時間未定')}</span><span>＠ ${esc(event.venue)}</span></div></div>${progressMarkup(event)}<div class="event-actions"><button class="secondary" data-event="${esc(event.id)}" aria-label="${esc(event.title)}の詳細">詳細 ›</button></div></article>`;
+  return `<article class="event-card${featured?' featured-performance':''}"><div class="date-badge" aria-hidden="true"><small>${Number(mon)}月</small><strong>${Number(day)}</strong></div><div>${featured?'<h2 class="next-event-label">次回の公演</h2>':''}<h3>${esc(event.title)}</h3>${scheduleChangeBadge(event,esc)}<div class="meta"><span>${featured?esc(dateLabel(event.date)):year+'/'+mon+'/'+day} ${esc(event.time||'時間未定')}</span><span>＠ ${esc(event.venue)}</span></div></div>${progressMarkup(event)}<div class="event-actions"><button class="secondary" data-event="${esc(event.id)}" aria-label="${esc(event.title)}の詳細">詳細 ›</button></div></article>`;
 }
 let requestedEvent=new URLSearchParams(location.search).get('detail');
 function render() {
@@ -147,13 +147,15 @@ function render() {
   const filter=document.getElementById('event-kind-filter');if(filter){const value=filter.value;filter.innerHTML='<option value="">全区分</option>'+categoryOptions(value,events.map(e=>e.kind));filter.value=value;}
   const scheduled = events.filter(e=>!e.archivedAt&&upcoming(e));
   nextEventId=[...scheduled].sort((a,b)=>(a.date+(a.time||'23:59')).localeCompare(b.date+(b.time||'23:59')))[0]?.id;
+  const featured=document.getElementById('next-performance'),next=events.find(e=>e.id===nextEventId);
+  if(featured){featured.hidden=!next||(cloud.state.configured&&(!cloudLoaded||!cloud.state.role));featured.innerHTML=featured.hidden?'':card(next,true)}
   const stats = [['▦','予定の公演',scheduled.length],['◷','準備未完了',scheduled.filter(event=>{const {done,total}=progress(event);return done<total}).length],['✓','準備完了',scheduled.filter(event=>{const {done,total}=progress(event);return total>0&&done===total}).length]];
   if($('stats'))$('stats').innerHTML = stats.map(([icon,label,count]) => `<div class="stat"><span class="stat-icon" aria-hidden="true">${icon}</span><div><small>${label}</small><strong>${count}</strong><span class="unit">件</span></div></div>`).join('');
   $('list-tab').setAttribute('aria-pressed', tab === 'list');
   $('calendar-tab').setAttribute('aria-pressed', tab === 'calendar');
   const warning=cloudLoaded&&cloudLoadError?'<p class="sync-warning" role="status">更新できませんでした。前回取得した公演予定を表示しています。</p>':'';
   $('schedule').innerHTML = cloud.state.configured&&!cloudLoaded ? '<p class="empty">'+(cloud.state.role?esc(cloudLoadError||'公演予定を読み込んでいます。'):'公演予定を見るには会員ログインしてください。端末内のデータは保持しています。')+'</p>' : tab === 'list'
-    ? sortedEvents(events.filter(e=>!e.archivedAt)).map(card).join('') || '<p class="empty">公演がありません。「公演を登録」から追加できます。</p>'
+    ? sortedEvents(events.filter(e=>!e.archivedAt&&e.id!==nextEventId)).map(e=>card(e)).join('') || (nextEventId?'<p class="empty">このほかの公演予定はありません。</p>':'<p class="empty">公演がありません。「公演を登録」から追加できます。</p>')
     : calendar();
 
   if(warning)$('schedule').insertAdjacentHTML('afterbegin',warning);
@@ -170,7 +172,7 @@ function calendar() {
     const count = counts.get(date);
     return `<button class="day" data-day="${date}" aria-label="${dateLabel(date)}${count ? ' 公演' + count + '件' : ''}" aria-pressed="${date === selected}" ${date === today() ? 'aria-current="date"' : ''}>${i + 1}${count ? '<span>' + count + '件</span>' : ''}</button>`;
   }).join('');
-  const cards = sortedEvents(events.filter(event => event.date === selected)).map(card).join('');
+  const cards = sortedEvents(events.filter(event => event.date === selected)).map(e=>card(e)).join('');
   return `<div class="calendar"><div class="calendar-head"><button data-month="-1" aria-label="前の月">‹</button><h3>${year}年${mon}月</h3><button data-month="1" aria-label="次の月">›</button></div><div class="calendar-grid">${labels}${'<span></span>'.repeat(first)}${cells}</div></div><div class="calendar-results"><h3>${dateLabel(selected)}</h3>${cards || '<p class="empty">この日の公演はありません。</p>'}</div>`;
 }
 function showEvent() {
@@ -435,8 +437,9 @@ $('schedule').onclick = async click => {
     $('schedule').querySelector(`[data-month="${button.dataset.month}"]`).focus();
   }
 };
+document.getElementById('next-performance')?.addEventListener('click',event=>{const button=event.target.closest('[data-event]');if(button)renderDetails(button.dataset.event)});
 $('list-tab').onclick = () => {tab = 'list'; render();};
-$('calendar-tab').onclick = () => {location.href = 'rehearsals.html?v=20261124-simple1';};
+$('calendar-tab').onclick = () => {location.href = 'rehearsals.html?v=20261124-layout2';};
 $('new-event').onclick = () => renderForm();
 $('data-open').onclick = () => $('data-dialog').showModal();
 guardEditor(eventDialog);
@@ -510,9 +513,9 @@ const organize=document.createElement('div');organize.className='record-filters'
 const reservationsButton=document.createElement('button');
 reservationsButton.type='button';reservationsButton.className='secondary reservation-launch';
 reservationsButton.textContent='予約書類を追加';reservationsButton.hidden=true;
-document.querySelector('main .tabs')?.after(reservationsButton);
+document.querySelector('.workspace')?.append(reservationsButton);
 cloud.onState(state=>{reservationsButton.hidden=state.provider!=='apps-script'||!state.role});
 reservationsButton.onclick=async()=>{
- const {openReservationDocuments}=await import('./reservation-documents.js?v=20261124-simple1');
+ const {openReservationDocuments}=await import('./reservation-documents.js?v=20261124-layout2');
  if(cloud.state.role)openReservationDocuments();
 };

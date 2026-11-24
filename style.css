@@ -112,3 +112,12 @@ dialog{border:1px solid var(--line);border-radius:14px;width:min(680px,calc(100%
 .flyer-quick-filters{display:grid;grid-template-columns:minmax(0,1fr) minmax(7rem,.65fr);gap:10px}
 .flyer-quick-filters label{min-width:0}
 .flyer-quick-filters input,.flyer-quick-filters select{width:100%;min-width:0}
+
+#next-performance .featured-performance{display:block;border:0;margin:0;padding:0;background:transparent}
+#next-performance .date-badge{display:none}
+#next-performance .next-event-label{font-size:1.35rem;margin:0 0 .75rem}
+#next-performance h3{font-size:1.2rem;margin:.75rem 0}
+#next-performance .meta{font-size:1.05rem;margin:.65rem 0 1rem}
+#next-performance .meta span:first-child{color:var(--ink);font-size:1.15rem}
+#next-performance .progress{margin:1rem 0}
+.reservation-launch{margin-top:1.25rem}
