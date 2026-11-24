@@ -1,12 +1,12 @@
-import {startEditor,finishEditor,leaveEditor,guardEditor,editorState,hasEditorDraft,saveRecovery,recoveryScope,recoveredEditState} from './editor-dialog.js?v=20261124-map3';
-import {performerPicker,updatePerformerPickers,readPerformer,showPerformerRoster} from './performer-picker.js?v=20261124-map3';
-import {mountMemberHome} from './member-home.js?v=20261124-map3';
-import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261124-map3';
-import {readCategories,saveCategories,validCategories} from './categories.js?v=20261124-map3';
-import {mountScheduleImport} from './schedule-import.js?v=20261124-map3';
-import {scheduleChange,scheduleChangeBadge,duplicateSchedule,copyScheduleInvite,toRecord,formatDuration,rehearsalTitle,readRecords,mergeRecords,mergedRecords} from './record-transfer.js?v=20261124-map3';
-import {cloud,startCloud,mountAccount} from './cloud.js?v=20261124-map3';
-import {statuses,rehearsalNames,validRehearsal,validAttendance,attendanceSummary,japanDate,rehearsalBadge,rehearsalDateTime} from './rehearsal-model.js?v=20261124-map3';
+import {startEditor,finishEditor,leaveEditor,guardEditor,editorState,hasEditorDraft,saveRecovery,recoveryScope,recoveredEditState} from './editor-dialog.js?v=20261124-shared1';
+import {performerPicker,updatePerformerPickers,readPerformer,showPerformerRoster} from './performer-picker.js?v=20261124-shared1';
+import {mountMemberHome} from './member-home.js?v=20261124-shared1';
+import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261124-shared1';
+import {readCategories,saveCategories,validCategories} from './categories.js?v=20261124-shared1';
+import {mountScheduleImport} from './schedule-import.js?v=20261124-shared1';
+import {scheduleChange,scheduleChangeBadge,duplicateSchedule,copyScheduleInvite,toRecord,formatDuration,rehearsalTitle,readRecords,mergeRecords,mergedRecords} from './record-transfer.js?v=20261124-shared1';
+import {cloud,startCloud,mountAccount} from './cloud.js?v=20261124-shared1';
+import {statuses,rehearsalNames,validRehearsal,validAttendance,attendanceSummary,japanDate,rehearsalBadge,rehearsalDateTime} from './rehearsal-model.js?v=20261124-shared1';
 const $=id=>document.getElementById(id),esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const key='yuitei.rehearsals.v1';let items=[],attendance={},names=[],revision=0,loaded=false,storageOK=true,stop,stopAttendance,opened=null,detailRevision=0,busy=false,archiving=false;
 let noticeTimer;
@@ -496,6 +496,6 @@ reservationsButton.textContent='予約書類を追加';reservationsButton.hidden
 document.querySelector('.workspace')?.append(reservationsButton);
 cloud.onState(state=>{reservationsButton.hidden=state.provider!=='apps-script'||!state.role});
 reservationsButton.onclick=async()=>{
- const {openReservationDocuments}=await import('./reservation-documents.js?v=20261124-map3');
+ const {openReservationDocuments}=await import('./reservation-documents.js?v=20261124-shared1');
  if(cloud.state.role)openReservationDocuments();
 };

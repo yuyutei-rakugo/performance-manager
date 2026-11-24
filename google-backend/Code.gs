@@ -7,19 +7,20 @@ function initializeOwner(){
  const lock=LockService.getScriptLock();lock.waitLock(20000);
  try{const props=PropertiesService.getScriptProperties();if(props.getProperty('DB_FILE_ID'))throw Error('初期設定済みです。');const pin=props.getProperty('OWNER_PIN')||'1111';checkPin_(pin);const secret=Utilities.getUuid()+Utilities.getUuid();props.setProperty('AUTH_SECRET',secret);const owner={id:'owner',name:'勇水',role:'admin',active:true,epoch:1,salt:Utilities.getUuid(),owner:true};owner.pinHash=hashPin_(owner,pin);const file=Drive.Files.create({name:'結友亭の帳面-共通データ.json',mimeType:'application/json'},Utilities.newBlob(JSON.stringify({version:1,members:[owner],shared:{},attendance:{}}),'application/json'),{fields:'id'});props.setProperty('DB_FILE_ID',file.id);props.deleteProperty('OWNER_PIN');return '勇水を最初の管理者として登録しました。'}finally{lock.releaseLock()}
 }
-function doGet(){return output_({reservationDocuments:true,ok:true,service:'yuyutei-members',version:1,attendanceProxy:true,rehearsalArchiveToday:true,automaticBackup:true,backupRecoveryRevision:2,checklistExclusion:true,flyerVenues:true,flyerLocationFields:true})}
+function doGet(){return output_({reservationDocuments:true,ok:true,service:'yuyutei-members',version:1,attendanceProxy:true,rehearsalArchiveToday:true,automaticBackup:true,backupRecoveryRevision:2,checklistExclusion:true,flyerVenues:true,flyerLocationFields:true,flyerSharedFacilities:true})}
 function doPost(event){
  const lock=LockService.getScriptLock();let locked=false;
  try{if(!event||!event.postData||event.postData.contents.length>1500000)throw Error('リクエストを確認してください。');const req=JSON.parse(event.postData.contents);if(!req||typeof req!=='object')throw Error('リクエストを確認してください。');lock.waitLock(20000);locked=true;const db=readDb_();if(req.action==='login')return output_({ok:true,...login_(db,req)});const member=authorize_(db,req.token);let data;
  switch(req.action){
  case 'reservationList':case 'reservationPhoto':case 'reservationAdd':case 'reservationReview':case 'reservationContact':data=reservationRequest_(db,member,req);break;
+ case 'flyerMigrationPreview':case 'flyerMigrationApply':admin_(member);data=flyerMigration_(db,req);break;
  case 'flyerRead':case 'flyerSave':case 'flyerRefuse':case 'flyerCarry':case 'flyerImport':data=flyerRequest_(db,req);break;
  case 'roster':data={members:db.members.filter(m=>m.active).map(m=>({name:m.name}))};break;
  case 'archivePast':admin_(member);data=archivePast_(db,req,member);if(data.count)writeDb_(db);break;
- case 'importLocal':admin_(member);data=importLocal_(db,req,member);writeDb_(db);break;
+ case 'importLocal':admin_(member);data=importLocal_(db,req,member);if(db.flyers?.facilities)seedFlyerFacilities_(db.flyers,db.shared.events.items);writeDb_(db);break;
  case 'session':if(req.remember===true){const props=PropertiesService.getScriptProperties(),key='SESSION_'+digest_(req.token),session=JSON.parse(props.getProperty(key));session.expires=Date.now()+30*24*60*60*1000;props.setProperty(key,JSON.stringify(session))}data={member:publicMember_(member)};break;
  case 'read':checkCollection_(req.name);data={doc:db.shared[req.name]||null};break;
- case 'save':if(!['admin','editor'].includes(member.role))throw Error('編集権限が必要です。');checkCollection_(req.name);validCollection_(req.name,req.items);if(!Array.isArray(req.items)||req.items.length>500)throw Error('データの形式を確認してください。');const current=db.shared[req.name];if(['events','rehearsals'].includes(req.name)){const old=new Map((current?current.items:[]).map(r=>[r.id,r]));for(const r of req.items){if((r.archivedAt||null)!==(old.get(r.id)?.archivedAt||null))throw Error('記録への移動は管理者ページから行ってください。')}for(const r of old.values())if(r.archivedAt&&!req.items.some(n=>n.id===r.id))throw Error('転記済みの予定は保持してください。')}if((current?current.revision:0)!==req.revision)throw Error('ほかの端末で更新されています。再読み込みしてください。');db.shared[req.name]={items:req.items,revision:req.revision+1,updatedBy:member.id,updatedAt:new Date().toISOString()};writeDb_(db);data={revision:req.revision+1};break;
+ case 'save':if(!['admin','editor'].includes(member.role))throw Error('編集権限が必要です。');checkCollection_(req.name);validCollection_(req.name,req.items);if(!Array.isArray(req.items)||req.items.length>500)throw Error('データの形式を確認してください。');const current=db.shared[req.name];if(['events','rehearsals'].includes(req.name)){const old=new Map((current?current.items:[]).map(r=>[r.id,r]));for(const r of req.items){if((r.archivedAt||null)!==(old.get(r.id)?.archivedAt||null))throw Error('記録への移動は管理者ページから行ってください。')}for(const r of old.values())if(r.archivedAt&&!req.items.some(n=>n.id===r.id))throw Error('転記済みの予定は保持してください。')}if((current?current.revision:0)!==req.revision)throw Error('ほかの端末で更新されています。再読み込みしてください。');db.shared[req.name]={items:req.items,revision:req.revision+1,updatedBy:member.id,updatedAt:new Date().toISOString()};if(req.name==='events'&&db.flyers?.facilities)seedFlyerFacilities_(db.flyers,req.items);writeDb_(db);data={revision:req.revision+1};break;
  case 'attendanceRead':checkId_(req.id);data={rows:Object.values(db.attendance[req.id]||{})};break;
  case 'attendanceSave':checkId_(req.id);if(db.shared.rehearsals?.items.some(r=>r.id===req.id&&r.archivedAt))throw Error('この稽古は記録へ移動済みです。');if(typeof req.id!=='string'||!['出席','欠席','未定','未回答'].includes(req.status))throw Error('出欠を確認してください。');db.attendance[req.id]=db.attendance[req.id]||{};db.attendance[req.id][member.id]={stageName:member.name,status:req.status,updatedAt:new Date().toISOString()};writeDb_(db);data={};break;
  case 'attendanceProxy':{
@@ -214,27 +215,103 @@ function flyerEntry_(input){
  const name=flyerText_(input.name,120),region=flyerText_(input.region,80);
  return {name,region,category:flyerText_(input.category,80),status:input.status,memo:flyerText_(input.memo,2000,true),...(input.location===undefined?{}:{location:flyerLocation_(input.location)})};
 }
+function flyerKeys_(row){return row.keys||[flyerKey_(row.name,row.region)]}
+function flyerBlocked_(flyers){return new Set(flyers.refused.flatMap(flyerKeys_))}
+function flyerUpcoming_(event,now){
+ return !event.archivedAt&&event.date+(event.time||'23:59')>=now;
+}
+function flyerNow_(){return Utilities.formatDate(new Date(),'Asia/Tokyo','yyyy-MM-ddHH:mm')}
+function flyerFacility_(row){
+ const {name,region,category,location}=row;
+ return {name,region,category,...(location===undefined?{}:{location})};
+}
+function seedFlyerFacilities_(flyers,events,now=flyerNow_()){
+ const blocked=flyerBlocked_(flyers);
+ for(const event of events){
+  if(!flyerUpcoming_(event,now))continue;
+  const rows=(flyers.events[event.id]||[]).slice();
+  const keys=new Set(rows.flatMap(flyerKeys_));
+  for(const facility of Object.values(flyers.facilities||{})){
+   if(facility.keys.some(key=>blocked.has(key)||keys.has(key)))continue;
+   rows.push({...flyerFacility_(facility),keys:facility.keys,facilityId:facility.id,id:Utilities.getUuid(),revision:1,status:'未依頼',memo:''});
+   facility.keys.forEach(key=>keys.add(key));
+  }
+  if(rows.length>200)throw Error('掲示先は公演ごとに200件までです。');
+  if(rows.length)flyers.events[event.id]=rows;
+ }
+}
+function flyerMigration_(db,req){
+ const flyers=db.flyers||{events:{},refused:[]};
+ const now=flyerNow_(),events=(db.shared.events?.items||[]).filter(event=>flyerUpcoming_(event,now));
+ const groups=new Map(),blocked=flyerBlocked_(flyers),choices=[],skipped=[];
+ const registered=new Set(Object.values(flyers.facilities||{}).flatMap(flyerKeys_));
+ for(const event of events)for(const row of flyers.events[event.id]||[]){
+  if(row.source||row.facilityId||flyerKeys_(row).some(key=>blocked.has(key)))continue;
+  const key=flyerKey_(row.name,row.region);
+  if(!groups.has(key))groups.set(key,[]);
+  groups.get(key).push({eventId:event.id,row});
+ }
+ for(const group of groups.values()){
+  const first=group[0].row;
+  const signature=row=>JSON.stringify(flyerFacility_(row));
+  const other=group.some(({row})=>signature(row)!==signature(first));
+  const aliases=[...new Set(group.flatMap(({row})=>flyerKeys_(row)))];
+  const identifier=first.region+' ／ '+first.name;
+  const outside=events.some(event=>(flyers.events[event.id]||[]).some(row=>!group.some(link=>link.row===row)&&flyerKeys_(row).some(key=>aliases.includes(key))));
+  const confirmed=first.location&&Number.isFinite(first.location.lat)&&Number.isFinite(first.location.lng);
+  if(other||outside||aliases.some(key=>registered.has(key))||(group.length>1&&!confirmed)){
+   skipped.push(identifier);continue;
+  }
+  aliases.forEach(key=>registered.add(key));
+  choices.push({group,aliases,identifier});
+ }
+ const preview={expected:digest_(JSON.stringify({flyers,events:events.map(event=>[event.id,event.date,event.time])})),
+  targets:events.map(({title,date})=>({title,date})),facilities:choices.map(choice=>({name:choice.identifier,existing:choice.group.length,added:events.length-choice.group.length})),skipped};
+ if(req.action==='flyerMigrationPreview')return preview;
+ if(req.expected!==preview.expected)throw Error('データが変更されました。もう一度対象を確認してください。');
+ if(!choices.length)return {...preview,applied:0};
+ const before=JSON.stringify(db);
+ flyers.facilities=flyers.facilities||{};
+ for(const {group,aliases} of choices){
+  const id=Utilities.getUuid();
+  flyers.facilities[id]={...flyerFacility_(group[0].row),id,keys:aliases};
+  for(const {eventId,row} of group){
+   flyers.events[eventId]=flyers.events[eventId].map(current=>current===row?{...row,facilityId:id,revision:row.revision+1}:current);
+  }
+ }
+ seedFlyerFacilities_(flyers,events,now);
+ const backup=createDataBackup_(before,true);
+ db.flyers=flyers;writeDb_(db);
+ return {...preview,applied:choices.length,backupCreatedAt:backup.createdAt};
+}
+
 function flyerRequest_(db,req){
  checkId_(req.eventId);
  const events=db.shared.events?.items||[];
  const event=events.find(item=>item.id===req.eventId);
  if(!event)throw Error('公演が見つかりません。');
  const flyers=db.flyers||{events:{},refused:[]};
+ const now=flyerNow_(),upcoming=flyerUpcoming_(event,now);
  const saved=flyers.events[event.id]||[],rows=saved.slice();
  const scheduleKey=item=>item.date+(item.time||'23:59');
  const sources=events.filter(item=>scheduleKey(item)<scheduleKey(event)&&flyers.events[item.id]?.length);
- const view=()=>({
-  rows,
+ const view=()=>{
+ const blocked=flyerBlocked_(flyers);
+ return {
+  rows:upcoming?rows.filter(row=>!row.facilityId||!flyerKeys_(row).some(key=>blocked.has(key))):rows,
   refused:flyers.refused,
   categories:[...new Set([...flyerCategories_,...Object.values(flyers.events).flat().map(row=>row.category),...rows.map(row=>row.category)])],
   sources:sources.map(({id,title,date})=>({id,title,date})),
   locationFields:true,
-  archived:!!event.archivedAt
- });
+  sharedFacilities:true,
+  regions:[...new Set(['銚子市','神栖市',...Object.values(flyers.events).flat().map(row=>row.region)])],
+  archived:!upcoming
+ };
+ };
  if(req.action==='flyerRead')return view();
- if(event.archivedAt)throw Error('記録へ移動済みの公演は閲覧のみです。');
- const blocked=new Set(flyers.refused.flatMap(row=>row.keys));
- const keys=row=>row.keys||[flyerKey_(row.name,row.region)];
+ if(!upcoming)throw Error('開催済みの公演は閲覧のみです。');
+ const blocked=flyerBlocked_(flyers);
+ const keys=flyerKeys_;
  const indexOf=key=>rows.findIndex(row=>keys(row).includes(key));
  const push=(entry,related=[],source)=>{
   const key=flyerKey_(entry.name,entry.region),aliases=[...new Set([key,...related])];
@@ -242,6 +319,7 @@ function flyerRequest_(db,req){
   rows.push({...entry,id:Utilities.getUuid(),revision:1,keys:aliases,...(source?{source}:{})});
   return true;
  };
+ let sync=false;
  if(req.action==='flyerSave'){
   const value=flyerEntry_(req.entry),key=flyerKey_(value.name,value.region);
   if(req.id){
@@ -250,7 +328,33 @@ function flyerRequest_(db,req){
    const current=rows[index];
    if(key!==flyerKey_(current.name,current.region)&&(blocked.has(key)||rows.some((row,i)=>i!==index&&keys(row).includes(key))))throw Error('同じ施設が登録済み、または一覧から除外済みです。');
    rows[index]={...current,...value,revision:current.revision+1,keys:[...new Set([...keys(current),key])]};
-  }else if(!push(value))throw Error('同じ施設が登録済み、または一覧から除外済みです。');
+   if(current.facilityId){
+    const facility=flyers.facilities[current.facilityId];
+    const updated=flyerFacility_(rows[index]);
+    if(!facility||blocked.has(key))throw Error('一覧から除外済みです。');
+    if(JSON.stringify(flyerFacility_(facility))!==JSON.stringify(updated)){
+     const aliases=[...new Set([...facility.keys,key])];
+     for(const other of events.filter(item=>flyerUpcoming_(item,now))){
+      const otherRows=other.id===event.id?rows:flyers.events[other.id]||[];
+      if(otherRows.some(row=>row.facilityId!==facility.id&&keys(row).some(alias=>aliases.includes(alias))))throw Error('別の公演に同名の施設があります。施設名と場所を確認してください。');
+     }
+     flyers.facilities[facility.id]={...updated,id:facility.id,keys:aliases};
+     for(const other of events.filter(item=>item.id!==event.id&&flyerUpcoming_(item,now))){
+      if(flyers.events[other.id])flyers.events[other.id]=flyers.events[other.id].map(row=>row.facilityId===facility.id?{...row,...updated,keys:aliases,revision:row.revision+1}:row);
+     }
+     sync=true;
+    }
+   }
+  }else{
+   if(req.sharedFacility&&events.some(other=>flyerUpcoming_(other,now)&&(flyers.events[other.id]||[]).some(row=>keys(row).includes(key))))throw Error('別の公演に同名の施設があります。重複を確認してください。');
+   if(!push(value))throw Error('同じ施設が登録済み、または一覧から除外済みです。');
+   if(req.sharedFacility){
+    const row=rows[rows.length-1];row.facilityId=row.id;
+    flyers.facilities=flyers.facilities||{};
+    flyers.facilities[row.id]={...flyerFacility_(row),id:row.id,keys:row.keys};
+    sync=true;
+   }
+  }
  }else if(req.action==='flyerRefuse'){
   const index=rows.findIndex(row=>row.id===req.id);
   if(index<0||rows[index].revision!==req.revision)throw Error('この掲示先は更新されました。最新の内容を確認してください。');
@@ -270,7 +374,9 @@ function flyerRequest_(db,req){
  }
  if(rows.length>200)throw Error('掲示先は公演ごとに200件までです。');
  if(rows.length!==saved.length||rows.some((row,i)=>row!==saved[i])){
-  flyers.events[event.id]=rows;db.flyers=flyers;writeDb_(db);
+  flyers.events[event.id]=rows;
+  if(sync)seedFlyerFacilities_(flyers,events,now);
+  db.flyers=flyers;writeDb_(db);
  }
  return view();
 }

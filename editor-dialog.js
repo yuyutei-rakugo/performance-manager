@@ -52,6 +52,7 @@ export function leaveEditor(dialog,leave){
  prompt.className='discard-dialog';
  prompt.setAttribute('aria-label','変更が保存されていません');
  prompt.innerHTML='<div class="dialog-body"><p>変更が保存されていません。</p><div class="form-actions"><button type="button" class="primary" autofocus>編集を続ける</button><button type="button" class="secondary">変更を破棄する</button></div></div>';
+ if(dialog.dataset.discardLabel)prompt.querySelector('.secondary').textContent=dialog.dataset.discardLabel;
  const pending=editors.get(dialog).pending;
  if(pending){
   prompt.querySelector('p').textContent='保存結果はまだ確定していません。閉じた後も、この画面で保存結果と復元用の入力を確認できます。';

@@ -1,12 +1,12 @@
-import {openFlyerVenues} from './flyer-venues.js?v=20261124-map3';
-import {startEditor,finishEditor,leaveEditor,guardEditor,editorState,saveRecovery,recoveryScope,recoveredEditState} from './editor-dialog.js?v=20261124-map3';
-import {performerPicker,updatePerformerPickers,readPerformer,showPerformerRoster} from './performer-picker.js?v=20261124-map3';
-import {mountMemberHome} from './member-home.js?v=20261124-map3';
-import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261124-map3';
-import {readCategories,saveCategories,validCategories,categoryOptions,mountCategories,mountCategoryAdder} from './categories.js?v=20261124-map3';
-import {mountScheduleImport} from './schedule-import.js?v=20261124-map3';
-import {scheduleChange,scheduleChangeBadge,preparationTemplates,draftTask,duplicateSchedule,copyScheduleInvite,validPerformer,timeline,formatDuration,toRecord,transferRecord,readRecords,mergeRecords,mergedRecords} from './record-transfer.js?v=20261124-map3';
-import {cloud,startCloud,mountAccount} from './cloud.js?v=20261124-map3';
+import {openFlyerVenues} from './flyer-venues.js?v=20261124-shared1';
+import {startEditor,finishEditor,leaveEditor,guardEditor,editorState,saveRecovery,recoveryScope,recoveredEditState} from './editor-dialog.js?v=20261124-shared1';
+import {performerPicker,updatePerformerPickers,readPerformer,showPerformerRoster} from './performer-picker.js?v=20261124-shared1';
+import {mountMemberHome} from './member-home.js?v=20261124-shared1';
+import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261124-shared1';
+import {readCategories,saveCategories,validCategories,categoryOptions,mountCategories,mountCategoryAdder} from './categories.js?v=20261124-shared1';
+import {mountScheduleImport} from './schedule-import.js?v=20261124-shared1';
+import {scheduleChange,scheduleChangeBadge,preparationTemplates,draftTask,duplicateSchedule,copyScheduleInvite,validPerformer,timeline,formatDuration,toRecord,transferRecord,readRecords,mergeRecords,mergedRecords} from './record-transfer.js?v=20261124-shared1';
+import {cloud,startCloud,mountAccount} from './cloud.js?v=20261124-shared1';
 'use strict';
 
 const key = 'yuitei.events.v1';
@@ -439,7 +439,7 @@ $('schedule').onclick = async click => {
 };
 document.getElementById('next-performance')?.addEventListener('click',event=>{const button=event.target.closest('[data-event]');if(button)renderDetails(button.dataset.event)});
 $('list-tab').onclick = () => {tab = 'list'; render();};
-$('calendar-tab').onclick = () => {location.href = 'rehearsals.html?v=20261124-map3';};
+$('calendar-tab').onclick = () => {location.href = 'rehearsals.html?v=20261124-shared1';};
 $('new-event').onclick = () => renderForm();
 $('data-open').onclick = () => $('data-dialog').showModal();
 guardEditor(eventDialog);
@@ -516,6 +516,6 @@ reservationsButton.textContent='予約書類を追加';reservationsButton.hidden
 document.querySelector('.workspace')?.append(reservationsButton);
 cloud.onState(state=>{reservationsButton.hidden=state.provider!=='apps-script'||!state.role});
 reservationsButton.onclick=async()=>{
- const {openReservationDocuments}=await import('./reservation-documents.js?v=20261124-map3');
+ const {openReservationDocuments}=await import('./reservation-documents.js?v=20261124-shared1');
  if(cloud.state.role)openReservationDocuments();
 };
