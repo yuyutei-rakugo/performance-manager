@@ -91,7 +91,15 @@ assert(!call('flyerImport',{token:member.token,eventId:first,entries:candidates.
 let imported;for(let i=0;i<candidates.length;i+=50){imported=call('flyerImport',{token:member.token,eventId:first,entries:candidates.slice(i,i+50)});assert(imported.ok)}
 assert(imported.ok);assert.equal(imported.rows.length,candidates.length+2);
 assert.equal(imported.rows.find(row=>row.source).status,'未依頼');
-const refusal=call('flyerRefuse',{token:member.token,eventId:first,id:row.id,revision:2});
+function legacyRefuse(eventId,id){
+ const data=JSON.parse(files[properties.DB_FILE_ID]);
+ const entries=data.flyers.events[eventId],index=entries.findIndex(row=>row.id===id);
+ const [item]=entries.splice(index,1);
+ data.flyers.refused.push({...item,eventId,eventTitle:event.title,refusedOn:'2026-11-19'});
+ files[properties.DB_FILE_ID]=JSON.stringify(data);
+ return call('flyerRead',{token,eventId});
+}
+const refusal=legacyRefuse(first,row.id);
 assert(refusal.ok);assert.equal(refusal.refused[0].eventTitle,event.title);assert.equal(refusal.refused[0].memo,'更新されたメモ');
 assert.deepEqual(refusal.refused[0].location,location);
 assert.equal(refusal.refused[0].refusedOn,'2026-11-19');
@@ -119,6 +127,7 @@ fixture.flyers.events[expiredVenueEvent]=[{...entry,name:'過去の掲示先',id
 files[properties.DB_FILE_ID]=JSON.stringify(fixture);
 const pastFlyers=getFlyers(expiredVenueEvent);
 const listBeforeMigration=getFlyers(first);
+assert.equal(call('flyerRead',{token,eventId:first}).migrationRequired,true);
 const plan=call('flyerMigrationPreview',{token,eventId:first});
 expectError(call('flyerMigrationPreview',{token:flyerMember,eventId:first}),/管理者/);
 assert(plan.facilities.some(row=>row.name.includes('別の店')));
@@ -153,9 +162,25 @@ const schedulesBeforeNew=call('read',{token,name:'events'}).doc;
 const newEventId='new-shared-event';
 assert(call('save',{token,name:'events',revision:schedulesBeforeNew.revision,items:[...schedulesBeforeNew.items,{...event,id:newEventId,date:'2028-01-02'}]}).ok);
 assert.equal(getFlyers(newEventId).find(row=>row.facilityId===sharedRow.facilityId).memo,'');
-assert(call('flyerRefuse',{token:flyerMember,eventId:nextFlyer,id:updatedOther.id,revision:updatedOther.revision}).ok);
+assert.equal(call('flyerRead',{token,eventId:first}).migrationRequired,false);
+const skipped=call('flyerSave',{token:flyerMember,eventId:first,id:sharedRow.id,revision:getFlyers(first).find(row=>row.id===sharedRow.id).revision,entry:{...sharedEntry,category:'文化施設',status:'今回は見送り',declined:true,memo:'次回は相談'}});
+assert(skipped.ok&&skipped.declineHistory.some(row=>row.memo==='次回は相談'));
+assert.equal(getFlyers(nextFlyer).find(row=>row.id===updatedOther.id).status,'依頼済み');
+const fresh=call('read',{token,name:'events'}).doc;
+assert(call('save',{token,name:'events',revision:fresh.revision,items:[...fresh.items,{...event,id:'after-decline',date:'2029-01-02'}]}).ok);
+const inherited=getFlyers('after-decline').find(row=>row.facilityId===sharedRow.facilityId);
+assert.equal(inherited.status,'今回は見送り');assert.equal(inherited.memo,'');assert(!inherited.declined);
+assert(call('flyerSave',{token:flyerMember,eventId:'after-decline',id:inherited.id,revision:inherited.revision,entry:{...sharedEntry,category:'文化施設',status:'依頼済み'}}).ok);
+expectError(call('flyerRefuse',{token:flyerMember,eventId:nextFlyer,id:updatedOther.id,revision:updatedOther.revision}),/見送り/);
+legacyRefuse(nextFlyer,updatedOther.id);
 assert(!getFlyers(first).some(row=>row.facilityId===sharedRow.facilityId));
 assert(!getFlyers(newEventId).some(row=>row.facilityId===sharedRow.facilityId));
+expectError(call('flyerRestore',{token:flyerMember,eventId:nextFlyer,from:nextFlyer,id:updatedOther.id}),/管理者/);
+const restored=call('flyerRestore',{token,eventId:nextFlyer,from:nextFlyer,id:updatedOther.id});
+assert(restored.ok&&restored.refused.some(row=>row.id===updatedOther.id&&row.restoredAt));
+assert.equal(restored.rows.filter(row=>row.facilityId===sharedRow.facilityId).length,1);
+assert.equal(restored.rows.find(row=>row.facilityId===sharedRow.facilityId).status,'今回は見送り');
+assert.equal(getFlyers('after-decline').find(row=>row.id===inherited.id).status,'依頼済み');
 assert(call('flyerMigrationPreview',{token,eventId:first}).facilities.length===0);
 assert.equal(getFlyers(first).find(row=>row.name===ambiguousVenue).facilityId,undefined);
 assert.deepEqual(getFlyers(expiredVenueEvent),pastFlyers);
