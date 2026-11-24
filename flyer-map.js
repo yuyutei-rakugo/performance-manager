@@ -38,7 +38,7 @@ export async function mountFlyerMap(host,actions){
   content.append(title,status,memo);
   if(!archived){
    const button=document.createElement('button');button.type='button';button.className='secondary';button.textContent='編集する';
-   button.disabled=busy;button.onclick=()=>actions.edit(row.id);
+   button.disabled=busy;button.onclick=event=>{event.stopPropagation();actions.edit(row.id)};
    const label=document.createElement('label');label.textContent='状況を変更';
    const select=document.createElement('select');
    select.replaceChildren(...statuses.map(value=>new Option(value,value,false,value===row.status)));
@@ -48,7 +48,7 @@ export async function mountFlyerMap(host,actions){
   if(result){
    const feedback=document.createElement('p');feedback.setAttribute('role','status');feedback.textContent=result.text;
    if(result.retry){
-    const retry=document.createElement('button');retry.type='button';retry.textContent='再試行';retry.disabled=busy;retry.onclick=()=>actions.retry(row.id);feedback.append(' ',retry);
+    const retry=document.createElement('button');retry.type='button';retry.textContent='再試行';retry.disabled=busy;retry.onclick=event=>{event.stopPropagation();actions.retry(row.id)};feedback.append(' ',retry);
    }
    content.append(feedback);
   }
@@ -56,7 +56,7 @@ export async function mountFlyerMap(host,actions){
    const label=document.createElement('p');label.textContent='同じ場所にある施設';content.append(label);
    for(const neighbor of neighbors){
     const button=document.createElement('button');button.type='button';button.className='secondary';
-    button.textContent=neighbor.name;button.onclick=()=>pins.get(neighbor.id)?.node.openPopup();content.append(button);
+    button.textContent=neighbor.name;button.onclick=event=>{event.stopPropagation();pins.get(neighbor.id)?.node.openPopup()};content.append(button);
    }
   }
   return content;
