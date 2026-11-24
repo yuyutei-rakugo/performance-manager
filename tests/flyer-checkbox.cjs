@@ -39,3 +39,18 @@ const tick=()=>new Promise(r=>setImmediate(r));
  panel.querySelector('[data-close-flyers]').click();assert(!w.document.querySelector('.flyer-dialog'));w.close();
  console.log('PASS flyer status saves, errors and retries; default all facilities auto-added in safe batches; existing state and refusals preserved; repeat reads do not write');
 })().catch(error=>{console.error(error);process.exitCode=1});
+
+const helpers=new JSDOM('',{runScripts:'outside-only'}).window;
+helpers.eval(clean('flyer-locations.js')+'\nwindow.position=positionFromUrl;window.addressPosition=exactAddressPosition;window.info=flyerLocationInfo;');
+const all=require('../flyer-candidates.json');
+assert.equal(all.filter(row=>Number.isFinite(helpers.info(row)?.lat)&&helpers.info(row)?.address?.includes(row.region)&&helpers.info(row)?.source?.startsWith('https://')).length,94);
+assert.equal(helpers.info({...all[0],location:null}),null);
+assert.deepEqual(Array.from(helpers.position('https://maps.google.co.jp/maps?q=35.73,140.83')),[35.73,140.83]);
+assert.deepEqual(Array.from(helpers.position('https://www.openstreetmap.org/?mlat=35.73&mlon=140.83')),[35.73,140.83]);
+assert.equal(helpers.position('https://www.google.com/maps/@35.73,140.83,15z'),undefined);
+assert.throws(()=>helpers.position('http://example.test'),/https/);
+const feature={properties:{title:'茨城県神栖市若松中央二丁目３０番地'},geometry:{coordinates:[140.73584,35.836029]}};
+assert.deepEqual(Array.from(helpers.addressPosition('茨城県神栖市若松中央2-30',[feature])),[35.836029,140.73584]);
+assert.equal(helpers.addressPosition('茨城県神栖市若松中央2-30-4',[feature]),undefined);
+assert.equal(helpers.addressPosition('茨城県神栖市若松中央2-30',[feature,feature]),undefined);
+helpers.close();

@@ -7,7 +7,7 @@ function initializeOwner(){
  const lock=LockService.getScriptLock();lock.waitLock(20000);
  try{const props=PropertiesService.getScriptProperties();if(props.getProperty('DB_FILE_ID'))throw Error('初期設定済みです。');const pin=props.getProperty('OWNER_PIN')||'1111';checkPin_(pin);const secret=Utilities.getUuid()+Utilities.getUuid();props.setProperty('AUTH_SECRET',secret);const owner={id:'owner',name:'勇水',role:'admin',active:true,epoch:1,salt:Utilities.getUuid(),owner:true};owner.pinHash=hashPin_(owner,pin);const file=Drive.Files.create({name:'結友亭の帳面-共通データ.json',mimeType:'application/json'},Utilities.newBlob(JSON.stringify({version:1,members:[owner],shared:{},attendance:{}}),'application/json'),{fields:'id'});props.setProperty('DB_FILE_ID',file.id);props.deleteProperty('OWNER_PIN');return '勇水を最初の管理者として登録しました。'}finally{lock.releaseLock()}
 }
-function doGet(){return output_({reservationDocuments:true,ok:true,service:'yuyutei-members',version:1,attendanceProxy:true,rehearsalArchiveToday:true,automaticBackup:true,backupRecoveryRevision:2,checklistExclusion:true,flyerVenues:true})}
+function doGet(){return output_({reservationDocuments:true,ok:true,service:'yuyutei-members',version:1,attendanceProxy:true,rehearsalArchiveToday:true,automaticBackup:true,backupRecoveryRevision:2,checklistExclusion:true,flyerVenues:true,flyerLocationFields:true})}
 function doPost(event){
  const lock=LockService.getScriptLock();let locked=false;
  try{if(!event||!event.postData||event.postData.contents.length>1500000)throw Error('リクエストを確認してください。');const req=JSON.parse(event.postData.contents);if(!req||typeof req!=='object')throw Error('リクエストを確認してください。');lock.waitLock(20000);locked=true;const db=readDb_();if(req.action==='login')return output_({ok:true,...login_(db,req)});const member=authorize_(db,req.token);let data;
@@ -199,10 +199,20 @@ function flyerText_(value,max,optional=false){
 function flyerKey_(name,region){
  return JSON.stringify([region,name].map(value=>value.normalize('NFKC').toLowerCase().replace(/\s+/g,'')));
 }
+function flyerLocation_(input){
+ if(input===null)return null;
+ if(!input||typeof input!=='object')throw Error('位置情報を確認してください。');
+ const address=flyerText_(input.address,250,true),mapUrl=flyerText_(input.mapUrl,1000,true);
+ const lat=input.lat,lng=input.lng;
+ if(mapUrl&&!/^https:\/\/[^\s]+$/.test(mapUrl))throw Error('地図URLはhttpsで始めてください。');
+ if(lat===undefined&&lng===undefined)return address||mapUrl?{address,mapUrl}:null;
+ if(!Number.isFinite(lat)||!Number.isFinite(lng)||Math.abs(lat)>90||Math.abs(lng)>180)throw Error('緯度・経度を確認してください。');
+ return {address,mapUrl,lat,lng};
+}
 function flyerEntry_(input){
  if(!input||!flyerStatuses_.includes(input.status))throw Error('掲示先の状況を選んでください。');
  const name=flyerText_(input.name,120),region=flyerText_(input.region,80);
- return {name,region,category:flyerText_(input.category,80),status:input.status,memo:flyerText_(input.memo,2000,true)};
+ return {name,region,category:flyerText_(input.category,80),status:input.status,memo:flyerText_(input.memo,2000,true),...(input.location===undefined?{}:{location:flyerLocation_(input.location)})};
 }
 function flyerRequest_(db,req){
  checkId_(req.eventId);
@@ -218,6 +228,7 @@ function flyerRequest_(db,req){
   refused:flyers.refused,
   categories:[...new Set([...flyerCategories_,...Object.values(flyers.events).flat().map(row=>row.category),...rows.map(row=>row.category)])],
   sources:sources.map(({id,title,date})=>({id,title,date})),
+  locationFields:true,
   archived:!!event.archivedAt
  });
  if(req.action==='flyerRead')return view();
