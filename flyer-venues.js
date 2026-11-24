@@ -1,5 +1,5 @@
-import {startEditor,finishEditor,leaveEditor,guardEditor,editorState} from './editor-dialog.js?v=20261123-reservations1';
-import {cloud} from './cloud.js?v=20261123-reservations1';
+import {startEditor,finishEditor,leaveEditor,guardEditor,editorState} from './editor-dialog.js?v=20261124-simple1';
+import {cloud} from './cloud.js?v=20261124-simple1';
 
 const statuses=['未依頼','依頼済み','掲示済み','今回は見送り'];
 const compare=new Intl.Collator('ja',{numeric:true,sensitivity:'base'}).compare;
@@ -13,13 +13,15 @@ export function openFlyerVenues(event){
  const dialog=document.createElement('dialog');
  dialog.className='flyer-dialog';
  dialog.setAttribute('aria-label','チラシの掲示先');
- dialog.innerHTML='<div class="dialog-body"><div class="dialog-head"><h2>チラシの掲示先</h2><button type="button" data-close-flyers aria-label="閉じる">×</button></div><p></p><p class="muted">「状況を変更・メモ」を開いてチェック（自動保存）</p><div class="flyer-actions form-actions"><button type="button" data-add>施設を追加</button><button type="button" data-refresh class="secondary">最新を取得</button></div><p data-message role="status"></p><details class="flyer-tools"><summary>追加・絞り込み・引き継ぎ</summary><div class="record-filters flyer-filters"><label>地域<select data-region></select></label><label>区分<select data-category></select></label></div><div class="flyer-actions form-actions"><label>引き継ぎ元<select data-source></select></label><button type="button" data-carry>選んだ公演から引き継ぐ</button></div></details><div data-list></div><details><summary>断られた施設の履歴</summary><ul data-refused></ul></details></div>';
+ dialog.innerHTML='<div class="dialog-body"><div class="dialog-head"><h2>チラシの掲示先</h2><button type="button" data-close-flyers aria-label="閉じる">×</button></div><p></p><p class="muted">「状況を変更・メモ」を開いてチェック（自動保存）</p><div class="flyer-actions form-actions"><button type="button" data-add>施設を追加</button><button type="button" data-refresh class="secondary">最新を取得</button></div><p data-message role="status"></p><div class="flyer-quick-filters"><label>施設名で検索<input type="search" data-search placeholder="施設名を入力"></label><label>状況<select data-filter-status><option value="">すべて</option><option>未依頼</option><option>依頼済み</option><option>掲示済み</option><option>今回は見送り</option></select></label></div><p data-count class="muted" role="status"></p><details class="flyer-tools"><summary>追加・絞り込み・引き継ぎ</summary><div class="record-filters flyer-filters"><label>地域<select data-region></select></label><label>区分<select data-category></select></label></div><div class="flyer-actions form-actions"><label>引き継ぎ元<select data-source></select></label><button type="button" data-carry>選んだ公演から引き継ぐ</button></div></details><div data-list></div><details><summary>断られた施設の履歴</summary><ul data-refused></ul></details></div>';
  dialog.querySelector('.dialog-head + p').textContent=event.title;
  const q=selector=>dialog.querySelector(selector);
  const message=q('[data-message]'),source=q('[data-source]'),region=q('[data-region]'),category=q('[data-category]');
  const allowed=()=>cloud.state.provider==='apps-script'&&!!cloud.state.role;
  const identity=cloud.state.user?.uid;
  let data,busy=false,editor;
+ const rowNodes=new Map();
+ const normalize=value=>String(value||'').normalize('NFKC').toLowerCase().replace(/\s+/g,'');
  const request=(action,payload={})=>cloud.flyer(action,{eventId:event.id,...payload});
  function redraw(){
   const rows=data?.rows||[];
@@ -29,8 +31,28 @@ export function openFlyerVenues(event){
   category.replaceChildren(...options([...new Set(rows.map(row=>row.category))].sort(compare),'すべての区分'));
   source.replaceChildren(new Option('公演を選択',''),...(data?.sources||[]).map(row=>new Option(row.date+' '+row.title,row.id)));
   for(const [select,value] of [[region,selectedRegion],[category,selectedCategory],[source,selectedSource]])if([...select.options].some(option=>option.value===value))select.value=value;
-  const match=rows.filter(row=>(!region.value||row.region===region.value)&&(!category.value||row.category===category.value));
-  q('[data-list]').innerHTML=match.sort((left,right)=>compare(orderName(left),orderName(right))||compare(left.region,right.region)).map(row=>`<article class="flyer-item" data-venue-id="${esc(row.id)}" data-status="${statuses.indexOf(row.status)}"><div class="flyer-heading"><span class="flyer-badge">${esc(row.status)}</span><h3>${esc(row.name)}</h3><a class="flyer-map" href="${esc(mapUrl(row))}" target="_blank" rel="noopener noreferrer" aria-label="${esc(row.name)}をGoogleマップで検索">地図</a></div><details class="flyer-row-details" ${expanded.has(row.id)?'open':''}><summary>状況を変更・メモ</summary><fieldset class="flyer-choices"><legend>状況</legend>${statuses.map((status,i)=>`<label class="flyer-choice flyer-status ${row.status===status?'is-selected':''}" data-status="${i}"><input type="checkbox" data-status-choice="${esc(row.id)}" value="${esc(status)}" ${row.status===status?'checked':''}><span>${esc(status)}</span></label>`).join('')}</fieldset><p data-row-message role="status"></p><p class="flyer-meta">${esc(row.region)} ／ ${esc(row.category)}</p>${row.memo?`<p class="memo">${esc(row.memo)}</p>`:''}${data.archived?'':`<button type="button" class="secondary" data-edit-flyer="${esc(row.id)}">編集する</button> <button type="button" class="secondary" data-refuse-flyer="${esc(row.id)}">断られたため一覧から外す</button>`}${row.source?`<p><a href="${esc(row.source.url)}" target="_blank" rel="noopener noreferrer">確認元</a> <time>${esc(row.source.date)}</time></p>`:''}</details></article>`).join('')||(data?'<p>表示する掲示先はありません。「追加・絞り込み・引き継ぎ」から登録できます。</p>':'');
+  const match=rows.filter(row=>(!region.value||row.region===region.value)&&(!category.value||row.category===category.value)&&(!q('[data-filter-status]').value||row.status===q('[data-filter-status]').value)&&normalize(row.name).includes(normalize(q('[data-search]').value)));
+  const list=q('[data-list]'),desired=[];
+  for(const row of match.sort((left,right)=>compare(orderName(left),orderName(right))||compare(left.region,right.region))){
+   const signature=JSON.stringify([row,!!data.archived]);
+   let cached=rowNodes.get(row.id);
+   if(!cached||cached.signature!==signature){
+    const template=document.createElement('template');
+    template.innerHTML=`<article class="flyer-item" data-venue-id="${esc(row.id)}" data-status="${statuses.indexOf(row.status)}"><div class="flyer-heading"><span class="flyer-badge">${esc(row.status)}</span><h3>${esc(row.name)}</h3><a class="flyer-map" href="${esc(mapUrl(row))}" target="_blank" rel="noopener noreferrer" aria-label="${esc(row.name)}をGoogleマップで検索">地図</a></div><details class="flyer-row-details" ${expanded.has(row.id)?'open':''}><summary>状況を変更・メモ</summary><fieldset class="flyer-choices"><legend>状況</legend>${statuses.map((status,i)=>`<label class="flyer-choice flyer-status ${row.status===status?'is-selected':''}" data-status="${i}"><input type="checkbox" data-status-choice="${esc(row.id)}" value="${esc(status)}" ${row.status===status?'checked':''}><span>${esc(status)}</span></label>`).join('')}</fieldset><p data-row-message role="status"></p><p class="flyer-meta">${esc(row.region)} ／ ${esc(row.category)}</p>${row.memo?`<p class="memo">${esc(row.memo)}</p>`:''}${data.archived?'':`<button type="button" class="secondary" data-edit-flyer="${esc(row.id)}">編集する</button> <button type="button" class="secondary" data-refuse-flyer="${esc(row.id)}">断られたため一覧から外す</button>`}${row.source?`<p><a href="${esc(row.source.url)}" target="_blank" rel="noopener noreferrer">確認元</a> <time>${esc(row.source.date)}</time></p>`:''}</details></article>`;
+    cached={signature,node:template.content.firstElementChild};rowNodes.set(row.id,cached);
+   }
+   // Restore the confirmed checkbox state after failed saves or a re-click.
+   for(const input of cached.node.querySelectorAll('[data-status-choice]'))input.checked=input.value===row.status;
+   cached.node.querySelector('[data-row-message]').textContent='';
+   cached.node.querySelectorAll('.sync-warning').forEach(node=>node.remove());
+   desired.push(cached.node);
+  }
+  const keep=new Set(desired);
+  for(const node of [...list.children])if(!keep.has(node))node.remove();
+  desired.forEach((node,index)=>{if(list.children[index]!==node)list.insertBefore(node,list.children[index]||null)});
+  for(const id of rowNodes.keys())if(!rows.some(row=>row.id===id))rowNodes.delete(id);
+  if(!desired.length&&data)list.innerHTML='<p>条件に合う掲示先はありません。</p>';
+  q('[data-count]').textContent=data?match.length+'／'+rows.length+'施設':'';
   q('[data-refused]').innerHTML=(data?.refused||[]).map(row=>`<li><strong>${esc(row.name)}</strong> ／ ${esc(row.eventTitle)} ／ ${esc(row.refusedOn)}${row.memo?`<p class="memo">${esc(row.memo)}</p>`:''}</li>`).join('')||'<li>履歴はありません。</li>';
   updateControls();
  }
@@ -82,6 +104,8 @@ export function openFlyerVenues(event){
   };
   editor.showModal();
  }
+ q('[data-search]').oninput=redraw;
+ q('[data-filter-status]').onchange=redraw;
  region.onchange=category.onchange=redraw;source.onchange=updateControls;
  q('[data-close-flyers]').onclick=()=>{if(!busy)dialog.close()};
  dialog.addEventListener('cancel',e=>{if(busy)e.preventDefault()});
@@ -95,7 +119,7 @@ export function openFlyerVenues(event){
    if(!dialog.open)return;
    redraw();
    if(!data.archived){
-    const response=await fetch('./flyer-candidates.json?v=20261123-reservations1');
+    const response=await fetch('./flyer-candidates.json?v=20261124-simple1');
     if(!response.ok)throw Error('施設一覧を読み込めませんでした。');
     const catalog=await response.json();
     if(!Array.isArray(catalog))throw Error('施設一覧を読み込めませんでした。');

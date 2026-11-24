@@ -107,3 +107,8 @@ dialog{border:1px solid var(--line);border-radius:14px;width:min(680px,calc(100%
 .reservation-item img{display:block;max-width:100%;height:auto}
 .reservation-dialog [data-draft] label{margin-block:8px}
 .reservation-dialog [data-draft]{margin-bottom:14px;scroll-margin:12px}
+
+.next-event-label{font-weight:700;color:#071d42;margin:0 0 .4rem;font-size:1rem}
+.flyer-quick-filters{display:grid;grid-template-columns:minmax(0,1fr) minmax(7rem,.65fr);gap:10px}
+.flyer-quick-filters label{min-width:0}
+.flyer-quick-filters input,.flyer-quick-filters select{width:100%;min-width:0}
