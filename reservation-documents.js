@@ -1,4 +1,4 @@
-import {cloud} from './cloud.js?v=20261124-follow1';
+import {cloud} from './cloud.js?v=20261124-ux1';
 
 const captions={date:'利用日',venue:'施設名',room:'部屋',start:'予約開始',end:'予約終了',issued:'発行日'};
 const escapeHtml=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));

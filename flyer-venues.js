@@ -1,7 +1,7 @@
-import {previewFlyerMigration} from './flyer-migration.js?v=20261124-follow1';
-import {flyerLocation,flyerLocationInfo,positionFromUrl,exactAddressPosition} from './flyer-locations.js?v=20261124-follow1';
-import {startEditor,finishEditor,leaveEditor,guardEditor,editorState} from './editor-dialog.js?v=20261124-follow1';
-import {cloud} from './cloud.js?v=20261124-follow1';
+import {previewFlyerMigration} from './flyer-migration.js?v=20261124-ux1';
+import {flyerLocation,flyerLocationInfo,positionFromUrl,exactAddressPosition} from './flyer-locations.js?v=20261124-ux1';
+import {startEditor,finishEditor,leaveEditor,guardEditor,editorState} from './editor-dialog.js?v=20261124-ux1';
+import {cloud} from './cloud.js?v=20261124-ux1';
 
 const statuses=['未依頼','依頼済み','掲示済み','今回は見送り'];
 const compare=new Intl.Collator('ja',{numeric:true,sensitivity:'base'}).compare;
@@ -25,19 +25,21 @@ const options=(values,all)=>[new Option(all,''),...values.map(value=>new Option(
 let catalogPromise;
 
 export function openFlyerVenues(event){
+ if(document.querySelector('.flyer-dialog[open]'))return;
  const dialog=document.createElement('dialog');
  dialog.className='flyer-dialog';
  dialog.setAttribute('aria-label','チラシ配布・掲示');
- dialog.innerHTML='<div class="dialog-body"><div class="dialog-head"><h2>チラシ配布・掲示</h2><button type="button" data-close-flyers aria-label="閉じる">×</button></div><p></p><p class="muted">「状況・メモを変更する」から操作できます。</p><div class="flyer-actions form-actions"><button type="button" class="secondary" data-open-map>地図で見る</button><button type="button" data-add>施設を追加</button><button type="button" data-refresh class="secondary">最新を取得</button></div><p data-message role="status"></p><div class="flyer-quick-filters"><label>施設名で検索<input type="search" data-search placeholder="施設名を入力"></label><label>状況<select data-filter-status><option value="">すべて</option><option>未依頼</option><option>依頼済み</option><option>掲示済み</option><option>今回は見送り</option></select></label></div><div data-flyer-migration hidden><button type="button" class="secondary" data-migration-preview>既存施設の共通化を確認</button><div data-migration-plan></div></div><p data-count class="muted" role="status"></p><p data-position-count class="muted"></p><details class="flyer-tools"><summary>追加・絞り込み・引き継ぎ</summary><div class="record-filters flyer-filters"><label>地域<select data-region></select></label><label>区分<select data-category></select></label></div><div class="flyer-actions form-actions"><label>引き継ぎ元<select data-source></select></label><button type="button" data-carry>選んだ公演から引き継ぐ</button></div></details><section data-map-panel hidden></section><div data-list></div><details><summary>お断りの履歴</summary><ul data-refused></ul></details></div>';
+ dialog.innerHTML='<div class="dialog-body"><div class="dialog-head"><h2>チラシ配布・掲示</h2><button type="button" data-close-flyers aria-label="閉じる">×</button></div><p></p><p class="muted">「状況・メモを編集」からまとめて保存できます。</p><div class="flyer-actions form-actions"><button type="button" class="secondary" data-open-map>地図で見る</button><button type="button" data-add>施設を追加</button><button type="button" data-refresh class="secondary">最新を取得</button></div><p data-message role="status"></p><p data-updated class="muted" role="status"></p><div class="flyer-quick-filters"><label>施設名で検索<input type="search" data-search placeholder="施設名を入力"></label><label>状況<select data-filter-status><option value="">すべて</option><option>未依頼</option><option>依頼済み</option><option>掲示済み</option><option>今回は見送り</option></select></label></div><div data-flyer-migration hidden><button type="button" class="secondary" data-migration-preview>既存施設の共通化を確認</button><div data-migration-plan></div></div><p data-count class="muted" role="status"></p><details class="flyer-tools"><summary>追加・絞り込み・引き継ぎ</summary><p data-position-count class="muted"></p><div class="record-filters flyer-filters"><label>地域<select data-region></select></label><label>区分<select data-category></select></label></div><div class="flyer-actions form-actions"><label>引き継ぎ元<select data-source></select></label><button type="button" data-carry>選んだ公演から引き継ぐ</button></div></details><section data-map-panel hidden></section><div data-list></div><details><summary>お断りの履歴</summary><ul data-refused></ul></details></div>';
  dialog.querySelector('.dialog-head + p').textContent=event.title;
  const q=selector=>dialog.querySelector(selector);
  const message=q('[data-message]'),source=q('[data-source]'),region=q('[data-region]'),category=q('[data-category]');
  const allowed=()=>cloud.state.provider==='apps-script'&&!!cloud.state.role;
  const identity=cloud.state.user?.uid;
- let data,busy=false,editor,editedId;
+ let data,busy=false,editor,editedId,lastRead=0,refreshQueued=false;
  const rowNodes=new Map(),groupNodes=new Map(),rowMessages=new Map();
+ const markRead=()=>{lastRead=Date.now();q('[data-updated]').textContent='最終取得 '+new Intl.DateTimeFormat('ja-JP',{hour:'2-digit',minute:'2-digit',second:'2-digit',timeZone:'Asia/Tokyo'}).format(lastRead);};
  let mapView,mapOpening=false,refusedMarkup;
- const snapshotCatalog=()=>catalogPromise||(catalogPromise=fetch('./flyer-candidates.json?v=20261124-follow1').then(response=>{if(!response.ok)throw Error('施設一覧を読み込めませんでした。');return response.json()}).catch(error=>{catalogPromise=null;throw error}));
+ const snapshotCatalog=()=>catalogPromise||(catalogPromise=fetch('./flyer-candidates.json?v=20261124-ux1').then(response=>{if(!response.ok)throw Error('施設一覧を読み込めませんでした。');return response.json()}).catch(error=>{catalogPromise=null;throw error}));
  const normalize=value=>String(value||'').normalize('NFKC').toLowerCase().replace(/\s+/g,'');
  const request=(action,payload={})=>cloud.flyer(action,{eventId:event.id,...payload});
  function redraw(){
@@ -74,19 +76,13 @@ export function openFlyerVenues(event){
    let cached=rowNodes.get(row.id);
    if(!cached||cached.signature!==signature){
     const template=document.createElement('template');
-    template.innerHTML=`<article class="flyer-item" data-venue-id="${esc(row.id)}" data-status="${statuses.indexOf(row.status)}"><div class="flyer-heading"><span class="flyer-badge">${esc(row.status)}</span><h3>${esc(row.name)}${flyerLocation(row)?'':`<small class="flyer-unlocated" title="${esc(position?.reason||'緯度と経度が登録されていません。')}">位置未確認</small>`}</h3><a class="flyer-map" href="${esc(mapUrl(row))}" target="_blank" rel="noopener noreferrer" aria-label="${esc(row.name)}をGoogleマップで検索">地図</a></div>${history?'<p class="flyer-meta">以前お断りあり</p>':''}<details class="flyer-row-details" ${cached?.node.querySelector('.flyer-row-details').open?'open':''}><summary class="secondary flyer-disclosure"><span>状況・メモを変更する</span><span>閉じる</span></summary><p class="muted">状況は自動保存。メモは「施設情報・メモを編集」から保存します。</p>${mapAllowed&&flyerLocation(row)?`<button type="button" class="secondary" data-focus-pin="${esc(row.id)}">地図でこの施設を見る</button>`: ''}<fieldset class="flyer-choices"><legend>状況</legend>${statuses.map((status,i)=>`<label class="flyer-choice flyer-status ${row.status===status?'is-selected':''}" data-status="${i}"><input type="checkbox" data-status-choice="${esc(row.id)}" value="${esc(status)}" ${row.status===status?'checked':''}><span>${esc(status)}</span></label>`).join('')}</fieldset>${data.declineFields&&row.status==='今回は見送り'?`<label class="flyer-decline"><input type="checkbox" data-decline-choice="${esc(row.id)}" ${row.declined?'checked':''}>過去または今回、お断りがあったため見送り</label><p class="muted">今後、改めてお願いできる場合があります。</p>`:''}<p data-row-message role="status"></p><p class="flyer-meta">${esc(row.region)} ／ ${esc(row.category)}</p>${position?.address?`<p class="flyer-meta">${esc(position.address)}</p>`:''}${!flyerLocation(row)?`<p class="flyer-meta">${esc(position?.reason||'緯度と経度が登録されていません。')}</p>`:''}${row.memo?`<p class="memo">${esc(row.memo)}</p>`:''}${data.archived?'':`${!flyerLocation(row)?`<button type="button" class="secondary" data-find-flyer="${esc(row.id)}">場所を探す</button>`:''}<button type="button" class="secondary" data-edit-flyer="${esc(row.id)}">施設情報・メモを編集</button>`}${row.source?`<p><a href="${esc(row.source.url)}" target="_blank" rel="noopener noreferrer">確認元</a> <time>${esc(row.source.date)}</time></p>`:''}</details></article>`;
+    template.innerHTML=`<article class="flyer-item" data-venue-id="${esc(row.id)}" data-status="${statuses.indexOf(row.status)}"><div class="flyer-heading"><span class="flyer-badge">${esc(row.status)}</span><h3>${esc(row.name)}${flyerLocation(row)?'':`<small class="flyer-unlocated" title="${esc(position?.reason||'緯度と経度が登録されていません。')}">位置未確認</small>`}</h3><a class="flyer-map" href="${esc(mapUrl(row))}" target="_blank" rel="noopener noreferrer" aria-label="${esc(row.name)}をGoogleマップで検索">地図</a></div>${row.memo?`<p class="memo flyer-visible-memo">${esc(row.memo)}</p>`:''}${data.archived?'':`<button type="button" class="secondary" data-edit-flyer="${esc(row.id)}">状況・メモを編集</button>`}${history?'<p class="flyer-meta">以前お断りあり</p>':''}<details class="flyer-row-details" ${cached?.node.querySelector('.flyer-row-details').open?'open':''}><summary class="secondary flyer-disclosure"><span>施設の詳細</span><span>閉じる</span></summary>${mapAllowed&&flyerLocation(row)?`<button type="button" class="secondary" data-focus-pin="${esc(row.id)}">地図でこの施設を見る</button>`: ''}<p data-row-message role="status"></p><p class="flyer-meta">${esc(row.region)} ／ ${esc(row.category)}</p>${position?.address?`<p class="flyer-meta">${esc(position.address)}</p>`:''}${!flyerLocation(row)?`<p class="flyer-meta">${esc(position?.reason||'緯度と経度が登録されていません。')}</p>`:''}${data.archived?'':`${!flyerLocation(row)?`<button type="button" class="secondary" data-find-flyer="${esc(row.id)}">場所を探す</button>`:''}`}${row.source?`<p><a href="${esc(row.source.url)}" target="_blank" rel="noopener noreferrer">確認元</a> <time>${esc(row.source.date)}</time></p>`:''}</details></article>`;
     cached={signature,node:template.content.firstElementChild};rowNodes.set(row.id,cached);
    }
-   // Restore the confirmed checkbox state after failed saves or a re-click.
-   for(const input of cached.node.querySelectorAll('[data-status-choice]'))input.checked=input.value===row.status;
-   const decline=cached.node.querySelector('[data-decline-choice]');if(decline)decline.checked=!!row.declined;
    const feedback=cached.node.querySelector('[data-row-message]'),result=rowMessages.get(row.id);
    if(feedback.dataset.text!==(result?.text||'')){
     feedback.dataset.text=result?.text||'';
     feedback.textContent=result?.text||'';
-    if(result?.retry){
-     const button=document.createElement('button');button.type='button';button.dataset.retryFlyer=row.id;button.textContent='再試行';feedback.append(' ',button);
-    }
    }
    cached.node.classList.toggle('flyer-just-edited',row.id===editedId);
    desired.push(cached.node);
@@ -111,7 +107,7 @@ export function openFlyerVenues(event){
   q('[data-refresh]').disabled=busy||!allowed();
   q('[data-flyer-migration]').hidden=!(data?.migrationRequired===true&&!data?.archived&&cloud.state.role==='admin');
   q('[data-migration-preview]').disabled=busy;
-  for(const button of dialog.querySelectorAll('[data-add],[data-edit-flyer],[data-find-flyer],[data-restore-flyer],[data-decline-choice],[data-status-choice],[data-retry-flyer]'))button.disabled=!available;
+  for(const button of dialog.querySelectorAll('[data-add],[data-edit-flyer],[data-find-flyer],[data-restore-flyer]'))button.disabled=!available;
   source.disabled=!available;region.disabled=category.disabled=busy;
   q('[data-close-flyers]').disabled=busy;
   q('[data-carry]').disabled=!available||!source.value;
@@ -123,9 +119,9 @@ export function openFlyerVenues(event){
   try{
    const next=await request(action,body);
    if(!dialog.open)return;
-   data=next;redraw();message.textContent=success;return true;
+   data=next;markRead();redraw();message.textContent=success;return true;
   }catch(error){if(dialog.open){redraw();message.textContent=(action==='flyerRead'?'最新の情報を取得できませんでした。':'保存を確認できませんでした。')+error.message+' 「最新を取得」で確認してから、もう一度お試しください。'}return false;}
-  finally{busy=false;if(dialog.open)redraw()}
+  finally{busy=false;if(dialog.open){redraw();if(refreshQueued&&!editor?.open)void refreshRead()}}
  }
  function edit(row={},openPlace=false){
   if(busy||!data||data.archived||!allowed())return;
@@ -133,9 +129,12 @@ export function openFlyerVenues(event){
   editor=document.createElement('dialog');
   editor.setAttribute('aria-label','掲示先を編集');
   editor.dataset.discardLabel='変更を破棄して一覧に戻る';
-  editor.innerHTML=`<div class="dialog-body"><h2>${row.id?'掲示先を編集':'掲示先を追加'}</h2><form><div class="editor-bar"><div class="form-actions"><button type="submit" class="primary">変更を保存する</button><button type="button" data-cancel class="secondary">一覧に戻る</button></div><p data-editor-status role="status" hidden></p></div><label>施設名<input name="name" required maxlength="120" value="${esc(row.name)}"></label>${data.sharedFacilities?(!row.id||row.facilityId?'<p class="muted">施設情報は他の公演にも反映されます。</p>':!row.source?'<p class="muted">この施設は共通化前です。管理者が一覧で共通化を確認できます。</p>':''):'<p class="muted">共通保存の更新までは、この公演に保存されます。</p>'}${editorChoice('region','地域',['銚子市','神栖市',...(data.regions||[]),...data.rows.map(item=>item.region)],row.region||region.value||'神栖市')}${editorChoice('category','区分',data.categories,row.category||category.value||'その他')}<button type="button" class="secondary" data-find-place>場所を探す</button><div data-place-results aria-live="polite"></div><label>状況<select name="status">${statuses.map(status=>`<option ${(row.status||statuses[0])===status?'selected':''}>${status}</option>`).join('')}</select></label><label>自由メモ（任意・この公演のみ）<textarea name="memo" aria-label="自由メモ（任意）" maxlength="2000" rows="4"></textarea></label><details ${row.id&&!flyerLocation(row)?'open':''}><summary>住所・地図の位置</summary><button type="button" class="secondary" data-pick-place>地図上で位置を指定</button><div data-picker></div><label>住所<input name="address" maxlength="250" value="${esc(position?.address)}"></label><button type="button" class="secondary" data-search-address>住所を地図で確認</button> <button type="button" class="secondary" data-locate-address>完全一致する住所から座標を入れる</button><p data-address-result role="status"></p><label>地図URL<input name="mapUrl" type="url" maxlength="1000" value="${esc(position?.mapUrl)}"></label><p class="muted">住所や地図リンクだけも保存できます。ピンを表示するには、ピンの座標が入った地図URL、または緯度・経度を入力してください。</p><label>緯度<input name="lat" type="number" min="-90" max="90" step="any" value="${esc(position?.lat)}"></label><label>経度<input name="lng" type="number" min="-180" max="180" step="any" value="${esc(position?.lng)}"></label></details></form></div>`;
+  editor.innerHTML=`<div class="dialog-body"><h2>${row.id?'状況・メモを編集':'配布・掲示する施設を追加'}</h2>${row.id?`<p class="flyer-editor-name">${esc(row.name)}</p>`:''}<form><div class="editor-bar"><div class="form-actions"><button type="submit" class="primary">変更を保存する</button><button type="button" data-cancel class="secondary">一覧に戻る</button></div><p data-editor-status role="status" hidden></p></div><fieldset class="flyer-choices"><legend>状況（１つ選択）</legend>${statuses.map((status,i)=>`<label class="flyer-choice flyer-status" data-status="${i}"><input type="radio" name="status" value="${status}" ${(row.status||statuses[0])===status?'checked':''} required><span>${status}</span></label>`).join('')}</fieldset>${data.declineFields?`<label class="flyer-decline" data-decline-field><input type="checkbox" name="declined" ${row.declined?'checked':''}>過去または今回、お断りがあったため見送り</label>`:''}<label>自由メモ（任意・この公演のみ）<textarea name="memo" aria-label="自由メモ（任意）" maxlength="2000" rows="4"></textarea></label><details class="quick-help" ${row.id?'':'open'}><summary>施設名・地域・区分</summary><label>施設名<input name="name" required maxlength="120" value="${esc(row.name)}"></label>${data.sharedFacilities?(!row.id||row.facilityId?'<p class="muted">施設情報は他の公演にも反映されます。</p>':!row.source?'<p class="muted">この施設は共通化前です。管理者が一覧で共通化を確認できます。</p>':''):'<p class="muted">共通保存の更新までは、この公演に保存されます。</p>'}${editorChoice('region','地域',['銚子市','神栖市',...(data.regions||[]),...data.rows.map(item=>item.region)],row.region||region.value||'神栖市')}${editorChoice('category','区分',data.categories,row.category||category.value||'その他')}<button type="button" class="secondary" data-find-place>場所を探す</button><div data-place-results aria-live="polite"></div></details><details ${row.id&&!flyerLocation(row)?'open':''}><summary>住所・地図の位置</summary><button type="button" class="secondary" data-pick-place>地図上で位置を指定</button><div data-picker></div><label>住所<input name="address" maxlength="250" value="${esc(position?.address)}"></label><button type="button" class="secondary" data-search-address>住所を地図で確認</button> <button type="button" class="secondary" data-locate-address>完全一致する住所から座標を入れる</button><p data-address-result role="status"></p><label>地図URL<input name="mapUrl" type="url" maxlength="1000" value="${esc(position?.mapUrl)}"></label><p class="muted">住所や地図リンクだけも保存できます。ピンを表示するには、ピンの座標が入った地図URL、または緯度・経度を入力してください。</p><label>緯度<input name="lat" type="number" min="-90" max="90" step="any" value="${esc(position?.lat)}"></label><label>経度<input name="lng" type="number" min="-180" max="180" step="any" value="${esc(position?.lng)}"></label></details></form></div>`;
   const form=editor.querySelector('form'),cancel=form.querySelector('[data-cancel]');
   form.elements.memo.value=row.memo||'';
+  const declineField=form.querySelector('[data-decline-field]');
+  const updateStatus=()=>{if(declineField){declineField.hidden=form.elements.status.value!=='今回は見送り';form.elements.declined.disabled=declineField.hidden}};
+  form.addEventListener('change',updateStatus);updateStatus();
   const readRegion=wireChoice(form,'region'),readCategory=wireChoice(form,'category');
   const search=form.querySelector('[data-find-place]'),results=form.querySelector('[data-place-results]');
   const picker=form.querySelector('[data-picker]');
@@ -151,7 +150,7 @@ export function openFlyerVenues(event){
    if(!name||!region){results.textContent='施設名と地域を入力してください。';return}
    search.disabled=true;results.textContent='場所を探しています…';
    try{
-    const {searchPlaces,showPlaceCandidates}=await import('./flyer-place-picker.js?v=20261124-follow1');
+    const {searchPlaces,showPlaceCandidates}=await import('./flyer-place-picker.js?v=20261124-ux1');
     const local=(await snapshotCatalog().catch(()=>[])).filter(item=>item.region===region&&normalize(item.name).includes(normalize(name))).flatMap(item=>{
      const location=flyerLocationInfo(item);return location?.lat===undefined?[]:[{name:item.name,...location}];
     });
@@ -170,7 +169,7 @@ export function openFlyerVenues(event){
    if(removePicker){removePicker();removePicker=null;picker.replaceChildren();pickButton.textContent='地図上で位置を指定';return}
    pickButton.disabled=true;
    try{
-    const {mountPlacePicker}=await import('./flyer-place-picker.js?v=20261124-follow1');
+    const {mountPlacePicker}=await import('./flyer-place-picker.js?v=20261124-ux1');
     const initial=form.elements.lat.value&&form.elements.lng.value?[Number(form.elements.lat.value),Number(form.elements.lng.value)]:null;
     removePicker=await mountPlacePicker(picker,initial,([lat,lng])=>{
      usePlace(lat,lng);picker.replaceChildren();removePicker?.();removePicker=null;pickButton.textContent='地図上で位置を指定';
@@ -211,13 +210,14 @@ export function openFlyerVenues(event){
   editor.addEventListener('cancel',event=>{if(busy){event.preventDefault();event.stopImmediatePropagation()}},{capture:true});
   cancel.onclick=()=>{if(!busy)leaveEditor(editor,()=>editor.close())};
   const current=editor;
-  editor.addEventListener('close',()=>{removePicker?.();unguard();current.remove();if(editor===current)editor=null},{once:true});
+  editor.addEventListener('close',()=>{removePicker?.();unguard();current.remove();if(editor===current)editor=null;if(refreshQueued)void refreshRead()},{once:true});
   form.onsubmit=async event=>{
    event.preventDefault();
    if(busy||!allowed())return;
    if(locating){editorState(form,'住所の確認が終わってから保存してください。');return}
    const {address,mapUrl,lat,lng,regionNew,categoryNew,...entry}=Object.fromEntries(new FormData(form));
    entry.region=readRegion();entry.category=readCategory();
+   if(data.declineFields)entry.declined=entry.status==='今回は見送り'&&form.elements.declined.checked;
    const original=row.location;
    const changed=address.trim()!==(position?.address||'')||mapUrl.trim()!==(position?.mapUrl||'')||lat!==String(position?.lat??'')||lng!==String(position?.lng??'');
    if(changed){
@@ -246,12 +246,12 @@ export function openFlyerVenues(event){
       throw Error('施設情報は保存されましたが、位置情報は保存されませんでした。共通保存の更新後に、位置情報を登録してください。');
      }
     }
-    data=next;editedId=saved?.id;finishEditor(current);current.close();
+    data=next;markRead();refreshQueued=false;editedId=saved?.id;finishEditor(current);current.close();
     if(editedId)rowMessages.set(editedId,{text:'保存しました。'});
     redraw();message.textContent='掲示先を保存しました。 '+entry.name;
    }catch(error){
     if(current.open)editorState(form,'保存できませんでした。'+error.message+' 入力はそのままです。競合した場合は、入力を控えてから一覧を更新してください。');
-   }finally{busy=false;cancel.disabled=false;if(dialog.open)redraw()}
+   }finally{busy=false;cancel.disabled=false;if(dialog.open){redraw();if(refreshQueued&&!editor?.open)void refreshRead()}}
   };
   editor.showModal();
   if(openPlace)search.click();
@@ -261,7 +261,7 @@ export function openFlyerVenues(event){
  region.onchange=category.onchange=redraw;source.onchange=updateControls;
  q('[data-close-flyers]').onclick=()=>{if(!busy)dialog.close()};
  dialog.addEventListener('cancel',e=>{if(busy)e.preventDefault()});
- q('[data-refresh]').onclick=()=>void loadAllVenues();
+ q('[data-refresh]').onclick=()=>void refreshRead(true);
  q('[data-add]').onclick=()=>edit();
  q('[data-migration-preview]').onclick=()=>previewFlyerMigration(q('[data-migration-plan]'),request,async()=>{
   data={...data,migrationRequired:false};redraw();
@@ -279,7 +279,7 @@ export function openFlyerVenues(event){
   if(busy||!allowed())return;
   busy=true;updateControls();message.textContent='施設一覧を読み込み中…';
   try{
-   data=await request('flyerRead');
+   data=await request('flyerRead');markRead();
    if(!dialog.open)return;
    redraw();
    if(!data.archived){
@@ -297,30 +297,9 @@ export function openFlyerVenues(event){
    }
    message.textContent='';
   }catch(error){if(dialog.open){redraw();message.textContent='施設一覧をすべて取得できませんでした。'+error.message+' 「最新を取得」で再試行してください。登録済みの状況とメモは保持されます。'}}
-  finally{busy=false;if(dialog.open)redraw()}
+  finally{busy=false;if(dialog.open){redraw();if(refreshQueued&&!editor?.open)void refreshRead()}}
  }
  q('[data-carry]').onclick=()=>run('flyerCarry',{from:source.value},'引き継ぎを確認しました。未登録の施設のみ追加しました。');
- async function saveStatus(row,status,declined=status==='今回は見送り'&&!!row?.declined){
-  if(!row||busy||data.archived||!allowed()||row.status===status&&!!row.declined===declined)return;
-  busy=true;
-  rowMessages.set(row.id,{text:'保存中…'});redraw();
-  try{
-   const entry={name:row.name,region:row.region,category:row.category,memo:row.memo,status,...(data.declineFields?{declined}:{})};
-   data=await request('flyerSave',{id:row.id,revision:row.revision,entry});
-   rowMessages.set(row.id,{text:'保存しました。'});
-  }catch(error){
-   const conflict=/更新されました/.test(error.message);
-   rowMessages.set(row.id,{text:'保存できませんでした。'+error.message,retry:{status,declined,conflict}});
-  }finally{busy=false;if(dialog.open)redraw()}
- }
- q('[data-list]').onchange=event=>{
-  const decline=event.target.closest('[data-decline-choice]');
-  if(decline){void saveStatus(data?.rows.find(row=>row.id===decline.dataset.declineChoice),'今回は見送り',decline.checked);return}
-  const input=event.target.closest('[data-status-choice]');if(!input)return;
-  const row=data?.rows.find(row=>row.id===input.dataset.statusChoice);
-  if(!input.checked||input.value===row?.status){redraw();return}
-  void saveStatus(row,input.value);
- };
  q('[data-open-map]').onclick=()=>openMap();
  async function openMap(focusId){
   const host=q('[data-map-panel]'),button=q('[data-open-map]');
@@ -329,12 +308,11 @@ export function openFlyerVenues(event){
   if(mapView){mapView.destroy();mapView=null;host.hidden=true;button.textContent='地図で見る';return}
   mapOpening=true;host.hidden=false;host.textContent='地図を読み込み中…';
   try{
-   const {mountFlyerMap}=await import('./flyer-map.js?v=20261124-follow1');
+   const {mountFlyerMap}=await import('./flyer-map.js?v=20261124-ux1');
    if(!dialog.open)return;
    mapView=await mountFlyerMap(host,{
     edit:id=>{const row=data?.rows.find(row=>row.id===id);if(row)edit(row)},
-    change:(id,status)=>saveStatus(data?.rows.find(row=>row.id===id),status),
-    retry:id=>retryStatus(id)
+
    });
    if(!dialog.open){mapView.destroy();mapView=null;return}
    button.textContent='地図を閉じる';redraw();
@@ -346,23 +324,27 @@ export function openFlyerVenues(event){
  q('[data-list]').onclick=event=>{
   const button=event.target.closest('button');if(!button)return;
   if(button.dataset.focusPin){void openMap(button.dataset.focusPin);return}
-  const id=button.dataset.editFlyer||button.dataset.findFlyer||button.dataset.retryFlyer;
+  const id=button.dataset.editFlyer||button.dataset.findFlyer;
   const row=data?.rows.find(row=>row.id===id);
   if(!row)return;
-  if(button.dataset.retryFlyer)retryStatus(id);
-  else if(button.dataset.editFlyer||button.dataset.findFlyer)edit(row,!!button.dataset.findFlyer);
+  if(button.dataset.editFlyer||button.dataset.findFlyer)edit(row,!!button.dataset.findFlyer);
  };
- function retryStatus(id){
-   const row=data?.rows.find(row=>row.id===id);
-   const retry=rowMessages.get(id)?.retry;
-   if(retry?.conflict){
-    rowMessages.set(id,{text:'最新の内容を確認してから、状況を選び直してください。'});
-    void run('flyerRead');
-   }else if(retry)void saveStatus(row,retry.status,retry.declined);
+ // Refresh only reads: returning to the app must never import or write data.
+ async function refreshRead(manual=false){
+  if(!dialog.open||!allowed())return;
+  if(busy||editor?.open){refreshQueued=true;return}
+  if(!manual&&!refreshQueued&&Date.now()-lastRead<1000)return;
+  refreshQueued=false;
+  await run('flyerRead',{},manual?'最新の情報を取得しました。':'');
  }
+ const onVisible=()=>{if(!document.hidden)void refreshRead()};
+ document.addEventListener('visibilitychange',onVisible);
+ window.addEventListener('focus',onVisible);
+ window.addEventListener('pageshow',onVisible);
+ const refreshTimer=setInterval(onVisible,60000);
  document.body.append(dialog);
  dialog.showModal();
  const stop=cloud.onState(()=>{if(!allowed()||cloud.state.user?.uid!==identity){editor?.close();dialog.close()}});
- dialog.addEventListener('close',()=>{stop();mapView?.destroy();editor?.close();dialog.remove()},{once:true});
+ dialog.addEventListener('close',()=>{stop();clearInterval(refreshTimer);document.removeEventListener('visibilitychange',onVisible);window.removeEventListener('focus',onVisible);window.removeEventListener('pageshow',onVisible);mapView?.destroy();editor?.close();dialog.remove()},{once:true});
  redraw();void loadAllVenues();
 }
