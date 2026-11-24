@@ -238,7 +238,7 @@ export function openFlyerVenues(event){
  async function openMap(focusId){
   const host=q('[data-map-panel]'),button=q('[data-open-map]');
   if(mapOpening)return;
-  if(mapView&&focusId){mapView.focus(focusId);host.scrollIntoView({block:'nearest'});return}
+  if(mapView&&focusId){mapView.focus(focusId);return}
   if(mapView){mapView.destroy();mapView=null;host.hidden=true;button.textContent='地図で見る';return}
   mapOpening=true;host.hidden=false;host.textContent='地図を読み込み中…';
   try{
@@ -252,7 +252,7 @@ export function openFlyerVenues(event){
    if(!dialog.open){mapView.destroy();mapView=null;return}
    button.textContent='地図を閉じる';redraw();
    if(focusId)mapView.focus(focusId);
-   host.querySelector('.flyer-map-canvas').scrollIntoView({block:'center'});
+   else host.querySelector('.flyer-map-canvas').scrollIntoView({block:'center'});
   }catch{if(dialog.open)host.textContent='地図を読み込めませんでした。「地図で見る」で再試行できます。'}
   finally{mapOpening=false}
  };

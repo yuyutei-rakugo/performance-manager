@@ -16,7 +16,7 @@ function loadStyles(){
 }
 export async function mountFlyerMap(host,actions){
  await loadStyles();
- host.innerHTML='<p class="flyer-map-legend"></p><div class="flyer-map-canvas" role="region" aria-label="掲示先の地図"></div><p data-map-count></p><p data-tile-warning role="status" hidden>地図の背景を取得できませんでした。ピンの情報は開けます。</p>';
+ host.innerHTML='<p class="flyer-map-legend"></p><div class="flyer-map-canvas" role="region" aria-label="掲示先の地図"></div><section data-pin-details class="flyer-pin-details" aria-label="選んだ施設" hidden></section><p data-map-count></p><p data-tile-warning role="status" hidden>地図の背景を取得できませんでした。ピンの情報は開けます。</p>';
  const legend=host.querySelector('.flyer-map-legend'),canvas=host.querySelector('.flyer-map-canvas');
  for(const [index,status] of statuses.entries()){
   const item=document.createElement('span');item.className='flyer-status';item.dataset.status=index;item.textContent=status;legend.append(item);
@@ -28,9 +28,17 @@ export async function mountFlyerMap(host,actions){
  const warning=host.querySelector('[data-tile-warning]');
  background.on('loading',()=>{warning.hidden=true});
  background.on('tileerror',()=>{warning.hidden=false});
- const pins=new Map();
- let previousIds;
- function popup(row,archived,busy,result,neighbors){
+ const pins=new Map(),details=host.querySelector('[data-pin-details]');
+ let previousIds,selected;
+ function show(id,scroll=false){
+  selected=id;
+  const pin=pins.get(id);
+  details.hidden=!pin;
+  if(pin)details.replaceChildren(pin.content());
+  else details.replaceChildren();
+  if(pin&&scroll)details.scrollIntoView({block:'nearest'});
+ }
+ function venueDetails(row,archived,busy,result,neighbors){
   const content=document.createElement('div');
   const title=document.createElement('strong');title.textContent=row.name;
   const status=document.createElement('p');status.textContent=row.status;
@@ -56,7 +64,7 @@ export async function mountFlyerMap(host,actions){
    const label=document.createElement('p');label.textContent='同じ場所にある施設';content.append(label);
    for(const neighbor of neighbors){
     const button=document.createElement('button');button.type='button';button.className='secondary';
-    button.textContent=neighbor.name;button.onclick=event=>{event.stopPropagation();pins.get(neighbor.id)?.node.openPopup()};content.append(button);
+    button.textContent=neighbor.name;button.onclick=event=>{event.stopPropagation();show(neighbor.id,true)};content.append(button);
    }
   }
   return content;
@@ -65,7 +73,7 @@ export async function mountFlyerMap(host,actions){
   focus(id){
    const pin=pins.get(id)?.node;
    if(!pin)return;
-   view.setView(pin.getLatLng(),Math.max(view.getZoom(),17),{animate:false});pin.openPopup();
+   view.setView(pin.getLatLng(),Math.max(view.getZoom(),17),{animate:false});show(id,true);
   },
   update(rows,archived,busy,messages){
    const located=rows.filter(flyerLocation),ids=new Set(located.map(row=>row.id));
@@ -86,22 +94,22 @@ export async function mountFlyerMap(host,actions){
     const icon=divIcon({className:'flyer-pin',html:'<span class="flyer-status" data-status="'+index+'"></span>',iconSize:[34,40],iconAnchor:[17,37],popupAnchor:[0,-31]});
     const label=row.name+' '+row.status;
     const node=current?.node||marker(coordinate,{icon,title:label,autoPanOnFocus:false}).addTo(view);
-    const content=popup(row,archived,busy,messages.get(row.id),neighbors);
     if(current){
      if(String(current.coordinate)!==String(coordinate))node.setLatLng(coordinate);
      if(current.status!==row.status)node.setIcon(icon);
-     node.setPopupContent(content);
-    }else node.bindPopup(content,{maxWidth:205,maxHeight:165});
+    }
     const element=node.getElement();
     element.setAttribute('aria-label',label);element.title=label;
     // Pointer focus can scroll a clipped dialog between press and release.
     element.onmousedown=event=>{if(event.button===0)event.preventDefault()};
-    element.onclick=event=>{event.stopPropagation();node.openPopup()};
+    element.onclick=event=>{event.stopPropagation();show(row.id,true)};
     element.onkeydown=event=>{
-     if(event.key==='Enter'||event.key===' '){event.preventDefault();event.stopPropagation();node.openPopup()}
+     if(event.key==='Enter'||event.key===' '){event.preventDefault();event.stopPropagation();show(row.id,true)}
     };
-    pins.set(row.id,{node,signature,coordinate,status:row.status});
+    pins.set(row.id,{node,signature,coordinate,status:row.status,content:()=>venueDetails(row,archived,busy,messages.get(row.id),neighbors)});
+    if(row.id===selected)show(selected);
    }
+   if(selected&&!pins.has(selected))show(null);
    const idsKey=JSON.stringify([...ids]);
    if(idsKey!==previousIds&&located.length)view.fitBounds(latLngBounds(located.map(flyerLocation)),{padding:[28,28],maxZoom:15,animate:false});
    previousIds=idsKey;

@@ -569,11 +569,11 @@ async function main(){
     await mapPanel.getByRole('button',{name:'地図で見る'}).click();
     const centralPin=mapPanel.getByRole('button',{name:'中央図書館 掲示済み'});
     await centralPin.click();
-    await mapPanel.locator('.leaflet-popup-content').getByText('会員用の試験メモ',{exact:true}).waitFor();
+    await mapPanel.locator('[data-pin-details]').getByText('会員用の試験メモ',{exact:true}).waitFor();
     assert.equal(await mapPanel.locator('.flyer-pin').count(),2);
     assert.equal(await centralPin.textContent(),'');
     assert.equal(await centralPin.locator('span').getAttribute('data-status'),'2');
-    const popup=mapPanel.locator('.leaflet-popup-content');
+    const popup=mapPanel.locator('[data-pin-details]');
     failFlyer=true;
     await popup.getByLabel('状況を変更').selectOption('今回は見送り');
     await popup.getByText(/保存できませんでした/).waitFor();
@@ -583,7 +583,7 @@ async function main(){
     assert.equal(await popup.getByLabel('状況を変更').inputValue(),'今回は見送り');
     await popup.getByLabel('状況を変更').selectOption('掲示済み');
     await popup.getByText('保存しました。',{exact:true}).waitFor();
-    await mapPanel.locator('.leaflet-popup-content').getByRole('button',{name:'編集する'}).click();
+    await mapPanel.locator('[data-pin-details]').getByRole('button',{name:'編集する'}).click();
     const fromMap=page.getByRole('dialog',{name:'掲示先を編集',exact:true});
     assert.equal(await fromMap.getByLabel('施設名').inputValue(),'中央図書館');
     await fromMap.getByRole('button',{name:'キャンセル'}).click();
@@ -601,7 +601,7 @@ async function main(){
     await fromMap.waitFor({state:'hidden'});
     assert.deepEqual(flyerRows.find(row=>row.id==='test-flyer').location,{address:'銚子市模擬町1',mapUrl:'https://www.google.com/maps?q=35.73,140.83',lat:35.73,lng:140.83});
     await unknown.getByRole('button',{name:'地図でこの施設を見る'}).click();
-    await mapPanel.locator('.leaflet-popup-content').getByText('模擬施設',{exact:true}).waitFor();
+    await mapPanel.locator('[data-pin-details]').getByText('模擬施設',{exact:true}).waitFor();
 
     await invited.setViewportSize({width:320,height:680});
     await invited.locator('#event-dialog [data-close]').click();

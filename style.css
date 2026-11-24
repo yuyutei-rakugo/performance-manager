@@ -128,7 +128,9 @@ dialog{border:1px solid var(--line);border-radius:14px;width:min(680px,calc(100%
 .flyer-item [data-row-message]:empty{display:none}
 .flyer-map-canvas{height:clamp(235px,42vh,380px);isolation:isolate;background:#eef2f3}
 .flyer-map-legend{display:flex;gap:4px;flex-wrap:wrap;margin-block:8px}
-.flyer-dialog .leaflet-popup-content button{min-height:44px}
+.flyer-pin-details{margin-block:8px;padding:10px;border:1px solid var(--line);border-radius:8px;overflow-wrap:anywhere}
+.flyer-pin-details p{margin:4px 0}
+.flyer-pin-details select,.flyer-pin-details button{margin:4px 8px 4px 0}
 .flyer-map-legend .flyer-status,.flyer-pin .flyer-status{--pin:#a92530;--pin-bg:#fce9eb}
 .flyer-map-legend [data-status="1"],.flyer-pin [data-status="1"]{--pin:#1859a0;--pin-bg:#e5effb}
 .flyer-map-legend [data-status="2"],.flyer-pin [data-status="2"]{--pin:#1b6f49;--pin-bg:#e3f2e9}
