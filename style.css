@@ -142,7 +142,7 @@ dialog{border:1px solid var(--line);border-radius:14px;width:min(680px,calc(100%
 [data-nearby-list] ol,[data-unlocated] ul{padding-inline-start:24px}
 [data-nearby-list] button,[data-unlocated] button{margin-block:4px;text-align:left}
 .flyer-pin-details a{display:inline-flex;align-items:center;min-height:44px;margin-inline-end:8px}
-.flyer-disclosure{display:inline-flex;align-items:center;min-height:44px;cursor:pointer;list-style:none}
+.flyer-row-details .flyer-disclosure{display:inline-flex;align-items:center;min-height:44px;cursor:pointer;list-style:none}
 .flyer-disclosure::-webkit-details-marker{display:none}
 .flyer-disclosure span:last-child,.flyer-row-details[open]>.flyer-disclosure span:first-child{display:none}
 .flyer-row-details[open]>.flyer-disclosure span:last-child{display:inline}
