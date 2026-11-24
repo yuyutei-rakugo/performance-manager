@@ -85,7 +85,7 @@ export async function mountFlyerMap(host,actions){
     const index=statuses.indexOf(row.status);
     const icon=divIcon({className:'flyer-pin',html:'<span class="flyer-status" data-status="'+index+'"></span>',iconSize:[34,40],iconAnchor:[17,37],popupAnchor:[0,-31]});
     const label=row.name+' '+row.status;
-    const node=current?.node||marker(coordinate,{icon,title:label}).addTo(view);
+    const node=current?.node||marker(coordinate,{icon,title:label,autoPanOnFocus:false}).addTo(view);
     const content=popup(row,archived,busy,messages.get(row.id),neighbors);
     if(current){
      if(String(current.coordinate)!==String(coordinate))node.setLatLng(coordinate);
