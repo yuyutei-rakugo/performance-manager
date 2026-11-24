@@ -1,4 +1,4 @@
-import {loadStyles} from './flyer-map.js?v=20261124-follow1';
+import {loadStyles} from './flyer-map.js?v=20261124-ux1';
 import {map, tileLayer, circleMarker} from './vendor/leaflet/leaflet-src.esm.js';
 
 const query=text=>'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(text);

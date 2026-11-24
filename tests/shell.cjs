@@ -7,7 +7,7 @@ for(const name of ['index.html','rehearsals.html','history.html']){
  const header=d.querySelector('.top').outerHTML;expected??=header;assert.equal(header,expected);
  assert.equal(d.querySelectorAll('.tabs').length,1);assert.equal(d.querySelectorAll('.tabs a,.tabs button').length,3);assert(d.querySelector('link[rel=manifest]'));assert.equal(d.querySelector('.hero-logo').getAttribute('src'),'notebook-art-v2.png');
  for(const p of ['style.css','schedule-ui.css',...(name==='history.html'?['records.css']:[]),'rakugo-theme.css']){const s=d.createElement('style');s.textContent=fs.readFileSync(''+p,'utf8');d.head.append(s)}
- assert.equal(dom.window.getComputedStyle(d.querySelector('.tabs [aria-current=page],.tabs [aria-pressed=true]')).backgroundColor,'rgb(7, 29, 66)');
+ assert.equal(dom.window.getComputedStyle(d.querySelector('.tabs [aria-current=page],.tabs [aria-pressed=true]')).backgroundColor,'rgb(16, 45, 79)');
  const w=dom.window,query=s=>d.querySelector(s);
  w.HTMLDialogElement.prototype.showModal=function(){this.open=true};
  w.HTMLDialogElement.prototype.close=function(){this.open=false};

@@ -1,0 +1,34 @@
+name: Notebook checks
+on:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install test dependencies
+        run: npm install --no-save --package-lock=false jsdom@31.0.1 playwright@1.65.1
+      - name: Check JavaScript syntax
+        run: |
+          for file in *.js tests/*.cjs tests/browser/*.cjs; do node --check "$file"; done
+      - name: Run component and backend tests
+        run: |
+          for file in tests/*.cjs; do node "$file"; done
+      - name: Locate test browser
+        run: |
+          if command -v google-chrome >/dev/null 2>&1; then
+            echo "CHROMIUM_PATH=$(command -v google-chrome)" >> "$GITHUB_ENV"
+          else
+            npx playwright install --with-deps chromium
+          fi
+      - name: Run browser tests against fixtures
+        run: |
+          python3 -m http.server 8151 --bind 127.0.0.1 > /tmp/notebook-http.log 2>&1 &
+          node tests/browser/save-navigation.cjs
+          node tests/browser/attendance-race.cjs

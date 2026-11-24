@@ -1,12 +1,11 @@
-import {openFlyerVenues} from './flyer-venues.js?v=20261124-label1';
-import {startEditor,finishEditor,leaveEditor,guardEditor,editorState,saveRecovery,recoveryScope,recoveredEditState} from './editor-dialog.js?v=20261124-follow1';
-import {performerPicker,updatePerformerPickers,readPerformer,showPerformerRoster} from './performer-picker.js?v=20261124-follow1';
-import {mountMemberHome} from './member-home.js?v=20261124-follow1';
-import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261124-follow1';
-import {readCategories,saveCategories,validCategories,categoryOptions,mountCategories,mountCategoryAdder} from './categories.js?v=20261124-follow1';
-import {mountScheduleImport} from './schedule-import.js?v=20261124-follow1';
-import {scheduleChange,scheduleChangeBadge,preparationTemplates,draftTask,duplicateSchedule,copyScheduleInvite,validPerformer,timeline,formatDuration,toRecord,transferRecord,readRecords,mergeRecords,mergedRecords} from './record-transfer.js?v=20261124-follow1';
-import {cloud,startCloud,mountAccount} from './cloud.js?v=20261124-follow1';
+import {openFlyerVenues} from './flyer-venues.js?v=20261124-ux1';
+import {startEditor,finishEditor,leaveEditor,guardEditor,editorState,saveRecovery,recoveryScope,recoveredEditState} from './editor-dialog.js?v=20261124-ux1';
+import {performerPicker,updatePerformerPickers,readPerformer,showPerformerRoster} from './performer-picker.js?v=20261124-ux1';
+import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261124-ux1';
+import {readCategories,saveCategories,validCategories,categoryOptions,mountCategories,mountCategoryAdder} from './categories.js?v=20261124-ux1';
+import {mountScheduleImport} from './schedule-import.js?v=20261124-ux1';
+import {scheduleChange,scheduleChangeBadge,preparationTemplates,draftTask,duplicateSchedule,copyScheduleInvite,validPerformer,timeline,formatDuration,toRecord,transferRecord,readRecords,mergeRecords,mergedRecords} from './record-transfer.js?v=20261124-ux1';
+import {cloud,startCloud,mountAccount} from './cloud.js?v=20261124-ux1';
 'use strict';
 
 const key = 'yuitei.events.v1';
@@ -58,9 +57,6 @@ function validEvent(event) {
 }
 
 let events = [];
-let tab = 'list';
-let selected = today();
-let month = selected.slice(0,7);
 let noticeTimer;
 let storageReadable = true;
 
@@ -149,31 +145,10 @@ function render() {
   nextEventId=[...scheduled].sort((a,b)=>(a.date+(a.time||'23:59')).localeCompare(b.date+(b.time||'23:59')))[0]?.id;
   const featured=document.getElementById('next-performance'),next=events.find(e=>e.id===nextEventId);
   if(featured){featured.hidden=!next||(cloud.state.configured&&(!cloudLoaded||!cloud.state.role));featured.innerHTML=featured.hidden?'':card(next,true)}
-  const stats = [['▦','予定の公演',scheduled.length],['◷','準備未完了',scheduled.filter(event=>{const {done,total}=progress(event);return done<total}).length],['✓','準備完了',scheduled.filter(event=>{const {done,total}=progress(event);return total>0&&done===total}).length]];
-  if($('stats'))$('stats').innerHTML = stats.map(([icon,label,count]) => `<div class="stat"><span class="stat-icon" aria-hidden="true">${icon}</span><div><small>${label}</small><strong>${count}</strong><span class="unit">件</span></div></div>`).join('');
-  $('list-tab').setAttribute('aria-pressed', tab === 'list');
-  $('calendar-tab').setAttribute('aria-pressed', tab === 'calendar');
   const warning=cloudLoaded&&cloudLoadError?'<p class="sync-warning" role="status">更新できませんでした。前回取得した公演予定を表示しています。</p>':'';
-  $('schedule').innerHTML = cloud.state.configured&&!cloudLoaded ? '<p class="empty">'+(cloud.state.role?esc(cloudLoadError||'公演予定を読み込んでいます。'):'公演予定を見るには会員ログインしてください。端末内のデータは保持しています。')+'</p>' : tab === 'list'
-    ? sortedEvents(events.filter(e=>!e.archivedAt&&e.id!==nextEventId)).map(e=>card(e)).join('') || (nextEventId?'<p class="empty">このほかの公演予定はありません。</p>':'<p class="empty">公演がありません。「公演を登録」から追加できます。</p>')
-    : calendar();
+  $('schedule').innerHTML = cloud.state.configured&&!cloudLoaded ? '<p class="empty">'+(cloud.state.role?esc(cloudLoadError||'公演予定を読み込んでいます。'):'公演予定を見るには会員ログインしてください。端末内のデータは保持しています。')+'</p>' : sortedEvents(events.filter(e=>!e.archivedAt&&e.id!==nextEventId)).map(e=>card(e)).join('') || (nextEventId?'<p class="empty">このほかの公演予定はありません。</p>':'<p class="empty">公演がありません。「公演を登録」から追加できます。</p>');
 
   if(warning)$('schedule').insertAdjacentHTML('afterbegin',warning);
-}
-function calendar() {
-  const [year, mon] = month.split('-').map(Number);
-  const first = new Date(year, mon - 1, 1).getDay();
-  const days = new Date(year, mon, 0).getDate();
-  const counts = new Map();
-  events.forEach(({date}) => counts.set(date, (counts.get(date) || 0) + 1));
-  const labels = [...'日月火水木金土'].map(day => `<span class="weekday">${day}</span>`).join('');
-  const cells = Array.from({length:days}, (_,i) => {
-    const date = month + '-' + String(i + 1).padStart(2,'0');
-    const count = counts.get(date);
-    return `<button class="day" data-day="${date}" aria-label="${dateLabel(date)}${count ? ' 公演' + count + '件' : ''}" aria-pressed="${date === selected}" ${date === today() ? 'aria-current="date"' : ''}>${i + 1}${count ? '<span>' + count + '件</span>' : ''}</button>`;
-  }).join('');
-  const cards = sortedEvents(events.filter(event => event.date === selected)).map(e=>card(e)).join('');
-  return `<div class="calendar"><div class="calendar-head"><button data-month="-1" aria-label="前の月">‹</button><h3>${year}年${mon}月</h3><button data-month="1" aria-label="次の月">›</button></div><div class="calendar-grid">${labels}${'<span></span>'.repeat(first)}${cells}</div></div><div class="calendar-results"><h3>${dateLabel(selected)}</h3>${cards || '<p class="empty">この日の公演はありません。</p>'}</div>`;
 }
 function showEvent() {
   if (!eventDialog.open) eventDialog.showModal();
@@ -264,7 +239,7 @@ function renderForm(existing,recovery) {
   if(!editable()){notify('編集できる会員でログインしてください。');return}
   const formRevision=cloudRevision;
   const submissionId=existing?.id||recovery?.id||(globalThis.crypto.randomUUID?.() ?? 'event-' + Date.now() + '-' + Math.random().toString(36).slice(2));
-  const event = recovery?.value || existing || {title:'',date:tab === 'calendar' ? selected : today(),time:'14:00',venue:'',memo:'',performers:[],checklist:copiedTasks()};
+  const event = recovery?.value || existing || {title:'',date:today(),time:'14:00',venue:'',memo:'',performers:[],checklist:copiedTasks()};
   eventDialog.onchange = null;
   eventDialog.innerHTML = `<div class="dialog-body"><div class="dialog-head"><h2 id="event-heading">${existing ? '公演を編集' : '公演を登録'}</h2><button type="button" data-close="event-dialog" aria-label="閉じる">×</button></div>
     <form id="event-form"><div class="editor-bar"><div class="form-actions"><button class="primary" type="submit">変更を保存する</button><button class="secondary" type="button" id="cancel-edit">キャンセル</button></div><p id="form-feedback" role="status" data-editor-status hidden></p></div><div class="fields"><label class="wide">公演名<input name="title" value="${esc(event.title)}" required></label><label>区分<select name="kind">${categoryOptions(event.kind||'その他公演',events.map(e=>e.kind))}</select></label><label>開催日<input name="date" type="date" value="${event.date}" required></label><label>開始時刻（空欄は時間未定）<input name="time" type="time" value="${esc(event.time)}"></label><label class="wide">会場<input name="venue" value="${esc(event.venue)}" required></label><label>部屋（任意）<input name="reservationRoom" maxlength="100" value="${esc(event.room||'')}"></label><label>利用終了時刻（任意）<input type="time" name="reservationEnd" value="${esc(event.endTime||'')}"></label></div>
@@ -407,9 +382,6 @@ function renderForm(existing,recovery) {
       editorState(activeForm,failure);
       return;
     }
-    if(tab==='calendar'){
-      selected=next.date;month=next.date.slice(0,7);render();
-    }
     finishEditor(eventDialog);
     renderDetails(next.id,'公演を保存しました。');
   };
@@ -423,23 +395,10 @@ $('schedule').onclick = async click => {
   if (button.dataset.editEvent !== undefined) { renderForm(events.find(item => item.id === button.dataset.editEvent)); return; }
   if (button.dataset.deleteEvent !== undefined) { await deleteEvent(button.dataset.deleteEvent); return; }
   if (button.dataset.event !== undefined) renderDetails(button.dataset.event);
-  if (button.dataset.day) {
-    selected = button.dataset.day;
-    render();
-    $('schedule').querySelector('[aria-pressed="true"]').focus();
-  }
-  if (button.dataset.month) {
-    const [year, mon] = month.split('-').map(Number);
-    const next = new Date(year,mon - 1 + Number(button.dataset.month),1);
-    month = localDate(next).slice(0,7);
-    selected = month === today().slice(0,7) ? today() : localDate(next);
-    render();
-    $('schedule').querySelector(`[data-month="${button.dataset.month}"]`).focus();
-  }
 };
 document.getElementById('next-performance')?.addEventListener('click',event=>{const button=event.target.closest('[data-event]');if(button)renderDetails(button.dataset.event)});
-$('list-tab').onclick = () => {tab = 'list'; render();};
-$('calendar-tab').onclick = () => {location.href = 'rehearsals.html?v=20261124-follow1';};
+$('list-tab').onclick = () => render();
+$('calendar-tab').onclick = () => {location.href = 'rehearsals.html?v=20261124-ux1';};
 $('new-event').onclick = () => renderForm();
 $('data-open').onclick = () => $('data-dialog').showModal();
 guardEditor(eventDialog);
@@ -496,7 +455,7 @@ $('import-submit').onclick = async () => {
 
 render();
 
-mountMemberHome();mountAccount();
+mountAccount();
 cloud.onState(state=>{
  eventRecovery.render();
  const identity=state.configured?`${state.user?.uid||''}:${state.role||''}`:'local';
@@ -516,6 +475,6 @@ reservationsButton.textContent='予約書類を追加';reservationsButton.hidden
 document.querySelector('.workspace')?.append(reservationsButton);
 cloud.onState(state=>{reservationsButton.hidden=state.provider!=='apps-script'||!state.role});
 reservationsButton.onclick=async()=>{
- const {openReservationDocuments}=await import('./reservation-documents.js?v=20261124-follow1');
+ const {openReservationDocuments}=await import('./reservation-documents.js?v=20261124-ux1');
  if(cloud.state.role)openReservationDocuments();
 };

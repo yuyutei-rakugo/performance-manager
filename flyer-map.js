@@ -1,5 +1,5 @@
 import {map, tileLayer, circleMarker, marker, divIcon, latLngBounds} from './vendor/leaflet/leaflet-src.esm.js';
-import {flyerLocation,flyerLocationInfo,flyerSearchUrl,approximateAddressPosition} from './flyer-locations.js?v=20261124-follow1';
+import {flyerLocation,flyerLocationInfo,flyerSearchUrl,approximateAddressPosition} from './flyer-locations.js?v=20261124-ux1';
 
 const statuses=['未依頼','依頼済み','掲示済み','今回は見送り'];
 let styles;
@@ -129,19 +129,12 @@ export async function mountFlyerMap(host,actions){
   const search=document.createElement('a');
   search.href=flyerSearchUrl(row);search.textContent='Googleマップで探す';search.target='_blank';search.rel='noopener noreferrer';content.append(search);
   if(!archived){
-   const button=document.createElement('button');button.type='button';button.className='secondary';button.textContent='編集する';
+   const button=document.createElement('button');button.type='button';button.className='secondary';button.textContent='状況・メモを編集';
    button.disabled=busy;button.onclick=event=>{event.stopPropagation();actions.edit(row.id)};
-   const label=document.createElement('label');label.textContent='状況を変更';
-   const select=document.createElement('select');
-   select.replaceChildren(...statuses.map(value=>new Option(value,value,false,value===row.status)));
-   select.disabled=busy;select.onchange=()=>actions.change(row.id,select.value);
-   label.append(select);content.append(label,button);
+   content.append(button);
   }
   if(result){
    const feedback=document.createElement('p');feedback.setAttribute('role','status');feedback.textContent=result.text;
-   if(result.retry){
-    const retry=document.createElement('button');retry.type='button';retry.textContent='再試行';retry.disabled=busy;retry.onclick=event=>{event.stopPropagation();actions.retry(row.id)};feedback.append(' ',retry);
-   }
    content.append(feedback);
   }
   if(neighbors.length){

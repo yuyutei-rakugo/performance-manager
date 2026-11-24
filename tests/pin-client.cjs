@@ -3,7 +3,7 @@ let calls=[],requests=[],timers=[],clearedTimers=[],listeners={},now=Date.now();
 class Clock extends Date { static now(){return now} }
 const persistent=new Map();
 const state={stageName:'勇水'},storage=new Map([['yuitei.session','test-session']]);
-const sandbox={AbortController,setTimeout,clearTimeout,Date:Clock,JSON,Map,Set,Error,Object,String,Promise,structuredClone,queueMicrotask,localStorage:{getItem:k=>persistent.get(k),setItem:(k,v)=>persistent.set(k,v),removeItem:k=>persistent.delete(k)},sessionStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},document:{visibilityState:'visible'},window:{addEventListener:(event,fn)=>{listeners[event]=fn}},setInterval:fn=>{timers.push(fn);return timers.length},clearInterval:id=>clearedTimers.push(id),fetch:(url,options)=>{const body=JSON.parse(options.body);calls.push(body);return new Promise(resolve=>requests.push({body,resolve:result=>resolve({ok:true,json:async()=>result})}))}};
+const sandbox={AbortController,setTimeout,clearTimeout,Date:Clock,JSON,Map,Set,Error,Object,String,Promise,structuredClone,queueMicrotask,localStorage:{getItem:k=>persistent.get(k),setItem:(k,v)=>persistent.set(k,v),removeItem:k=>persistent.delete(k)},sessionStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},document:{visibilityState:'visible',hidden:false,addEventListener:(event,fn)=>{listeners[event]=fn}},window:{addEventListener:(event,fn)=>{listeners[event]=fn}},setInterval:fn=>{timers.push(fn);return timers.length},clearInterval:id=>clearedTimers.push(id),fetch:(url,options)=>{const body=JSON.parse(options.body);calls.push(body);return new Promise(resolve=>requests.push({body,resolve:result=>resolve({ok:true,json:async()=>result})}))}};
 vm.createContext(sandbox);vm.runInContext(fs.readFileSync('pin-cloud.js','utf8').replace('export function','function')+'\nthis.client=createPinClient("https://example.test",this.state,()=>{});',Object.assign(sandbox,{state}));
 const client=sandbox.client,tick=()=>new Promise(r=>setImmediate(r));
 function respond(action,data){const i=requests.findIndex(r=>r.body.action===action);assert(i>=0,'missing '+action);requests.splice(i,1)[0].resolve({ok:true,...data})}
@@ -11,6 +11,7 @@ function respond(action,data){const i=requests.findIndex(r=>r.body.action===acti
  let a=[],b=[],errors=[];const stopA=client.watch('rehearsals',d=>a.push(d),e=>errors.push(e));const stopB=client.watch('rehearsals',d=>b.push(d));assert.equal(calls.length,1);assert.equal(timers.length,1);respond('read',{doc:{items:[],revision:1}});await tick();assert.equal(a.length,1);assert.equal(b.length,1);
  stopA();assert.equal(clearedTimers.length,0);stopB();assert.deepEqual(clearedTimers,[1]);let c=[];const stopC=client.watch('rehearsals',d=>c.push(d));await tick();assert.equal(c.length,1);assert.equal(calls.length,1,'reuse recently confirmed document');
  now+=61000;
+ listeners.visibilitychange();
  let fresh=[];
  const stopFresh=client.watch('rehearsals',d=>fresh.push(d));await tick();
  assert.equal(fresh.length,1,'a recent view renders before revalidation');

@@ -184,6 +184,7 @@ export function createPinClient(endpoint,state,emit){
   for(const entry of streams.values())if(entry.subscribers.size&&(entry.action==='attendanceRead'||Date.now()-entry.updatedAt>=freshFor))load(entry);
  }
  window.addEventListener('focus',refreshVisible);
+ document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshVisible()});
  window.addEventListener('pageshow',event=>{
   if(!event.persisted||!token)return;
   if((readStorage(localStorage)||readStorage(sessionStorage))!==token)signOut();
