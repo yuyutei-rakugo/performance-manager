@@ -64,7 +64,7 @@ async function main(){
             docs.rehearsals={items:docs.rehearsals.items.map(r=>r.id===transfer.id?{...r,archivedAt:'2026-11-21T08:00:00Z'}:r),revision:docs.rehearsals.revision+1};
             return ok({count:1,rehearsals:docs.rehearsals});
           }
-          case 'flyerRead':case 'flyerImport':return ok({rows:flyerRows,locationFields:true,refused:flyerRefused,categories:['公共施設'],sources:[],archived:false});
+          case 'flyerRead':case 'flyerImport':return ok({rows:flyerRows,locationFields:true,declineFields:true,migrationRequired:false,refused:flyerRefused,categories:['公共施設'],sources:[],archived:false});
           case 'flyerSave':{
             assert.equal(role,request.id?'admin':'viewer');
             assert.equal(request.eventId,docs.events.items[0].id);
@@ -75,7 +75,7 @@ async function main(){
               assert.equal(request.revision,flyerRows[i].revision);
               flyerRows[i]={...flyerRows[i],...request.entry,revision:request.revision+1};
             }else flyerRows.push({...request.entry,id:'test-flyer',revision:1});
-            return ok({rows:flyerRows,locationFields:true,refused:flyerRefused,categories:['公共施設'],sources:[],archived:false});
+            return ok({rows:flyerRows,locationFields:true,declineFields:true,migrationRequired:false,refused:flyerRefused,categories:['公共施設'],sources:[],archived:false});
           }
           case 'reservationList':return ok({documents:reservationRows,schedules:[],canReview:false});
           case 'reservationAdd':{
@@ -638,6 +638,23 @@ async function main(){
     await mapPanel.getByRole('button',{name:'地図を閉じる'}).click();
     await mapPanel.locator('[data-filter-status]').selectOption('');
     const unknown=mapPanel.locator('[data-venue-id="test-flyer"]');
+    assert.equal(await mapPanel.getByRole('button',{name:'既存施設の共通化を確認'}).count(),0);
+    const savedCard=mapPanel.locator('[data-venue-id="known1"]');
+    await savedCard.locator('summary').click();
+    await savedCard.getByText('今回は見送り',{exact:true}).last().click();
+    const decline=savedCard.getByRole('checkbox',{name:'過去または今回、お断りがあったため見送り'});
+    await decline.waitFor();
+    failFlyer=true;
+    await decline.click();
+    await savedCard.getByText(/保存できませんでした/).waitFor();
+    assert.equal(await decline.isChecked(),false);
+    await savedCard.getByRole('button',{name:'再試行'}).click();
+    await savedCard.getByText('保存しました。',{exact:true}).waitFor();
+    assert.equal(await decline.isChecked(),true);
+    await savedCard.getByText('依頼済み',{exact:true}).last().click();
+    await decline.waitFor({state:'hidden'});
+    await savedCard.getByText('保存しました。',{exact:true}).waitFor();
+    assert.equal(flyerRows.find(row=>row.id==='known1').declined,false);
     await unknown.locator('summary').click();
     await unknown.getByRole('button',{name:'施設情報・メモを編集'}).click();
     await fromMap.getByLabel('住所',{exact:true}).fill('銚子市模擬町1');

@@ -149,3 +149,7 @@ dialog{border:1px solid var(--line);border-radius:14px;width:min(680px,calc(100%
 .flyer-just-edited{outline:2px solid var(--navy);outline-offset:1px}
 .flyer-place-candidate{margin-block:8px;padding:8px;border:1px solid var(--line);border-radius:8px;overflow-wrap:anywhere}
 [aria-label="掲示先を編集"] select,[aria-label="掲示先を編集"] input{max-width:100%}
+.flyer-decline{display:flex;align-items:flex-start;gap:.65em;padding:.65em 0;line-height:1.55;min-height:44px}
+.flyer-decline input{flex:0 0 auto;width:1.2em;height:1.2em;margin:.15em 0 0;accent-color:var(--navy)}
+.dialog-body h2,.dialog-body h3,.dialog-body label,.editor-bar button,.rehearsal-card h2{overflow-wrap:anywhere}
+.dialog-body input:not([type=checkbox]):not([type=radio]),.dialog-body select,.dialog-body textarea{max-width:100%;min-width:0}
