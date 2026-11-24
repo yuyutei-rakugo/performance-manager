@@ -245,7 +245,7 @@ async function main(){
   assert.equal(await card.locator('[data-open-rehearsal]').getAttribute('data-open-rehearsal'),today.id);
   await card.getByText('通常稽古',{exact:true}).waitFor();
   await card.getByText('2026年 11月21日（土） 17:00',{exact:true}).waitFor();
-  assert.equal(await card.locator('.rehearsal-kind').getAttribute('class'),await p.locator('#rehearsals').getByText('通常稽古',{exact:true}).getAttribute('class'));
+  assert.equal(await p.locator('#rehearsals [data-detail="'+today.id+'"]').count(),0);
   await p.locator('#rehearsals').getByText('自主稽古',{exact:true}).waitFor();
   await p.locator('#rehearsals').getByText('その他：交流会',{exact:true}).waitFor();
   await p.clock.setFixedTime(new Date('2026-11-21T08:00:01Z'));
@@ -295,7 +295,7 @@ async function main(){
   // Independent administrator and member sessions reading the same attendance.
   const adm=await session(names[0],true),peer=await session(names[1]);
   for(const user of [adm,peer]){
-   await user.p.locator('[data-detail="december"]').click();
+   await user.p.locator('[data-detail="december"], [data-open-rehearsal="december"]').click();
    await panel(user.p).getByText('未登録 2人').waitFor();
   }
   assert.equal(await panel(peer.p).locator('[data-proxy]').count(),0);
@@ -326,7 +326,7 @@ async function main(){
   await proxyStatus.getByText(/未定で代行登録/).waitFor();
   await panel(adm.p).getByText('（管理者代行）',{exact:true}).waitFor();
   const third=await session(names[2]);
-  await third.p.locator('[data-detail="december"]').click();
+  await third.p.locator('[data-detail="december"], [data-open-rehearsal="december"]').click();
   await panel(third.p).getByText('（管理者代行）',{exact:true}).waitFor();
   await panel(third.p).locator('[data-self-status="欠席"]').click();
   await panel(third.p).getByText('欠席 2人').waitFor();

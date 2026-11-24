@@ -1,12 +1,12 @@
-import {startEditor,finishEditor,leaveEditor,guardEditor,editorState,hasEditorDraft,saveRecovery,recoveryScope,recoveredEditState} from './editor-dialog.js?v=20261124-layout2';
-import {performerPicker,updatePerformerPickers,readPerformer,showPerformerRoster} from './performer-picker.js?v=20261124-layout2';
-import {mountMemberHome} from './member-home.js?v=20261124-layout2';
-import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261124-layout2';
-import {readCategories,saveCategories,validCategories} from './categories.js?v=20261124-layout2';
-import {mountScheduleImport} from './schedule-import.js?v=20261124-layout2';
-import {scheduleChange,scheduleChangeBadge,duplicateSchedule,copyScheduleInvite,toRecord,formatDuration,rehearsalTitle,readRecords,mergeRecords,mergedRecords} from './record-transfer.js?v=20261124-layout2';
-import {cloud,startCloud,mountAccount} from './cloud.js?v=20261124-layout2';
-import {statuses,rehearsalNames,validRehearsal,validAttendance,attendanceSummary,japanDate,rehearsalBadge,rehearsalDateTime} from './rehearsal-model.js?v=20261124-layout2';
+import {startEditor,finishEditor,leaveEditor,guardEditor,editorState,hasEditorDraft,saveRecovery,recoveryScope,recoveredEditState} from './editor-dialog.js?v=20261124-map1';
+import {performerPicker,updatePerformerPickers,readPerformer,showPerformerRoster} from './performer-picker.js?v=20261124-map1';
+import {mountMemberHome} from './member-home.js?v=20261124-map1';
+import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261124-map1';
+import {readCategories,saveCategories,validCategories} from './categories.js?v=20261124-map1';
+import {mountScheduleImport} from './schedule-import.js?v=20261124-map1';
+import {scheduleChange,scheduleChangeBadge,duplicateSchedule,copyScheduleInvite,toRecord,formatDuration,rehearsalTitle,readRecords,mergeRecords,mergedRecords} from './record-transfer.js?v=20261124-map1';
+import {cloud,startCloud,mountAccount} from './cloud.js?v=20261124-map1';
+import {statuses,rehearsalNames,validRehearsal,validAttendance,attendanceSummary,japanDate,rehearsalBadge,rehearsalDateTime} from './rehearsal-model.js?v=20261124-map1';
 const $=id=>document.getElementById(id),esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const key='yuitei.rehearsals.v1';let items=[],attendance={},names=[],revision=0,loaded=false,storageOK=true,stop,stopAttendance,opened=null,detailRevision=0,busy=false,archiving=false;
 let noticeTimer;
@@ -42,11 +42,12 @@ async function save(next,expected=revision,nextAttendance=attendance,report=noti
  return true;
 }
 
+let featuredRehearsalId;
 function render(){
  rehearsalRecovery.render();practiceRecovery.render();
  const upcoming=items.filter(r=>!r.archivedAt&&r.date>=japanDate());if($('stats'))$('stats').innerHTML=[['予定の稽古',upcoming.length],['師匠稽古',upcoming.filter(r=>r.title==='師匠稽古').length],['自主稽古',upcoming.filter(r=>r.title==='自主稽古').length]].map(([label,count])=>`<div class="stat"><span class="stat-icon">▦</span><div><small>${label}</small><strong>${count}</strong><span class="unit">件</span></div></div>`).join('');
- $('add').disabled=!canEdit();$('mode').textContent=cloud.state.configured?(cloud.state.role?'予定ごとに「出欠・詳細」から回答・一覧を確認できます。':'出欠は会員ログイン後に回答できます。'):'現在はこのブラウザに保存します。自分の名前を選んで出欠を入力します。本人認証・端末間の同期はまだ有効ではありません。';
- $('rehearsals').innerHTML=items.filter(r=>!r.archivedAt).sort((a,b)=>(!!a.archivedAt-!!b.archivedAt)||(a.date+a.time).localeCompare(b.date+b.time)).map(r=>{const s=cloud.state.configured?null:attendanceSummary(names,attendance[r.id]||{});return `<article class="event-card rehearsal-card"><div class="date-badge" aria-hidden="true"><small>${Number(r.date.slice(5,7))}月</small><strong>${Number(r.date.slice(8))}</strong></div><div><h3>${rehearsalBadge(r,rehearsalTitle(r),esc)}${r.archivedAt?' <small>（記録へ移動済み）</small>':''}</h3>${scheduleChangeBadge(r,esc)}<div class="meta"><span>${r.date.replaceAll('-','/')} ${r.time}</span><span>＠ ${esc(r.venue)}</span></div></div>${s?`<div class="progress"><span class="progress-label">出席 ${s.count}人 ／ 未回答 ${s.unanswered}人</span></div>`:''}<div class="event-actions"><button class="secondary" data-detail="${esc(r.id)}">出欠・詳細</button></div></article>`}).join('')||(cloud.state.configured&&!loaded?'<p class="empty">'+(cloud.state.role?esc(scheduleError||'稽古予定を読み込み中…'):'稽古予定を見るには会員ログインしてください。')+'</p>':'<p class="empty">稽古予定はまだありません。</p>');
+ $('add').disabled=!canEdit();$('mode').textContent=cloud.state.configured?(cloud.state.role?'予定ごとに「詳細を見る」から回答・一覧を確認できます。':'出欠は会員ログイン後に回答できます。'):'現在はこのブラウザに保存します。自分の名前を選んで出欠を入力します。本人認証・端末間の同期はまだ有効ではありません。';
+ $('rehearsals').innerHTML=items.filter(r=>!r.archivedAt&&r.id!==featuredRehearsalId).sort((a,b)=>(!!a.archivedAt-!!b.archivedAt)||(a.date+a.time).localeCompare(b.date+b.time)).map(r=>{const s=cloud.state.configured?null:attendanceSummary(names,attendance[r.id]||{});return `<article class="event-card rehearsal-card"><div class="date-badge" aria-hidden="true"><small>${Number(r.date.slice(5,7))}月</small><strong>${Number(r.date.slice(8))}</strong></div><div><h3>${rehearsalBadge(r,rehearsalTitle(r),esc)}${r.archivedAt?' <small>（記録へ移動済み）</small>':''}</h3>${scheduleChangeBadge(r,esc)}<div class="meta"><span>${r.date.replaceAll('-','/')} ${r.time}</span><span>＠ ${esc(r.venue)}</span></div></div>${s?`<div class="progress"><span class="progress-label">出席 ${s.count}人 ／ 未回答 ${s.unanswered}人</span></div>`:''}<div class="event-actions"><button class="secondary" data-detail="${esc(r.id)}">詳細を見る</button></div></article>`}).join('')||(cloud.state.configured&&!loaded?'<p class="empty">'+(cloud.state.role?esc(scheduleError||'稽古予定を読み込み中…'):'稽古予定を見るには会員ログインしてください。')+'</p>':(featuredRehearsalId?'<p class="empty">ほかの稽古予定はありません。</p>':'<p class="empty">稽古予定はまだありません。</p>'));
  if(loaded&&scheduleError)$('rehearsals').insertAdjacentHTML('afterbegin','<p class="sync-warning" role="status">更新できませんでした。前回取得した稽古予定を表示しています。</p>');
  openRequestedDetail();
 }
@@ -484,6 +485,7 @@ cloud.onState(s=>{
 
  render();
 });
+window.addEventListener('featured-rehearsal-change',event=>{featuredRehearsalId=event.detail.id;render()});
 mountMemberHome();mountAccount();startCloud();
 
 mountScheduleImport(document.querySelector('#data-dialog .dialog-body'),'rehearsals',()=>items,save,notify);
@@ -494,6 +496,6 @@ reservationsButton.textContent='予約書類を追加';reservationsButton.hidden
 document.querySelector('.workspace')?.append(reservationsButton);
 cloud.onState(state=>{reservationsButton.hidden=state.provider!=='apps-script'||!state.role});
 reservationsButton.onclick=async()=>{
- const {openReservationDocuments}=await import('./reservation-documents.js?v=20261124-layout2');
+ const {openReservationDocuments}=await import('./reservation-documents.js?v=20261124-map1');
  if(cloud.state.role)openReservationDocuments();
 };

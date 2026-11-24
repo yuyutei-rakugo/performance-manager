@@ -2,20 +2,21 @@ const {JSDOM}=require('jsdom'),fs=require('fs'),assert=require('node:assert/stri
 const clean=f=>fs.readFileSync(f,'utf8').replace(/^import .*;\n/gm,'').replace(/export /g,'');
 const tick=()=>new Promise(r=>setImmediate(r));
 (async()=>{
- const w=new JSDOM('<body></body>',{url:'https://example.test',runScripts:'outside-only'}).window;w.structuredClone=structuredClone;w.confirm=()=>true;w.fetch=async()=>({ok:true,json:async()=>[]});
+ const w=new JSDOM('<body></body>',{url:'https://example.test',runScripts:'outside-only'}).window;w.structuredClone=structuredClone;w.confirm=()=>true;w.fetch=async()=>({ok:false});
  w.HTMLDialogElement.prototype.showModal=function(){this.open=true};w.HTMLDialogElement.prototype.close=function(){this.open=false;this.dispatchEvent(new w.Event('close'))};
  let rows=[{id:'one',revision:2,name:'〇〇公民館',region:'神栖市',category:'公共施設',status:'依頼済み',memo:'受付に置いてもらう'}],fail=false,release,calls=[];
  w.cloud={state:{provider:'apps-script',role:'viewer',user:{uid:'member-one'}},onState(fn){fn(this.state);return()=>{}},async flyer(action,body){calls.push({action,body});if(action==='flyerSave'){await new Promise(r=>release=r);if(fail)throw Error('模擬保存失敗');assert.equal(body.revision,rows[0].revision);rows=[{...rows[0],...body.entry,revision:rows[0].revision+1}]}if(action==='flyerImport'){if(fail)throw Error('模擬追加失敗');rows.push(...body.entries.map((row,i)=>({...row,id:'added-'+(rows.length+i),revision:1,status:'未依頼',memo:''})))}return structuredClone({rows,refused:[{name:'断られた店',region:'神栖市',keys:[]}],categories:['公共施設'],sources:[],archived:false})}};
- w.eval(clean('editor-dialog.js')+'\n'+clean('flyer-venues.js')+'\nopenFlyerVenues({id:"event-one",title:"寄席"});');await tick();
+ w.eval(clean('editor-dialog.js')+'\n'+clean('flyer-locations.js')+'\n'+clean('flyer-venues.js')+'\nopenFlyerVenues({id:"event-one",title:"寄席"});');await tick();
  const panel=w.document.querySelector('.flyer-dialog'),checkbox=(status='掲示済み')=>[...panel.querySelectorAll('[data-status-choice]')].find(input=>input.value===status);
  assert(!panel.querySelector('.flyer-tools').open);assert(!panel.querySelector('.flyer-row-details').open);assert.equal(checkbox().checked,false);assert.match(panel.textContent,/受付に置いてもらう/);
+ assert.match(panel.querySelector('.flyer-group').textContent,/神栖市.*公共施設/);assert.match(panel.querySelector('.flyer-unlocated').textContent,/位置未確認/);
  const map=new URL(panel.querySelector('.flyer-map').href);assert.equal(map.origin,'https://www.google.com');assert.equal(map.pathname,'/maps/search/');assert.equal(map.searchParams.get('api'),'1');assert.equal(map.searchParams.get('query'),'神栖市 〇〇公民館');assert(!map.href.includes(encodeURIComponent(rows[0].memo)));
  panel.querySelector('.flyer-row-details').open=true;
- checkbox().click();assert(checkbox().disabled);assert(panel.querySelector('[data-close-flyers]').disabled);assert.match(panel.querySelector('[data-message]').textContent,/保存中/);release();await tick();
+ checkbox().click();assert(checkbox().disabled);assert(panel.querySelector('[data-close-flyers]').disabled);assert.match(panel.querySelector('[data-row-message]').textContent,/保存中/);release();await tick();
  assert(panel.querySelector('.flyer-row-details').open);assert.equal(panel.querySelector('.flyer-badge').textContent,'掲示済み');
- assert(checkbox().checked);assert(!checkbox().disabled);assert.match(panel.querySelector('[data-message]').textContent,/掲示済みで保存しました/);assert.equal(rows[0].memo,'受付に置いてもらう');assert.equal(calls.at(-1).body.entry.region,'神栖市');
- fail=true;checkbox('未依頼').click();release();await tick();assert(checkbox().checked);assert(!checkbox().disabled);assert.match(panel.querySelector('[data-message]').textContent,/保存を確認できませんでした/);assert.equal(rows[0].status,'掲示済み');
- fail=false;checkbox('未依頼').click();release();await tick();assert(!checkbox().checked);assert.equal(rows[0].status,'未依頼');assert.match(panel.querySelector('[data-message]').textContent,/未依頼で保存しました/);
+ assert(checkbox().checked);assert(!checkbox().disabled);assert.match(panel.querySelector('[data-row-message]').textContent,/保存しました/);assert.equal(rows[0].memo,'受付に置いてもらう');assert.equal(calls.at(-1).body.entry.region,'神栖市');
+ fail=true;checkbox('未依頼').click();release();await tick();assert(checkbox().checked);assert(!checkbox().disabled);assert.match(panel.querySelector('[data-row-message]').textContent,/保存できませんでした/);assert.equal(rows[0].status,'掲示済み');
+ fail=false;panel.querySelector('[data-retry-flyer]').click();release();await tick();assert(!checkbox().checked);assert.equal(rows[0].status,'未依頼');assert.match(panel.querySelector('[data-row-message]').textContent,/保存しました/);
  for(const status of ['依頼済み','今回は見送り','掲示済み']){checkbox(status).click();release();await tick();assert.equal(rows[0].status,status);assert.equal(panel.querySelectorAll('[data-status-choice]:checked').length,1)}
  const count=calls.length;checkbox().click();await tick();assert(checkbox().checked);assert.equal(calls.length,count);
  panel.querySelector('[data-edit-flyer]').click();assert(w.document.querySelector('[aria-label="掲示先を編集"]'));w.document.querySelector('[data-cancel]').click();assert(!w.document.querySelector('[aria-label="掲示先を編集"]'));
