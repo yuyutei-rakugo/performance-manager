@@ -72,10 +72,10 @@ dialog{border:1px solid var(--line);border-radius:14px;width:min(680px,calc(100%
 .flyer-item{padding:10px;margin-block:8px;border:1px solid var(--line);border-radius:8px;overflow-wrap:anywhere}
 .flyer-item h3{margin:0}
 .flyer-item p{margin:6px 0}
-.flyer-item[data-status="0"],.flyer-choice[data-status="0"]{--flyer-color:#4b5563;--flyer-bg:#f0f1f3;--flyer-selected:#4b5563}
-.flyer-item[data-status="1"],.flyer-choice[data-status="1"]{--flyer-color:#174d80;--flyer-bg:#bddcff;--flyer-selected:#174d80}
-.flyer-item[data-status="2"],.flyer-choice[data-status="2"]{--flyer-color:#285b40;--flyer-bg:#b8e5c2;--flyer-selected:#285b40}
-.flyer-item[data-status="3"],.flyer-choice[data-status="3"]{--flyer-color:#79512e;--flyer-bg:#f3dfc6;--flyer-selected:#79512e}
+.flyer-item[data-status="0"],.flyer-status[data-status="0"]{--flyer-color:#4b5563;--flyer-bg:#f0f1f3;--flyer-selected:#4b5563}
+.flyer-item[data-status="1"],.flyer-status[data-status="1"]{--flyer-color:#174d80;--flyer-bg:#bddcff;--flyer-selected:#174d80}
+.flyer-item[data-status="2"],.flyer-status[data-status="2"]{--flyer-color:#285b40;--flyer-bg:#b8e5c2;--flyer-selected:#285b40}
+.flyer-item[data-status="3"],.flyer-status[data-status="3"]{--flyer-color:#79512e;--flyer-bg:#f3dfc6;--flyer-selected:#79512e}
 .flyer-item[data-status]{border-left:5px solid var(--flyer-color);background:var(--flyer-bg)}
 .flyer-status{border-radius:5px}
 
@@ -121,3 +121,13 @@ dialog{border:1px solid var(--line);border-radius:14px;width:min(680px,calc(100%
 #next-performance .meta span:first-child{color:var(--ink);font-size:1.15rem}
 #next-performance .progress{margin:1rem 0}
 .reservation-launch{margin-top:1.25rem}
+
+.flyer-group{margin:12px 0 4px;padding:4px 0;border-bottom:1px solid var(--line);font-size:.95rem}
+.flyer-group + .flyer-item{margin-top:4px}
+.flyer-unlocated{display:block;font-size:.75rem;color:var(--muted)}
+.flyer-item [data-row-message]:empty{display:none}
+.flyer-map-canvas{height:clamp(235px,42vh,380px);isolation:isolate;background:#eef2f3}
+.flyer-map-legend .flyer-status,.flyer-pin .flyer-status{background:var(--flyer-bg);color:var(--flyer-color);font-weight:700;padding:3px 6px}
+.flyer-map-legend{display:flex;gap:4px;flex-wrap:wrap;margin-block:8px}
+.flyer-pin .flyer-status{display:grid;place-items:center;width:36px;height:36px;margin:4px;border:2px solid white;border-radius:50%;box-shadow:0 1px 5px #0006}
+.flyer-dialog .leaflet-popup-content button{min-height:44px}

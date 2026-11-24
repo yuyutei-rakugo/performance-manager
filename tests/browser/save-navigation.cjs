@@ -313,7 +313,7 @@ async function main(){
     await page.locator('#event-dialog').getByText('番組表の復元').waitFor();
 
     await page.goto(new URL('rehearsals.html',base).href);
-    await page.locator('[data-detail]').click();
+    await page.locator('[data-detail], [data-open-rehearsal]').first().click();
     await page.locator('#edit-rehearsal-inside').click();
     await rehearsal.locator('[name=venue]').fill('稽古の復元');
     await failAfterClose('rehearsals',rehearsal,page.locator('#rehearsal-dialog [data-close]'),'[name=venue]','稽古の復元');
@@ -360,7 +360,7 @@ async function main(){
 
     const viewer=await session('viewer');
     await viewer.goto(base.href);
-    await viewer.locator('#schedule').getByText('翌日の公演').waitFor();
+    await viewer.locator('main .event-card').getByText('翌日の公演').waitFor();
     await viewer.locator('[data-event]').click();
     await viewer.locator('.program-table').getByText('翌日 00:07').waitFor();
     assert(!await viewer.locator('#new-event').isVisible());
@@ -369,18 +369,20 @@ async function main(){
     const rehearsalId=docs.rehearsals.items[0].id;
     attendance.set(rehearsalId,[{stageName:'別の会員',status:'出席'}]);
     await viewer.goto(new URL('rehearsals.html',base).href);
-    await viewer.locator('[data-detail]').click();
+    await viewer.locator('[data-open-rehearsal]').waitFor();
+    assert.equal(await viewer.locator('#rehearsals [data-detail="'+rehearsalId+'"]').count(),0);
+    await viewer.locator('[data-detail], [data-open-rehearsal]').first().click();
     await viewer.locator('#attendance [data-self-status="欠席"]').click();
     await viewer.locator('#attendance-feedback').getByText(/登録しました/).waitFor();
     await viewer.locator('#attendance [data-self-status="未定"]').click();
     await viewer.locator('#attendance').getByText('未定 1人').waitFor();
     await viewer.reload();
-    await viewer.locator('[data-detail]').click();
+    await viewer.locator('[data-detail], [data-open-rehearsal]').first().click();
     await viewer.locator('#attendance').getByText('未定 1人').waitFor();
     assert.equal(await viewer.locator('#attendance [data-person]').count(),1);
     const recordsBeforeDelete=structuredClone(docs.history);
     await page.goto(new URL('rehearsals.html',base).href);
-    await page.locator('[data-detail]').click();
+    await page.locator('[data-detail], [data-open-rehearsal]').first().click();
     await page.locator('#edit-rehearsal-inside').click();
     await page.getByText('この稽古を削除する').click();
     await page.locator('#delete-confirm').check();
@@ -537,11 +539,39 @@ async function main(){
     assert.equal(await flyerForm.getByLabel('自由メモ（任意）').inputValue(),'入力を保持');
     await flyerForm.getByRole('button',{name:'変更を保存する'}).click();
     await flyerPanel.getByText('掲示先を保存しました。').waitFor();
-    await flyerPanel.getByText('未依頼',{exact:true}).first().waitFor();
+    await flyerPanel.locator('.flyer-badge').getByText('未依頼',{exact:true}).first().waitFor();
     await flyerPanel.locator('[data-close-flyers]').click();
     await page.goto(invitation.href);
     await page.locator('[data-flyers]').click();
-    await page.getByRole('dialog',{name:'チラシの掲示先',exact:true}).getByText('模擬施設',{exact:true}).waitFor();
+    await page.getByRole('dialog',{name:'チラシの掲示先',exact:true}).getByRole('heading',{name: '模擬施設 位置未確認'}).waitFor();
+
+    flyerRows.push(
+      {id:'known1',name:'中央図書館',region:'神栖市',category:'公共施設',status:'掲示済み',memo:'会員用の試験メモ',revision:1},
+      {id:'known2',name:'うずも図書館',region:'神栖市',category:'公共施設',status:'依頼済み',memo:'',revision:1}
+    );
+    const mapPanel=page.getByRole('dialog',{name:'チラシの掲示先',exact:true});
+    let tiles=0;
+    await page.route('https://cyberjapandata.gsi.go.jp/xyz/**',route=>{
+      tiles++;assert(!decodeURIComponent(route.request().url()).includes('会員用の試験メモ'));
+      return route.fulfill({status:404,body:''});
+    });
+    await page.setViewportSize({width:320,height:680});
+    await mapPanel.getByRole('button',{name:'最新を取得'}).click();
+    await mapPanel.getByText('神栖市 ／ 公共施設',{exact:true}).first().waitFor();
+    assert.equal(tiles,0);
+    await mapPanel.getByRole('button',{name:'地図で見る'}).click();
+    const centralPin=mapPanel.getByRole('button',{name:'中央図書館 掲示済み'});
+    await centralPin.click();
+    await mapPanel.locator('.leaflet-popup-content').getByText('会員用の試験メモ',{exact:true}).waitFor();
+    assert.equal(await mapPanel.locator('.flyer-pin').count(),2);
+    await mapPanel.locator('.leaflet-popup-content').getByRole('button',{name:'編集する'}).click();
+    const fromMap=page.getByRole('dialog',{name:'掲示先を編集',exact:true});
+    assert.equal(await fromMap.getByLabel('施設名').inputValue(),'中央図書館');
+    await fromMap.getByRole('button',{name:'キャンセル'}).click();
+    await mapPanel.locator('[data-filter-status]').selectOption('掲示済み');
+    assert.equal(await mapPanel.locator('.flyer-pin').count(),1);
+    assert(tiles>0);
+    await mapPanel.getByRole('button',{name:'地図を閉じる'}).click();
 
     await invited.setViewportSize({width:320,height:680});
     await invited.locator('#event-dialog [data-close]').click();
@@ -569,7 +599,7 @@ async function main(){
     const narrow=await session('viewer');
     await narrow.setViewportSize({width:320,height:720});
     await narrow.goto(base.href);
-    await narrow.waitForFunction(()=>document.querySelectorAll('#schedule .event-card').length===500);
+    await narrow.waitForFunction(()=>document.querySelectorAll('main .event-card').length===500);
     assert(await narrow.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
     console.log('PASS event, rehearsal, and history saves remain committed when the original dialog is closed; new drafts, midnight timing, and cross-session read-back are preserved');
   }finally{
