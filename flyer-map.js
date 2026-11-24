@@ -129,13 +129,12 @@ export async function mountFlyerMap(host,actions){
   const search=document.createElement('a');
   search.href=flyerSearchUrl(row);search.textContent='Googleマップで探す';search.target='_blank';search.rel='noopener noreferrer';content.append(search);
   if(!archived){
-   const button=document.createElement('button');button.type='button';button.className='secondary';button.textContent='編集する';
+   const button=document.createElement('button');button.type='button';button.className='secondary';button.textContent='状況・メモを編集';
    button.disabled=busy;button.onclick=event=>{event.stopPropagation();actions.edit(row.id)};
-   button.textContent='状況・メモを編集';content.append(button);
+   content.append(button);
   }
   if(result){
    const feedback=document.createElement('p');feedback.setAttribute('role','status');feedback.textContent=result.text;
-
    content.append(feedback);
   }
   if(neighbors.length){

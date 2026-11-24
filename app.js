@@ -395,7 +395,6 @@ $('schedule').onclick = async click => {
   if (button.dataset.editEvent !== undefined) { renderForm(events.find(item => item.id === button.dataset.editEvent)); return; }
   if (button.dataset.deleteEvent !== undefined) { await deleteEvent(button.dataset.deleteEvent); return; }
   if (button.dataset.event !== undefined) renderDetails(button.dataset.event);
-
 };
 document.getElementById('next-performance')?.addEventListener('click',event=>{const button=event.target.closest('[data-event]');if(button)renderDetails(button.dataset.event)});
 $('list-tab').onclick = () => render();

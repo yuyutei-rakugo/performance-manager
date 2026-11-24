@@ -4,8 +4,8 @@ const tick=()=>new Promise(r=>setImmediate(r));
 (async()=>{
  const w=new JSDOM('<body></body>',{url:'https://example.test',runScripts:'outside-only'}).window;Object.defineProperty(w.document,'hidden',{value:false,configurable:true});w.structuredClone=structuredClone;w.confirm=()=>true;w.fetch=async()=>({ok:false});
  w.HTMLDialogElement.prototype.showModal=function(){this.open=true};w.HTMLDialogElement.prototype.close=function(){this.open=false;this.dispatchEvent(new w.Event('close'))};
- let rows=[{id:'one',revision:2,name:'〇〇公民館',region:'神栖市',category:'公共施設',status:'依頼済み',memo:'受付に置いてもらう'}],fail=false,release,calls=[];
- w.cloud={state:{provider:'apps-script',role:'viewer',user:{uid:'member-one'}},onState(fn){fn(this.state);return()=>{}},async flyer(action,body){calls.push({action,body});if(action==='flyerSave'){await new Promise(r=>release=r);if(fail)throw Error('模擬保存失敗');assert.equal(body.revision,rows[0].revision);rows=[{...rows[0],...body.entry,revision:rows[0].revision+1}]}if(action==='flyerImport'){if(fail)throw Error('模擬追加失敗');rows.push(...body.entries.map((row,i)=>({...row,id:'added-'+(rows.length+i),revision:1,status:'未依頼',memo:''})))}return structuredClone({rows,refused:[{name:'断られた店',region:'神栖市',keys:[]}],categories:['公共施設'],sources:[],declineFields:true,archived:false})}};
+ let rows=[{id:'one',revision:2,name:'〇〇公民館',region:'神栖市',category:'公共施設',status:'依頼済み',memo:'受付に置いてもらう'}],fail=false,failRead=false,release,calls=[];
+ w.cloud={state:{provider:'apps-script',role:'viewer',user:{uid:'member-one'}},onState(fn){fn(this.state);return()=>{}},async flyer(action,body){calls.push({action,body});if(action==='flyerRead'&&failRead)throw Error('模擬読み込み失敗');if(action==='flyerSave'){await new Promise(r=>release=r);if(fail)throw Error('模擬保存失敗');if(body.revision!==rows[0].revision)throw Error('この掲示先は更新されました。');rows=[{...rows[0],...body.entry,revision:rows[0].revision+1}]}if(action==='flyerImport'){if(fail)throw Error('模擬追加失敗');rows.push(...body.entries.map((row,i)=>({...row,id:'added-'+(rows.length+i),revision:1,status:'未依頼',memo:''})))}return structuredClone({rows,refused:[{name:'断られた店',region:'神栖市',keys:[]}],categories:['公共施設'],sources:[],declineFields:true,archived:false})}};
  w.eval(clean('editor-dialog.js')+'\n'+clean('flyer-locations.js')+'\n'+clean('flyer-venues.js')+'\nopenFlyerVenues({id:"event-one",title:"寄席"});');await tick();
  let panel=w.document.querySelector('.flyer-dialog');
  assert(!panel.querySelector('.flyer-tools').open);assert(!panel.querySelector('.flyer-row-details').open);
@@ -24,6 +24,13 @@ const tick=()=>new Promise(r=>setImmediate(r));
  assert.match(form.querySelector('[data-editor-status]').textContent,/保存できませんでした/);
  fail=false;form.dispatchEvent(new w.Event('submit',{cancelable:true}));release();await tick();
  assert.equal(rows[0].status,'掲示済み');assert.equal(rows[0].memo,'まとめて保存');assert.equal(panel.querySelector('.flyer-visible-memo').textContent,'まとめて保存');
+ // A concurrent edit cannot be overwritten by an older form.
+ form=openEdit();form.elements.memo.value='古い画面からのメモ';
+ rows[0]={...rows[0],memo:'他の会員の最新メモ',revision:rows[0].revision+1};
+ form.dispatchEvent(new w.Event('submit',{cancelable:true}));release();await tick();
+ assert.match(form.querySelector('[data-editor-status]').textContent,/更新されました/);
+ assert.equal(form.elements.memo.value,'古い画面からのメモ');assert.equal(rows[0].memo,'他の会員の最新メモ');
+ form.querySelector('[data-cancel]').click();w.document.querySelector('.discard-dialog .secondary').click();
  rows[0].memo='受付に置いてもらう';
  // A return to the tab reads the server; no import/write is triggered and filters survive.
  const search=panel.querySelector('[data-search]');search.value='〇〇';search.dispatchEvent(new w.Event('input'));
@@ -32,6 +39,11 @@ const tick=()=>new Promise(r=>setImmediate(r));
  w.dispatchEvent(new w.Event('focus'));await tick();
  assert.equal(calls.filter(c=>c.action!=='flyerRead').length,writes);assert.equal(search.value,'〇〇');
  assert.match(panel.querySelector('.flyer-visible-memo').textContent,/受付に置いてもらう/);
+ const lastUpdated=panel.querySelector('[data-updated]').textContent;
+ failRead=true;w.Date.now=()=>Date.now()+10000;w.dispatchEvent(new w.Event('focus'));await tick();
+ assert.match(panel.querySelector('[data-message]').textContent,/最新の情報を取得できませんでした/);
+ assert.equal(panel.querySelector('[data-updated]').textContent,lastUpdated);assert.match(panel.querySelector('.flyer-visible-memo').textContent,/受付に置いてもらう/);
+ failRead=false;
  form=openEdit();form.elements.memo.value='編集中の入力';
  const readCount=calls.filter(c=>c.action==='flyerRead').length;
  w.dispatchEvent(new w.Event('focus'));await tick();assert.equal(calls.filter(c=>c.action==='flyerRead').length,readCount);assert.equal(form.elements.memo.value,'編集中の入力');
@@ -56,7 +68,7 @@ const tick=()=>new Promise(r=>setImmediate(r));
  const importCount=calls.filter(c=>c.action==='flyerImport').length;panel.querySelector('[data-refresh]').click();await tick();assert.equal(calls.filter(c=>c.action==='flyerImport').length,importCount);assert.equal(rows.length,53);
  panel.querySelector('[data-add]').click();assert(w.document.querySelector('[aria-label="掲示先を編集"]'));w.document.querySelector('[data-cancel]').click();
  panel.querySelector('[data-close-flyers]').click();assert(!w.document.querySelector('.flyer-dialog'));w.close();
- console.log('PASS flyer status saves, errors and retries; default all facilities auto-added in safe batches; existing state and refusals preserved; repeat reads do not write');
+ console.log('PASS combined flyer status/memo saves, failure and conflict preservation, visible-tab refresh, draft protection, read failure fallback, catalog batching and filter preservation');
 })().catch(error=>{console.error(error);process.exit(1)});
 
 const helpers=new JSDOM('',{runScripts:'outside-only'}).window;

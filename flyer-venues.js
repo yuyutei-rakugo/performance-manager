@@ -261,7 +261,7 @@ export function openFlyerVenues(event){
  region.onchange=category.onchange=redraw;source.onchange=updateControls;
  q('[data-close-flyers]').onclick=()=>{if(!busy)dialog.close()};
  dialog.addEventListener('cancel',e=>{if(busy)e.preventDefault()});
- q('[data-refresh]').onclick=()=>void refreshRead(true);
+ q('[data-refresh]').onclick=()=>void loadAllVenues();
  q('[data-add]').onclick=()=>edit();
  q('[data-migration-preview]').onclick=()=>previewFlyerMigration(q('[data-migration-plan]'),request,async()=>{
   data={...data,migrationRequired:false};redraw();
@@ -311,8 +311,7 @@ export function openFlyerVenues(event){
    const {mountFlyerMap}=await import('./flyer-map.js?v=20261124-ux1');
    if(!dialog.open)return;
    mapView=await mountFlyerMap(host,{
-    edit:id=>{const row=data?.rows.find(row=>row.id===id);if(row)edit(row)},
-
+    edit:id=>{const row=data?.rows.find(row=>row.id===id);if(row)edit(row)}
    });
    if(!dialog.open){mapView.destroy();mapView=null;return}
    button.textContent='地図を閉じる';redraw();
@@ -330,12 +329,12 @@ export function openFlyerVenues(event){
   if(button.dataset.editFlyer||button.dataset.findFlyer)edit(row,!!button.dataset.findFlyer);
  };
  // Refresh only reads: returning to the app must never import or write data.
- async function refreshRead(manual=false){
+ async function refreshRead(){
   if(!dialog.open||!allowed())return;
   if(busy||editor?.open){refreshQueued=true;return}
-  if(!manual&&!refreshQueued&&Date.now()-lastRead<1000)return;
+  if(!refreshQueued&&Date.now()-lastRead<1000)return;
   refreshQueued=false;
-  await run('flyerRead',{},manual?'最新の情報を取得しました。':'');
+  await run('flyerRead');
  }
  const onVisible=()=>{if(!document.hidden)void refreshRead()};
  document.addEventListener('visibilitychange',onVisible);
