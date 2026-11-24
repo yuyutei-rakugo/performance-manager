@@ -64,13 +64,18 @@ async function main(){
             docs.rehearsals={items:docs.rehearsals.items.map(r=>r.id===transfer.id?{...r,archivedAt:'2026-11-21T08:00:00Z'}:r),revision:docs.rehearsals.revision+1};
             return ok({count:1,rehearsals:docs.rehearsals});
           }
-          case 'flyerRead':case 'flyerImport':return ok({rows:flyerRows,refused:[],categories:['公共施設'],sources:[],archived:false});
+          case 'flyerRead':case 'flyerImport':return ok({rows:flyerRows,locationFields:true,refused:[],categories:['公共施設'],sources:[],archived:false});
           case 'flyerSave':{
             assert.equal(role,'viewer');
             assert.equal(request.eventId,docs.events.items[0].id);
             if(failFlyer){failFlyer=false;return answer({ok:false,error:'模擬掲示先保存失敗'})}
-            flyerRows.push({...request.entry,id:'test-flyer',revision:1});
-            return ok({rows:flyerRows,refused:[],categories:['公共施設'],sources:[],archived:false});
+            if(request.id){
+              const i=flyerRows.findIndex(row=>row.id===request.id);
+              assert(i>=0);
+              assert.equal(request.revision,flyerRows[i].revision);
+              flyerRows[i]={...flyerRows[i],...request.entry,revision:request.revision+1};
+            }else flyerRows.push({...request.entry,id:'test-flyer',revision:1});
+            return ok({rows:flyerRows,locationFields:true,refused:[],categories:['公共施設'],sources:[],archived:false});
           }
           case 'reservationList':return ok({documents:reservationRows,schedules:[],canReview:false});
           case 'reservationAdd':{
@@ -564,6 +569,18 @@ async function main(){
     await centralPin.click();
     await mapPanel.locator('.leaflet-popup-content').getByText('会員用の試験メモ',{exact:true}).waitFor();
     assert.equal(await mapPanel.locator('.flyer-pin').count(),2);
+    assert.equal(await centralPin.textContent(),'');
+    assert.equal(await centralPin.locator('span').getAttribute('data-status'),'2');
+    const popup=mapPanel.locator('.leaflet-popup-content');
+    failFlyer=true;
+    await popup.getByLabel('状況を変更').selectOption('今回は見送り');
+    await popup.getByText(/保存できませんでした/).waitFor();
+    assert.equal(await popup.getByLabel('状況を変更').inputValue(),'掲示済み');
+    await popup.getByRole('button',{name:'再試行'}).click();
+    await popup.getByText('保存しました。',{exact:true}).waitFor();
+    assert.equal(await popup.getByLabel('状況を変更').inputValue(),'今回は見送り');
+    await popup.getByLabel('状況を変更').selectOption('掲示済み');
+    await popup.getByText('保存しました。',{exact:true}).waitFor();
     await mapPanel.locator('.leaflet-popup-content').getByRole('button',{name:'編集する'}).click();
     const fromMap=page.getByRole('dialog',{name:'掲示先を編集',exact:true});
     assert.equal(await fromMap.getByLabel('施設名').inputValue(),'中央図書館');
@@ -572,6 +589,17 @@ async function main(){
     assert.equal(await mapPanel.locator('.flyer-pin').count(),1);
     assert(tiles>0);
     await mapPanel.getByRole('button',{name:'地図を閉じる'}).click();
+    await mapPanel.locator('[data-filter-status]').selectOption('');
+    const unknown=mapPanel.locator('[data-venue-id="test-flyer"]');
+    await unknown.locator('summary').click();
+    await unknown.getByRole('button',{name:'編集する'}).click();
+    await fromMap.getByLabel('住所',{exact:true}).fill('銚子市模擬町1');
+    await fromMap.getByLabel('地図URL',{exact:true}).fill('https://www.google.com/maps?q=35.73,140.83');
+    await fromMap.getByRole('button',{name:'変更を保存する'}).click();
+    await fromMap.waitFor({state:'hidden'});
+    assert.deepEqual(flyerRows.find(row=>row.id==='test-flyer').location,{address:'銚子市模擬町1',mapUrl:'https://www.google.com/maps?q=35.73,140.83',lat:35.73,lng:140.83});
+    await unknown.getByRole('button',{name:'地図でこの施設を見る'}).click();
+    await mapPanel.locator('.leaflet-popup-content').getByText('模擬施設',{exact:true}).waitFor();
 
     await invited.setViewportSize({width:320,height:680});
     await invited.locator('#event-dialog [data-close]').click();

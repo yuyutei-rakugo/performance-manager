@@ -127,7 +127,12 @@ dialog{border:1px solid var(--line);border-radius:14px;width:min(680px,calc(100%
 .flyer-unlocated{display:block;font-size:.75rem;color:var(--muted)}
 .flyer-item [data-row-message]:empty{display:none}
 .flyer-map-canvas{height:clamp(235px,42vh,380px);isolation:isolate;background:#eef2f3}
-.flyer-map-legend .flyer-status,.flyer-pin .flyer-status{background:var(--flyer-bg);color:var(--flyer-color);font-weight:700;padding:3px 6px}
 .flyer-map-legend{display:flex;gap:4px;flex-wrap:wrap;margin-block:8px}
-.flyer-pin .flyer-status{display:grid;place-items:center;width:36px;height:36px;margin:4px;border:2px solid white;border-radius:50%;box-shadow:0 1px 5px #0006}
 .flyer-dialog .leaflet-popup-content button{min-height:44px}
+.flyer-map-legend .flyer-status,.flyer-pin .flyer-status{--pin:#a92530;--pin-bg:#fce9eb}
+.flyer-map-legend [data-status="1"],.flyer-pin [data-status="1"]{--pin:#1859a0;--pin-bg:#e5effb}
+.flyer-map-legend [data-status="2"],.flyer-pin [data-status="2"]{--pin:#1b6f49;--pin-bg:#e3f2e9}
+.flyer-map-legend [data-status="3"],.flyer-pin [data-status="3"]{--pin:#555c64;--pin-bg:#eceeef}
+.flyer-map-legend .flyer-status{background:var(--pin-bg);color:var(--pin);border-left:5px solid var(--pin);padding:3px 6px;font-weight:700}
+.flyer-pin .flyer-status{display:block;width:26px;height:26px;margin:4px;background:var(--pin);border:2px solid white;border-radius:50% 50% 50% 0;box-shadow:0 1px 5px #0006;transform:rotate(-45deg)}
+.flyer-pin .flyer-status::after{content:"";display:block;width:8px;height:8px;margin:4px auto;border-radius:50%;background:#fff}
