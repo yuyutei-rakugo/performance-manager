@@ -61,7 +61,7 @@ export async function mountFlyerMap(host,edit){
     pins.set(row.id,{node,signature});
    }
    const idsKey=JSON.stringify([...ids]);
-   if(idsKey!==previousIds&&located.length)view.fitBounds(latLngBounds(located.map(flyerLocation)),{padding:[28,28],maxZoom:15});
+   if(idsKey!==previousIds&&located.length)view.fitBounds(latLngBounds(located.map(flyerLocation)),{padding:[28,28],maxZoom:15,animate:false});
    previousIds=idsKey;
    host.querySelector('[data-map-count]').textContent='地図に表示 '+located.length+'件 ／ 位置未確認 '+(rows.length-located.length)+'件';
   },
