@@ -21,6 +21,7 @@ function moduleInstance(){
  let api=moduleInstance();
  assert.equal(api.normalizePlaceName('ユーポート　はさき'),api.normalizePlaceName('ゆ〜ぽ〜と はさき'));
  assert.equal(api.findRegionalPlaces(initial,'郵便局')[0].name,'矢田部郵便局');
+ assert.equal(api.findRegionalPlaces(initial,'郵便局 矢田部')[0].name,'矢田部郵便局');
  assert.equal(api.findRegionalPlaces(initial,'ユーポート')[0].name,'ゆ〜ぽ〜とはさき');
  assert.equal(api.findRegionalPlaces(initial,'丸竹')[0].name,'丸竹鮮魚店');
  assert.equal(api.findRegionalPlaces(initial,'丸竹').some(r=>r.name==='マルトモ'),false);

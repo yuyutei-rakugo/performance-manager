@@ -1,4 +1,4 @@
-import {openFlyerVenues} from './flyer-venues.js?v=20261125-simple1';
+import {openFlyerVenues} from './flyer-venues.js?v=20261125-simple2';
 import {startEditor,finishEditor,leaveEditor,guardEditor,editorState,saveRecovery,recoveryScope,recoveredEditState} from './editor-dialog.js?v=20261125-regions1';
 import {performerPicker,updatePerformerPickers,readPerformer,showPerformerRoster} from './performer-picker.js?v=20261125-regions1';
 import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261125-regions1';
