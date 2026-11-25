@@ -15,6 +15,18 @@ const tick=()=>new Promise(r=>setImmediate(r));
  const map=new URL(panel.querySelector('.flyer-map').href);assert.equal(map.origin,'https://www.google.com');assert.equal(map.searchParams.get('query'),'神栖市 〇〇公民館');
  const openEdit=()=>{panel.querySelector('[data-edit-flyer]').click();return w.document.querySelector('[aria-label="掲示先を編集"] form')};
  let form=openEdit();
+ const placeSteps=form.querySelector('.flyer-place-steps');
+ assert(placeSteps.contains(form.elements.name),'facility search is visible outside collapsed details');
+ assert(placeSteps.contains(form.elements.region),'region is next to facility name');
+ assert(!placeSteps.querySelector('[data-picker]').closest('details').open,'manual inputs stay collapsed');
+ assert.match(placeSteps.textContent,/ピンはまだ選ばれていません/);
+ assert.equal(form.children[1],placeSteps,'search precedes status and memo');
+ form.elements.lat.value='35.8';form.elements.lng.value='140.7';
+ form.elements.lat.dispatchEvent(new w.Event('input'));
+ assert.match(placeSteps.textContent,/ピンの位置を選択済み/);
+ form.elements.lat.value='';form.elements.lng.value='';
+ form.elements.lat.dispatchEvent(new w.Event('input'));
+
  const radio=status=>[...form.querySelectorAll('[name=status]')].find(input=>input.value===status);
  assert.equal(form.querySelectorAll('input[type=radio]').length,4);
  const before=calls.length;radio('掲示済み').click();form.elements.memo.value='まとめて保存';
