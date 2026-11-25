@@ -16,6 +16,8 @@ const tick=()=>new Promise(r=>setImmediate(r));
  const openEdit=()=>{panel.querySelector('[data-edit-flyer]').click();return w.document.querySelector('[aria-label="掲示先を編集"] form')};
  let form=openEdit();
  const placeSteps=form.querySelector('.flyer-place-steps');
+ assert(!placeSteps.querySelector('.flyer-google-help').open,'Google copying is an optional fallback');
+ assert.equal(placeSteps.querySelector('[data-find-place]').textContent,'施設名で場所を検索');
  let opened;w.open=url=>{opened=new URL(url)};
  [...placeSteps.querySelectorAll('button')].find(b=>b.textContent==='Googleマップで探す').click();
  assert.equal(opened.origin,'https://www.google.com');assert.match(opened.searchParams.get('query'),/〇〇公民館 神栖市/);
