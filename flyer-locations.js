@@ -168,3 +168,13 @@ export function approximateAddressPosition(address,region,features){
  const xy=candidates[0].geometry?.coordinates;
  if(Array.isArray(xy)&&xy.length===2&&xy.every(Number.isFinite)&&Math.abs(xy[0])<=180&&Math.abs(xy[1])<=90)return [xy[1],xy[0]];
 }
+
+// A shared link is a warning, not proof of an incorrect facility or pin.
+export function flyerLinkConflicts(row,rows){
+ const canonical=value=>{
+  try{const url=new URL(value);url.searchParams.delete('g_st');url.searchParams.sort();return url.href}catch{return ''}
+ };
+ const link=canonical(flyerLocationInfo(row)?.mapUrl);
+ if(!link)return [];
+ return [...new Set(rows.filter(other=>(other.name!==row.name||other.region!==row.region)&&canonical(flyerLocationInfo(other)?.mapUrl)===link).map(other=>other.name))];
+}
