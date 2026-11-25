@@ -44,7 +44,10 @@ export async function mountPlacePicker(host,initial,choose,options={}){
  const submit=document.createElement('button');submit.type='button';submit.className='secondary';submit.textContent=options.submitLabel||'この位置を使う';submit.disabled=true;
  host.replaceChildren(feedback,canvas,...(options.readOnly?[]:[submit]));
  const view=map(canvas,{scrollWheelZoom:false,maxZoom:21}).setView(initial||[35.85,140.72],initial?16:11);
- tileLayer('https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png',{attribution:'<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener noreferrer">地理院タイル</a> | © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap contributors</a>',maxNativeZoom:18,maxZoom:21,referrerPolicy:'no-referrer'}).addTo(view);
+ const background=tileLayer('https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png',{attribution:'<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener noreferrer">地理院タイル</a> | © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap contributors</a>',maxNativeZoom:18,maxZoom:21,referrerPolicy:'no-referrer'}).addTo(view);
+ const tileWarning=document.createElement('p');tileWarning.className='flyer-tile-warning';tileWarning.setAttribute('role','status');tileWarning.hidden=true;tileWarning.textContent='地図の背景を取得できませんでした。地図を閉じて開き直すと再試行できます。施設だけ先に登録しても構いません。';host.append(tileWarning);
+ background.on('tileerror',()=>{tileWarning.hidden=false});
+ background.on('loading',()=>{tileWarning.hidden=true});
  let selected=initial,positionMarker=initial?circleMarker(initial,{radius:8,color:'#a92530',fillOpacity:1,interactive:false}).addTo(view):null;
  if(initial){submit.disabled=false;feedback.textContent='赤い点が登録する位置です。違う場合は地図を押して変更できます。'}
  const locate=document.createElement('button');locate.type='button';locate.className='secondary';locate.textContent='現在地の周辺を表示';
