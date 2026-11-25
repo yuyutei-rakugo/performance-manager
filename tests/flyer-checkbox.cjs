@@ -125,5 +125,13 @@ assert.deepEqual(resolvePin({name:'ゆ〜ぽ〜とはさき',region:'神栖市',
 assert.deepEqual(resolvePin({...post,location:{...post.location,lat:35.8,lng:140.7}}),[35.8,140.7]);
 assert.equal(resolvePin({...post,location:{address:'茨城県神栖市別の住所',mapUrl:''}}),null);
 assert.equal(resolvePin({...post,location:null}),null);
-assert.equal(resolvePin({...post,location:{...post.location,mapUrl:'https://www.google.com/maps?q=35.7,140.8'}}),null);
+assert.deepEqual(resolvePin({...post,location:{...post.location,mapUrl:'https://www.google.com/maps?q=35.7,140.8'}}),[35.7,140.8]);
 console.log('PASS verified reference pins, postal/full-width address matching, manual override and changed-address protection');
+
+const addressWindow=new JSDOM('',{runScripts:'outside-only'}).window;
+addressWindow.eval(clean('flyer-locations.js')+'\nwindow.exact=exactAddressPosition;window.approx=approximateAddressPosition;');
+const featureForAddress={properties:{title:'茨城県神栖市須田２３４０番地'},geometry:{coordinates:[140.74,35.83]}};
+assert.equal(addressWindow.exact('〒314-0253 茨城県神栖市須田２３４０－１２７',[featureForAddress]),undefined);
+assert.deepEqual(Array.from(addressWindow.approx('〒314-0253 茨城県神栖市須田２３４０－１２７','神栖市',[featureForAddress])),[35.83,140.74]);
+assert.equal(addressWindow.approx('茨城県神栖市須田23401','神栖市',[featureForAddress]),undefined);
+console.log('PASS coordinate-link fallback and postal address exact/approximate distinction');
