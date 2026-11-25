@@ -89,14 +89,14 @@ export async function mountFlyerMap(host,actions){
    if(address){
     const button=document.createElement('button');button.type='button';button.textContent='住所から位置を探す';
     const feedback=document.createElement('span');feedback.setAttribute('role','status');
-    button.onclick=async()=>{
+    button.onclick=async(automatic=false)=>{
      button.disabled=true;feedback.textContent='確認中…';
      try{
       const response=await fetch('https://msearch.gsi.go.jp/address-search/AddressSearch?q='+encodeURIComponent(normalizeLocationAddress(address)),{referrerPolicy:'no-referrer',signal:AbortSignal.timeout(10000)});
       if(!response.ok)throw Error();
       const xy=approximateAddressPosition(address,row.region,await response.json());
       if(!active)return;
-      if(xy){estimated.set(addressKey(row),xy);update(...lastUpdate);focus(row.id)}
+      if(xy){estimated.set(addressKey(row),xy);update(...lastUpdate);if(automatic!==true)focus(row.id)}
       else feedback.textContent='住所と一致する範囲を確認できませんでした。';
      }catch{if(active)feedback.textContent='検索できませんでした。もう一度お試しください。'}
      finally{button.disabled=false}
@@ -106,7 +106,7 @@ export async function mountFlyerMap(host,actions){
     if(!automaticAttempts.has(key)){
      automaticAttempts.add(key);
      addressQueue=addressQueue.then(async()=>{
-      if(active&&lastUpdate[0].some(item=>addressKey(item)===key)&&!position(row))await button.onclick();
+      if(active&&lastUpdate[0].some(item=>addressKey(item)===key)&&!position(row))await button.onclick(true);
      });
     }
    }
