@@ -66,7 +66,7 @@ async function main(){
           }
           case 'flyerRead':case 'flyerImport':return ok({rows:flyerRows,locationFields:true,googleShare:true,declineFields:true,migrationRequired:false,refused:flyerRefused,categories:['公共施設'],sources:[],archived:false});
           case 'flyerResolveGoogleLink':
-            return request.url.endsWith('/example')?ok({name:'',address:''}):ok({name:'地図の登録名',address:'試験住所',lat:35.81,lng:140.71});
+            return request.url.endsWith('/example')?ok({name:'',address:''}):ok({name:'石毛呉服店',address:'千葉県銚子市飯沼町1-25'});
           case 'flyerSave':{
             assert(['admin','viewer'].includes(role),'authenticated members can save flyer records');
             assert.equal(request.eventId,docs.events.items[0].id);
@@ -547,18 +547,19 @@ async function main(){
     assert.equal(await flyerForm.locator('button[type=submit]').count(),1,'one save button');
     assert(!await flyerForm.getByLabel('住所',{exact:true}).isVisible(),'optional address stays hidden');
     assert(await flyerForm.getByLabel('Googleマップの共有リンク（任意）').isVisible());
+    assert.deepEqual(await flyerForm.locator('.flyer-share-link > button').allTextContents(),['Googleマップで探す','貼り付け','リンクから場所を確認']);
+    await flyerForm.locator('.flyer-place-fallback').evaluate(el=>el.open=true);
     await flyerForm.getByLabel('施設名',{exact:true}).fill('未収録の試験施設');
     await invited.context().route('https://www.google.com/maps/**',route=>route.fulfill({contentType:'text/html',body:'<h1>Map search handoff fixture</h1>'}));
     // Manual map opens immediately beside its sole button, not below all fallback fields.
-    await flyerForm.locator('.flyer-place-fallback > summary').click();
+    await flyerForm.locator('.flyer-place-fallback').evaluate(el=>el.open=true);
     assert(!await flyerForm.getByRole('button',{name:'地図上で位置を指定',exact:true}).isVisible());
-    await flyerForm.locator('.flyer-google-help > summary').click();
     const popupPromise=invited.context().waitForEvent('page');
     await flyerForm.getByRole('button',{name:'Googleマップで探す',exact:true}).click();
     const mapSearchPage=await popupPromise;await mapSearchPage.waitForLoadState();
     const externalQuery=new URL(mapSearchPage.url()).searchParams.get('query');
     assert.equal(externalQuery,'未収録の試験施設 神栖市');
-    await mapSearchPage.close();await flyerForm.locator('.flyer-google-help > summary').click();
+    await mapSearchPage.close();
     await flyerForm.getByRole('button',{name:'地図を開いて場所を指定',exact:true}).click();
     await flyerForm.locator('.flyer-inline-map .flyer-map-canvas').waitFor();
     assert(await flyerForm.locator('.flyer-inline-map').evaluate(el=>el.previousElementSibling?.textContent==='地図を閉じる'));
@@ -579,7 +580,8 @@ async function main(){
     // This scenario will register the facility without a pin, so clear only the test draft.
     await flyerForm.locator('[name=lat]').evaluate(el=>{el.value='';el.dispatchEvent(new Event('input',{bubbles:true}))});
     await flyerForm.locator('[name=lng]').evaluate(el=>{el.value='';el.dispatchEvent(new Event('input',{bubbles:true}))});
-    await flyerForm.locator('.flyer-place-fallback > summary').click();
+    await flyerForm.locator('.flyer-place-fallback').evaluate(el=>el.open=true);
+    await flyerForm.locator('.flyer-place-fallback').evaluate(el=>el.open=true);
     await flyerForm.getByRole('button',{name:'施設名で場所を検索',exact:true}).click();
     await flyerForm.getByText(/老舗でも未収録/).waitFor();
     await flyerForm.screenshot({path:'test-artifacts/facility-search-mobile.png'});
@@ -596,8 +598,7 @@ async function main(){
     await flyerPanel.getByRole('button',{name:'すべての施設に戻る',exact:true}).click();
     await flyerPanel.getByRole('button',{name:'場所を設定する（任意）',exact:true}).click();
     assert.equal(await flyerForm.getByLabel('施設名',{exact:true}).inputValue(),'未収録の試験施設');
-    await flyerForm.locator('.flyer-place-fallback > summary').click();
-    await flyerForm.locator('.flyer-google-help > summary').click();
+    await flyerForm.locator('.flyer-place-fallback').evaluate(el=>el.open=true);
     await invited.evaluate(()=>Object.defineProperty(navigator,'clipboard',{configurable:true,value:{readText:async()=> 'https://maps.app.goo.gl/example'}}));
     await flyerForm.getByRole('button',{name:'貼り付け',exact:true}).click();
     assert.equal(await flyerForm.getByLabel('Googleマップの共有リンク（任意）').inputValue(),'https://maps.app.goo.gl/example');
@@ -612,13 +613,13 @@ async function main(){
     await flyerPanel.getByRole('button',{name:'すべての施設に戻る',exact:true}).click();
 
     await flyerPanel.getByRole('button',{name:'場所を設定する（任意）',exact:true}).click();
-    await flyerForm.getByLabel('Googleマップの共有リンク（任意）').fill('https://maps.app.goo.gl/confirmed');
+    await flyerForm.getByLabel('Googleマップの共有リンク（任意）').fill('https://maps.app.goo.gl/j9k7ZsgZdyYVzWJZA?g_st=ac');
     await flyerForm.getByRole('button',{name:'リンクから場所を確認',exact:true}).click();
-    await flyerForm.getByText('試験住所',{exact:true}).waitFor();
+    await flyerForm.getByText('千葉県銚子市飯沼町1-25',{exact:true}).waitFor();
     await flyerForm.locator('.flyer-confirmation .flyer-map-canvas').waitFor();
-    await flyerForm.getByRole('button',{name:'施設名を「地図の登録名」に変更',exact:true}).click();
-    assert.equal(await flyerForm.locator('[name=lat]').inputValue(),'35.81');
-    assert.equal(await flyerForm.locator('[name=mapUrl]').inputValue(),'https://maps.app.goo.gl/confirmed');
+    await flyerForm.getByRole('button',{name:'施設名を「石毛呉服店」に変更',exact:true}).click();
+    assert.equal(await flyerForm.locator('[name=lat]').inputValue(),'35.73224754');
+    assert.equal(await flyerForm.locator('[name=mapUrl]').inputValue(),'https://maps.app.goo.gl/j9k7ZsgZdyYVzWJZA?g_st=ac');
     await flyerForm.getByRole('button',{name:'一覧に戻る',exact:true}).click();
     await invited.getByRole('button',{name:'変更を破棄して一覧に戻る',exact:true}).click();
 
@@ -627,6 +628,7 @@ async function main(){
       {properties:{name:'未収録の試験施設 本店',city:'神栖市'},geometry:{coordinates:[140.7,35.8]}}
     ]}}));
     await flyerPanel.getByRole('button',{name:'場所を設定する（任意）',exact:true}).click();
+    await flyerForm.locator('.flyer-place-fallback').evaluate(el=>el.open=true);
     await flyerForm.getByRole('button',{name:'施設名で場所を検索',exact:true}).click();
     await flyerForm.getByRole('button',{name:'この施設を選ぶ',exact:true}).click();
     await flyerForm.getByText('現在の登録名：未収録の試験施設',{exact:true}).waitFor();
@@ -641,7 +643,9 @@ async function main(){
 
     // Selecting a known candidate opens a read-only confirmation, then saves the pin.
     await flyerPanel.getByRole('button',{name:'施設を追加',exact:true}).click();
+    await flyerForm.locator('.flyer-place-fallback').evaluate(el=>el.open=true);
     await flyerForm.getByLabel('施設名',{exact:true}).fill('矢田部郵便局');
+    await flyerForm.locator('.flyer-place-fallback').evaluate(el=>el.open=true);
     await flyerForm.getByRole('button',{name:'施設名で場所を検索',exact:true}).click();
     await flyerForm.getByRole('button',{name:'この施設を選ぶ',exact:true}).first().click();
     await flyerForm.getByRole('heading',{name:'この施設ですか？',exact:true}).waitFor();
@@ -676,7 +680,9 @@ async function main(){
 
     // An existing facility candidate navigates to its row, without a duplicate save.
     await flyerPanel.getByRole('button',{name:'施設を追加',exact:true}).click();
+    await flyerForm.locator('.flyer-place-fallback').evaluate(el=>el.open=true);
     await flyerForm.getByLabel('施設名',{exact:true}).fill('矢田部郵便局');
+    await flyerForm.locator('.flyer-place-fallback').evaluate(el=>el.open=true);
     await flyerForm.getByRole('button',{name:'施設名で場所を検索',exact:true}).click();
     await flyerForm.getByRole('button',{name:'登録済み・一覧で見る',exact:true}).click();
     await flyerForm.waitFor({state:'hidden'});assert.equal(flyerRows.length,2);
@@ -712,7 +718,9 @@ async function main(){
     await flyerPanel.locator('.flyer-tools > summary').click();
     await flyerPanel.getByRole('button',{name:'一覧を更新',exact:true}).click();
     await flyerPanel.getByRole('button',{name:'施設を追加',exact:true}).click();
+    await flyerForm.locator('.flyer-place-fallback').evaluate(el=>el.open=true);
     await flyerForm.getByLabel('施設名',{exact:true}).fill('マルタケ');
+    await flyerForm.locator('.flyer-place-fallback').evaluate(el=>el.open=true);
     await flyerForm.getByRole('button',{name:'施設名で場所を検索',exact:true}).click();
     await flyerForm.getByRole('button',{name:'登録済み・一覧で見る',exact:true}).click();
     await flyerForm.waitFor({state:'hidden'});

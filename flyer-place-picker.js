@@ -1,5 +1,5 @@
 import {searchRegionalPlaces} from './regional-places.js?v=20261125-search1';
-import {loadStyles} from './flyer-map.js?v=20261125-link1';
+import {loadStyles} from './flyer-map.js?v=20261125-link2';
 import {map, tileLayer, circleMarker} from './vendor/leaflet/leaflet-src.esm.js';
 
 const clean=value=>String(value||'').normalize('NFKC').toLowerCase().replace(/\s+/g,'');

@@ -1,5 +1,5 @@
 import {map, tileLayer, circleMarker, marker, divIcon, latLngBounds} from './vendor/leaflet/leaflet-src.esm.js';
-import {flyerLocation,flyerLocationInfo,flyerSearchUrl,approximateAddressPosition,normalizeLocationAddress} from './flyer-locations.js?v=20261125-link1';
+import {flyerLocation,flyerLocationInfo,flyerSearchUrl,approximateAddressPosition,normalizeLocationAddress} from './flyer-locations.js?v=20261125-link2';
 
 const statuses=['未依頼','依頼済み','掲示済み','今回は見送り'];
 let styles;

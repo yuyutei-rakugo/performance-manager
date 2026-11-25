@@ -1,5 +1,6 @@
 // Public venue address and position references, checked 2026-11-24.
 const locations=new Map([
+ ["銚子市／石毛呉服店",{"address":"千葉県銚子市飯沼町1-25","lat":35.73224754,"lng":140.83911328,"source":"https://map.yahoo.co.jp/v3/place/vyrzhVHxJR6","confirmedLinks":["https://maps.app.goo.gl/j9k7ZsgZdyYVzWJZA"]}],
  ["神栖市／丸竹",{"aliases":["丸竹鮮魚店","マルタケ鮮魚店"],"address":"茨城県神栖市土合本町3丁目9809-267","lat":35.79461386,"lng":140.77759256,"source":"https://www.mapion.co.jp/phonebook/M02014/08232/20830199416/","confirmedLinks":["https://maps.app.goo.gl/g2AV4mKkUri1t9MS9","https://maps.app.goo.gl/17Sgq87wKKxGt7vj8"]}],
  ["神栖市／若松郵便局",{"address":"茨城県神栖市須田2340-127","lat":35.8391608,"lng":140.7424836,"source":"https://map.japanpost.jp/p/search/dtl/300106211000/"}],
  ["神栖市／ゆ〜ぽ〜とはさき",{"address":"茨城県神栖市砂山15","lat":35.84034367508438,"lng":140.74115608122614,"source":"https://www.city.kamisu.ibaraki.jp/kanko_sports/ss_facility/1002393/1002408/1002411.html"}],
@@ -145,13 +146,14 @@ export const normalizeLocationAddress=value=>String(value||'').normalize('NFKC')
   })
   .replace(/丁目|番地の?|番(?!地)/g,'-').replace(/[−‐－]/g,'-').replace(/\s/g,'').replace(/[-号]$/,'');
 
-export function confirmedGoogleShare(raw,region){
+export function confirmedGoogleShare(raw){
  const url=new URL(raw);
  const link=url.origin+url.pathname;
- const entries=[...locations].filter(([key,position])=>key.startsWith(region+'／')&&position.confirmedLinks?.includes(link));
+ const entries=[...locations].filter(([key,position])=>position.confirmedLinks?.includes(link));
  if(entries.length!==1)return;
- const [[name,position]]=entries;
- return {name:name.slice(region.length+1),...position};
+ const [[key,position]]=entries;
+ const [region,name]=key.split('／');
+ return {name,region,...position};
 }
 
 export function googleSharePreview(raw){
