@@ -29,7 +29,7 @@ export function showPlaceCandidates(host,candidates,choose){
   const title=document.createElement('strong');title.textContent=candidate.name;
   const address=document.createElement('p');address.textContent=candidate.address;
   const link=document.createElement('a');link.href=query(candidate.lat+','+candidate.lng);link.rel='noopener noreferrer';link.target='_blank';link.textContent='候補を地図で確認';
-  const button=document.createElement('button');button.type='button';button.className='secondary';button.textContent='この場所で登録';
+  const button=document.createElement('button');button.type='button';button.className='secondary';button.textContent='この施設を選ぶ（ピンを付ける）';
   button.onclick=()=>choose(candidate);
   row.append(title,address,link,' ',button);host.append(row);
  }
