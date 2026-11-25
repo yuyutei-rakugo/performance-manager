@@ -629,7 +629,7 @@ async function main(){
     await page.route('https://msearch.gsi.go.jp/**',route=>route.fulfill({json:[
       {properties:{title:'茨城県神栖市知手'},geometry:{coordinates:[140.70,35.86]}}
     ]}));
-    await mapPanel.locator('[data-unlocated] summary').click();
+    if(!await unlocated.evaluate(el=>el.open))await unlocated.locator('summary').click();
     await mapPanel.getByRole('button',{name:'住所から位置を探す'}).click();
     await popup.getByText('概略位置（住所に基づく目安）').waitFor();
     assert.equal(await mapPanel.locator('.flyer-pin-approx').count(),1);
