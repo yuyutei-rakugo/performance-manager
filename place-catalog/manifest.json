@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "sourceDate": "2026-11-24T21:21:23Z",
+  "source": "© OpenStreetMap contributors",
+  "sourceUrl": "https://download.geofabrik.de/asia/japan/kanto.html",
+  "license": "ODbL-1.0",
+  "licenseUrl": "https://opendatacommons.org/licenses/odbl/1-0/",
+  "regions": {
+    "神栖市": {
+      "file": "kamisu.json",
+      "count": 939,
+      "bytes": 163716,
+      "sha256": "b8b18b99575e37b1c54a99ed397c045c4958ddefa2fd1b9047fd59d7beae90f0",
+      "boundary": "relation/2682919"
+    },
+    "銚子市": {
+      "file": "choshi.json",
+      "count": 1205,
+      "bytes": 200691,
+      "sha256": "c92f875ff7b3b7b87e2d150367ea595c01d1c259d812f9db937f54063712f8a0",
+      "boundary": "relation/2679941"
+    }
+  }
+}

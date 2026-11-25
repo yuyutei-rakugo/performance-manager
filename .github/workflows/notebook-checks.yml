@@ -32,3 +32,11 @@ jobs:
           python3 -m http.server 8151 --bind 127.0.0.1 > /tmp/notebook-http.log 2>&1 &
           node tests/browser/save-navigation.cjs
           node tests/browser/attendance-race.cjs
+      - name: Save mobile UI review images
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-ui-review
+          path: test-artifacts/*.png
+          if-no-files-found: ignore
+          retention-days: 7

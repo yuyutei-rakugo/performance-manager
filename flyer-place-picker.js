@@ -1,4 +1,5 @@
-import {loadStyles} from './flyer-map.js?v=20261124-ux1';
+import {searchRegionalPlaces} from './regional-places.js?v=20261125-regions1';
+import {loadStyles} from './flyer-map.js?v=20261125-regions1';
 import {map, tileLayer, circleMarker} from './vendor/leaflet/leaflet-src.esm.js';
 
 const clean=value=>String(value||'').normalize('NFKC').toLowerCase().replace(/\s+/g,'');
@@ -14,10 +15,12 @@ export function placeCandidates(features,name,region){
  }).slice(0,6);
 }
 export async function searchPlaces(name,region){
+ let localError;
+ try{const rows=await searchRegionalPlaces(name,region);if(rows.length)return rows}catch(error){localError=error}
  const url=new URL('https://photon.komoot.io/api/');
  url.search=new URLSearchParams({q:name+' '+region,limit:12});
  const response=await fetch(url,{referrerPolicy:'no-referrer',signal:AbortSignal.timeout(10000)});
- if(!response.ok)throw Error('検索先に接続できません。');
+ if(!response.ok)throw localError||Error('検索先に接続できません。');
  return placeCandidates((await response.json()).features,name,region);
 }
 export function showPlaceCandidates(host,candidates,choose){
@@ -26,10 +29,11 @@ export function showPlaceCandidates(host,candidates,choose){
  for(const candidate of candidates){
   const row=document.createElement('div');row.className='flyer-place-candidate';
   const title=document.createElement('strong');title.textContent=candidate.name;
-  const address=document.createElement('p');address.textContent=candidate.address;
+  const address=document.createElement('p');address.textContent=candidate.address||candidate.region||'住所未収録：地図で場所を確認してください。';
+  const info=document.createElement('p');info.className='muted';info.textContent=[candidate.cachedCopy?'前回保存した地域データ':null,candidate.category,candidate.datasetDate?'収録：'+candidate.datasetDate.slice(0,10):null,candidate.position==='representative'?'建物・敷地の代表位置：地図で確認':null].filter(Boolean).join(' ／ ');
   const button=document.createElement('button');button.type='button';button.className='secondary';button.textContent='この場所を地図で確認';
   button.onclick=()=>choose(candidate);
-  row.append(title,address,button);host.append(row);
+  row.append(title,address,info,button);host.append(row);
  }
 }
 export async function mountPlacePicker(host,initial,choose,options={}){
@@ -40,7 +44,7 @@ export async function mountPlacePicker(host,initial,choose,options={}){
  const submit=document.createElement('button');submit.type='button';submit.className='secondary';submit.textContent=options.submitLabel||'この位置を使う';submit.disabled=true;
  host.replaceChildren(feedback,canvas,submit);
  const view=map(canvas,{scrollWheelZoom:false,maxZoom:21}).setView(initial||[35.85,140.72],initial?16:11);
- tileLayer('https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png',{attribution:'<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener noreferrer">地理院タイル</a>',maxNativeZoom:18,maxZoom:21,referrerPolicy:'no-referrer'}).addTo(view);
+ tileLayer('https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png',{attribution:'<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener noreferrer">地理院タイル</a> | © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap contributors</a>',maxNativeZoom:18,maxZoom:21,referrerPolicy:'no-referrer'}).addTo(view);
  let selected=initial,positionMarker=initial?circleMarker(initial,{radius:8,color:'#a92530',fillOpacity:1,interactive:false}).addTo(view):null;
  if(initial){submit.disabled=false;feedback.textContent='赤い点が登録する位置です。違う場合は地図を押して変更できます。'}
  const locate=document.createElement('button');locate.type='button';locate.className='secondary';locate.textContent='現在地の周辺を表示';
