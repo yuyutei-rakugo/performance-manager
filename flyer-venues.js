@@ -1,5 +1,5 @@
 import {previewFlyerMigration} from './flyer-migration.js?v=20261124-ux1';
-import {flyerLocation,flyerLocationInfo,positionFromUrl,exactAddressPosition} from './flyer-locations.js?v=20261124-ux1';
+import {flyerLocation,flyerLocationInfo,positionFromUrl,exactAddressPosition,normalizeLocationAddress} from './flyer-locations.js?v=20261124-ux1';
 import {startEditor,finishEditor,leaveEditor,guardEditor,editorState} from './editor-dialog.js?v=20261124-ux1';
 import {cloud} from './cloud.js?v=20261124-ux1';
 
@@ -273,7 +273,7 @@ export function openFlyerVenues(event){
    const address=form.elements.address.value.trim();
    locating=true;updateAddressButton();addressResult.textContent='住所を確認しています…';
    try{
-    const response=await fetch('https://msearch.gsi.go.jp/address-search/AddressSearch?q='+encodeURIComponent(address),{referrerPolicy:'no-referrer'});
+    const response=await fetch('https://msearch.gsi.go.jp/address-search/AddressSearch?q='+encodeURIComponent(normalizeLocationAddress(address)),{referrerPolicy:'no-referrer'});
     if(!response.ok)throw Error();
     const candidate=exactAddressPosition(address,await response.json());
     if(!editor?.contains(form)||address!==form.elements.address.value.trim())return;

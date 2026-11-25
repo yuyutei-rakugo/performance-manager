@@ -586,6 +586,7 @@ async function main(){
     await mapPanel.getByRole('button',{name:'最新を取得'}).click();
     await mapPanel.getByText('神栖市 ／ 公共施設',{exact:true}).first().waitFor();
     assert.equal(tiles,0);
+    await page.route('https://msearch.gsi.go.jp/**',route=>route.fulfill({json:[]}));
     await mapPanel.getByRole('button',{name:'地図で見る'}).click();
     const centralPin=mapPanel.getByRole('button',{name:'中央図書館 掲示済み'});
     await centralPin.click();
@@ -622,7 +623,7 @@ async function main(){
       {properties:{title:'茨城県神栖市知手'},geometry:{coordinates:[140.70,35.86]}}
     ]}));
     await mapPanel.locator('[data-unlocated] summary').click();
-    await mapPanel.getByRole('button',{name:'住所から概略位置を探す'}).click();
+    await mapPanel.getByRole('button',{name:'住所から位置を探す'}).click();
     await popup.getByText('概略位置（住所に基づく目安）').waitFor();
     assert.equal(await mapPanel.locator('.flyer-pin-approx').count(),1);
     const searchUrl=new URL(await popup.getByRole('link',{name:'Googleマップで探す'}).getAttribute('href'));
@@ -676,6 +677,20 @@ async function main(){
     await unknown.locator('summary').click();
     await unknown.getByRole('button',{name:'地図でこの施設を見る'}).click();
     await mapPanel.locator('[data-pin-details]').getByText('模擬施設',{exact:true}).waitFor();
+
+    // Missing coordinates are supplemented from the address without changing stored rows.
+    let addressLookups=0;
+    await page.route('https://msearch.gsi.go.jp/address-search/AddressSearch**',route=>{
+      addressLookups++;
+      const query=new URL(route.request().url()).searchParams.get('q');
+      assert.equal(query,'茨城県神栖市須田2340-127');
+      return route.fulfill({json:[{properties:{title:'茨城県神栖市須田２３４０番地'},geometry:{coordinates:[140.74,35.83]}}]});
+    });
+    flyerRows.push({id:'address-only',revision:1,name:'住所だけの施設',region:'神栖市',category:'その他',status:'未依頼',memo:'',location:{address:'〒314-0253 茨城県神栖市須田２３４０－１２７',mapUrl:''}});
+    await mapPanel.getByRole('button',{name:'最新を取得'}).click();
+    await mapPanel.getByRole('button',{name:'住所だけの施設 未依頼 概略位置',exact:true}).waitFor();
+    assert.equal(addressLookups,1);
+    assert.equal(flyerRows.find(row=>row.id==='address-only').location.lat,undefined);
 
     await invited.setViewportSize({width:320,height:680});
     await invited.locator('#event-dialog [data-close]').click();

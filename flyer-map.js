@@ -1,5 +1,5 @@
 import {map, tileLayer, circleMarker, marker, divIcon, latLngBounds} from './vendor/leaflet/leaflet-src.esm.js';
-import {flyerLocation,flyerLocationInfo,flyerSearchUrl,approximateAddressPosition} from './flyer-locations.js?v=20261124-ux1';
+import {flyerLocation,flyerLocationInfo,flyerSearchUrl,approximateAddressPosition,normalizeLocationAddress} from './flyer-locations.js?v=20261124-ux1';
 
 const statuses=['未依頼','依頼済み','掲示済み','今回は見送り'];
 let styles;
@@ -31,7 +31,8 @@ export async function mountFlyerMap(host,actions){
  background.on('loading',()=>{warning.hidden=true});
  background.on('tileerror',()=>{warning.hidden=false});
  const pins=new Map(),details=host.querySelector('[data-pin-details]');
- const estimated=new Map();
+ const estimated=new Map(),automaticAttempts=new Set();
+ let addressQueue=Promise.resolve();
  const nearbyList=host.querySelector('[data-nearby-list]'),nearbyButton=host.querySelector('[data-nearby]');
  const locateButton=host.querySelector('[data-locate-me]'),locationResult=host.querySelector('[data-location-result]');
  let previousIds,selected,active=true,userPosition,userMarker,lastUpdate;
@@ -86,21 +87,28 @@ export async function mountFlyerMap(host,actions){
    search.href=flyerSearchUrl(row);search.textContent='Googleマップで探す';search.target='_blank';search.rel='noopener noreferrer';
    item.append(row.name+' ／ '+(address?'座標未登録':'住所・座標未登録')+' ',search);
    if(address){
-    const button=document.createElement('button');button.type='button';button.textContent='住所から概略位置を探す';
+    const button=document.createElement('button');button.type='button';button.textContent='住所から位置を探す';
     const feedback=document.createElement('span');feedback.setAttribute('role','status');
-    button.onclick=async()=>{
+    button.onclick=async(automatic=false)=>{
      button.disabled=true;feedback.textContent='確認中…';
      try{
-      const response=await fetch('https://msearch.gsi.go.jp/address-search/AddressSearch?q='+encodeURIComponent(address),{referrerPolicy:'no-referrer'});
+      const response=await fetch('https://msearch.gsi.go.jp/address-search/AddressSearch?q='+encodeURIComponent(normalizeLocationAddress(address)),{referrerPolicy:'no-referrer',signal:AbortSignal.timeout(10000)});
       if(!response.ok)throw Error();
       const xy=approximateAddressPosition(address,row.region,await response.json());
       if(!active)return;
-      if(xy){estimated.set(addressKey(row),xy);update(...lastUpdate);focus(row.id)}
+      if(xy){estimated.set(addressKey(row),xy);update(...lastUpdate);if(automatic!==true)focus(row.id)}
       else feedback.textContent='住所と一致する範囲を確認できませんでした。';
      }catch{if(active)feedback.textContent='検索できませんでした。もう一度お試しください。'}
      finally{button.disabled=false}
     };
     item.append(' ',button,' ',feedback);
+    const key=addressKey(row);
+    if(!automaticAttempts.has(key)){
+     automaticAttempts.add(key);
+     addressQueue=addressQueue.then(async()=>{
+      if(active&&lastUpdate[0].some(item=>addressKey(item)===key)&&!position(row))await button.onclick(true);
+     });
+    }
    }
    return item;
   });

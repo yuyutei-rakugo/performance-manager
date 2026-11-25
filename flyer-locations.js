@@ -1,5 +1,7 @@
 // Public venue address and position references, checked 2026-11-24.
 const locations=new Map([
+ ["神栖市／若松郵便局",{"address":"茨城県神栖市須田2340-127","lat":35.8391608,"lng":140.7424836,"source":"https://map.japanpost.jp/p/search/dtl/300106211000/"}],
+ ["神栖市／ゆ〜ぽ〜とはさき",{"address":"茨城県神栖市砂山15","lat":35.84034367508438,"lng":140.74115608122614,"source":"https://www.city.kamisu.ibaraki.jp/kanko_sports/ss_facility/1002393/1002408/1002411.html"}],
  ["銚子市／イオン銚子店",{"address":"千葉県銚子市三崎町2丁目2660-1","lat":35.710182,"lng":140.7876928,"source":"https://www.mapion.co.jp/phonebook/M02002/12202/ILSP0000682420_ipclm/"}],
  ["銚子市／公正図書館",{"address":"千葉県銚子市新生町2丁目1-5","lat":35.732391,"lng":140.8333304,"source":"https://mapfan.com/spots/SC3AC%2CJ%2C14W"}],
  ["神栖市／カスミ 波崎店",{"address":"茨城県神栖市波崎8473-3","lat":35.7497229,"lng":140.8231211,"source":"https://www.mapion.co.jp/phonebook/M02002/08232/20830198003/"}],
@@ -97,12 +99,20 @@ const locations=new Map([
 ]);
 
 export function flyerLocationInfo(row){
- if(row.location!==undefined)return row.location;
- return locations.get(row.region+'／'+row.name);
+ const reference=locations.get(row.region+'／'+row.name);
+ if(row.location===undefined)return reference;
+ const saved=row.location;
+ // Explicit removal, changed addresses and manually selected pins always win.
+ if(!saved||!reference||Number.isFinite(saved.lat)||Number.isFinite(saved.lng))return saved;
+ if(!saved.address||normalizeLocationAddress(saved.address)!==normalizeLocationAddress(reference.address))return saved;
+ // A coordinate-bearing link can designate a different entrance; never replace it.
+ try{if(positionFromUrl(saved.mapUrl))return saved}catch{return saved}
+ return {...reference,...saved,lat:reference.lat,lng:reference.lng};
 }
 export function flyerLocation(row){
  const saved=flyerLocationInfo(row);
- if(Number.isFinite(saved?.lat)&&Number.isFinite(saved?.lng))return [saved.lat,saved.lng];
+ if(Number.isFinite(saved?.lat)&&Number.isFinite(saved?.lng)&&Math.abs(saved.lat)<=90&&Math.abs(saved.lng)<=180)return [saved.lat,saved.lng];
+ try{return positionFromUrl(saved?.mapUrl)}catch{return undefined}
 }
 export function positionFromUrl(value){
  if(!value)return;
@@ -120,15 +130,17 @@ export function positionFromUrl(value){
  if(coordinates&&Math.abs(Number(coordinates[1]))<=90&&Math.abs(Number(coordinates[2]))<=180)return coordinates.slice(1).map(Number);
 }
 
-export function exactAddressPosition(address,features){
- const normalize=value=>String(value||'').normalize('NFKC')
+export const normalizeLocationAddress=value=>String(value||'').normalize('NFKC')
+  .replace(/^〒?\s*\d{3}[-‐－]?\d{4}\s*/,'')
   .replace(/([一二三四五六七八九十]+)丁目/g,(_,n)=>{
    const digits='〇一二三四五六七八九';
    const parts=n.split('十');
    return (parts.length===1?digits.indexOf(n):(parts[0]?digits.indexOf(parts[0]):1)*10+(parts[1]?digits.indexOf(parts[1]):0))+'-';
   })
-  .replace(/丁目|番地の?|番(?!地)/g,'-').replace(/[−‐]/g,'-').replace(/\s/g,'').replace(/[-号]$/,'');
- const exact=features.filter(feature=>normalize(feature.properties?.title)===normalize(address));
+  .replace(/丁目|番地の?|番(?!地)/g,'-').replace(/[−‐－]/g,'-').replace(/\s/g,'').replace(/[-号]$/,'');
+
+export function exactAddressPosition(address,features){
+ const exact=features.filter(feature=>normalizeLocationAddress(feature.properties?.title)===normalizeLocationAddress(address));
  const xy=exact.length===1&&exact[0].geometry?.coordinates;
  if(Array.isArray(xy)&&xy.length===2&&xy.every(Number.isFinite)&&Math.abs(xy[0])<=180&&Math.abs(xy[1])<=90)return [xy[1],xy[0]];
 }
@@ -139,7 +151,7 @@ export function flyerSearchUrl(row){
 }
 
 export function approximateAddressPosition(address,region,features){
- const compact=value=>value.normalize('NFKC').replace(/\s+/g,'');
+ const compact=normalizeLocationAddress;
  const city=compact(region);
  const input=compact(address);
  if(!city||!input.includes(city)||input.endsWith(city)||!Array.isArray(features))return;
@@ -150,7 +162,7 @@ export function approximateAddressPosition(address,region,features){
   const district=title.split(city)[1];
   const fromCity=input.slice(input.indexOf(city));
   const candidate=district&&city+district;
-  return candidate&&district.length>=2&&fromCity.startsWith(candidate)&&(!fromCity.slice(candidate.length)||(!/\d$/.test(candidate)&&/^\d/.test(fromCity.slice(candidate.length))));
+  return candidate&&district.length>=2&&fromCity.startsWith(candidate)&&(!fromCity.slice(candidate.length)||(/\d$/.test(candidate)?/^[-]/.test(fromCity.slice(candidate.length)):/^\d/.test(fromCity.slice(candidate.length))));
  });
  if(candidates.length!==1)return;
  const xy=candidates[0].geometry?.coordinates;
