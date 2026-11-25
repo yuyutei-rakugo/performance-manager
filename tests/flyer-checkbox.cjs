@@ -46,7 +46,10 @@ const tick=()=>new Promise(r=>setImmediate(r));
  fail=true;form.dispatchEvent(new w.Event('submit',{cancelable:true}));assert(form.querySelector('button.primary').disabled);release();await tick();
  assert.equal(form.elements.memo.value,'まとめて保存');assert(radio('掲示済み').checked);assert.equal(rows[0].status,'依頼済み');
  assert.match(form.querySelector('[data-editor-status]').textContent,/保存できませんでした/);
- fail=false;form.dispatchEvent(new w.Event('submit',{cancelable:true}));release();await tick();
+ assert(!form.querySelector('.flyer-save-footer button').disabled,'both save buttons enable for retry');
+ assert(!form.querySelector('.flyer-save-footer').inert);
+ fail=false;panel.querySelector('[data-search]').value='一致しない';panel.querySelector('[data-filter-status]').value='未依頼';form.dispatchEvent(new w.Event('submit',{cancelable:true}));release();await tick();
+ assert.equal(panel.querySelector('[data-search]').value,'');assert.equal(panel.querySelector('[data-filter-status]').value,'');
  assert.equal(rows[0].status,'掲示済み');assert.equal(rows[0].memo,'まとめて保存');assert.equal(panel.querySelector('.flyer-visible-memo').textContent,'まとめて保存');
  // A concurrent edit cannot be overwritten by an older form.
  form=openEdit();form.elements.memo.value='古い画面からのメモ';
