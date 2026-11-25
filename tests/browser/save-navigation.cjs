@@ -544,7 +544,7 @@ async function main(){
     assert(!await flyerForm.getByLabel('Googleマップの共有リンク（任意）').isVisible());
     await flyerForm.getByLabel('施設名',{exact:true}).fill('未収録の試験施設');
     await flyerForm.getByRole('button',{name:'施設名で場所を検索',exact:true}).click();
-    await flyerForm.getByText(/老舗や営業中のお店でも、未収録/).waitFor();
+    await flyerForm.getByText(/老舗でも未収録/).waitFor();
     await flyerForm.screenshot({path:'test-artifacts/facility-search-mobile.png'});
     failFlyer=true;
     await flyerForm.getByRole('button',{name:'登録する',exact:true}).click();
@@ -577,6 +577,8 @@ async function main(){
     await flyerForm.getByRole('heading',{name:'この施設ですか？',exact:true}).waitFor();
     const confirmationMap=flyerForm.locator('.flyer-confirmation .flyer-map-canvas');
     await confirmationMap.waitFor();
+    const footerBounds=await flyerForm.getByRole('button',{name:'登録する',exact:true}).boundingBox();
+    assert(footerBounds.y>=0&&footerBounds.y+footerBounds.height<=740,'save stays visible without scrolling');
     const beforePin=await flyerForm.locator('[name=lat]').inputValue();
     await confirmationMap.click({position:{x:110,y:100}});
     assert.equal(await flyerForm.locator('[name=lat]').inputValue(),beforePin,'confirmation map never changes pin on tap');

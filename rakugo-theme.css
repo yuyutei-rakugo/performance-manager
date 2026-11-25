@@ -200,3 +200,12 @@ output[data-end-time]{font-size:1.1rem;font-weight:800;color:var(--red)}
 .flyer-editor [data-save-feedback][hidden]{display:none}
 .flyer-editor [hidden]{display:none!important}
 .flyer-save-footer{z-index:10;background:var(--paper,#fff)}
+
+/* Keep the single save action outside the scrolling fields. */
+.flyer-editor{overflow:hidden}
+.flyer-editor>.dialog-body{display:flex;flex-direction:column;max-height:calc(100dvh - 44px);box-sizing:border-box}
+.flyer-editor>.dialog-body>h2{flex:none;margin-block:0 12px}
+.flyer-editor form{display:flex;flex-direction:column;min-height:0}
+.flyer-editor-content{overflow:auto;min-height:0;overscroll-behavior:contain;padding:0 2px}
+.flyer-editor .flyer-save-footer{position:static;flex:none;margin-top:12px}
+.flyer-confirming .flyer-editor-extras{display:none}

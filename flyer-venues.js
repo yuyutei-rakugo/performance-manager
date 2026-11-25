@@ -176,7 +176,7 @@ export function openFlyerVenues(event){
    form.append(extra);
   }else{
    form.querySelector('.editor-bar').after(placeSection);
-   const optional=document.createElement('details');optional.innerHTML='<summary>その他の情報（任意）</summary>';optional.append(facilityDetails);
+   const optional=document.createElement('details');optional.className='flyer-editor-extras';optional.innerHTML='<summary>その他の情報（任意）</summary>';optional.append(facilityDetails);
    const fields=[form.querySelector('.flyer-choices'),form.querySelector('[data-decline-field]'),form.elements.memo.closest('label')].filter(Boolean);
    optional.append(...fields);form.append(optional);
    if(openPlace)editor.querySelector('h2').textContent='場所を設定（任意）';
@@ -207,12 +207,12 @@ export function openFlyerVenues(event){
   confirmation.append(confirmationTitle,confirmationAddress,preview,changePlace,backToSearch);
   placeSection.append(confirmation);
   function showConfirmation(candidate){
-   confirmation.hidden=false;confirmationTitle.textContent=candidate.name;confirmationAddress.textContent=candidate.address||'住所は地域データに未収録です。';
+   editor.classList.add('flyer-confirming');confirmation.hidden=false;confirmationTitle.textContent=candidate.name;confirmationAddress.textContent=candidate.address||'住所は地域データに未収録です。';
    for(const child of placeSection.children)if(child!==confirmation)child.hidden=true;
    editor.querySelector('h2').textContent='この施設ですか？';
   }
   backToSearch.onclick=()=>{
-   confirmation.hidden=true;for(const child of placeSection.children)if(child!==confirmation)child.hidden=false;
+   editor.classList.remove('flyer-confirming');confirmation.hidden=true;for(const child of placeSection.children)if(child!==confirmation)child.hidden=false;
    removePreview?.();removePreview=null;preview.replaceChildren();
    editor.querySelector('h2').textContent=row.id?'場所を設定（任意）':'施設を追加';
   };
@@ -292,7 +292,7 @@ export function openFlyerVenues(event){
       confirmation.scrollIntoView?.({block:'start'});
      }catch{preview.textContent='確認用の地図を開けませんでした。住所を確認し、保存ボタンで登録できます。'}
     });
-    if(!candidates.length)results.textContent='地域データに一致する候補が見つかりませんでした。老舗や営業中のお店でも、未収録の場合があります。この名前で施設を登録できます。';
+    if(!candidates.length)results.textContent='候補が見つかりませんでした。老舗でも未収録の場合があります。この名前で登録できます。';
     results.scrollIntoView?.({block:'start'});
    }catch{results.textContent='検索先に接続できませんでした。施設名と地域だけで登録し、場所は後から設定できます。'}
    finally{search.disabled=false}
@@ -354,7 +354,8 @@ export function openFlyerVenues(event){
   const footer=document.createElement('div');footer.className='editor-bar flyer-save-footer';
   footer.innerHTML=`<button type="submit" class="primary">${saveLabel}</button><p data-editor-status role="status" hidden></p><p data-save-feedback role="status" hidden></p>`;
   topBar.querySelector('[data-editor-status]').remove();
-  form.append(footer);
+  const scrollArea=document.createElement('div');scrollArea.className='flyer-editor-content';
+  scrollArea.append(...form.children);form.append(scrollArea,footer);
   startEditor(editor,form);const unguard=guardEditor(editor);
   // Keep the form open while the confirmed save is outstanding.
   editor.addEventListener('cancel',event=>{if(busy){event.preventDefault();event.stopImmediatePropagation()}},{capture:true});
