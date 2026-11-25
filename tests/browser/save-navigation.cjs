@@ -588,6 +588,13 @@ async function main(){
     assert.equal(tiles,0);
     await page.route('https://msearch.gsi.go.jp/**',route=>route.fulfill({json:[]}));
     await mapPanel.getByRole('button',{name:'地図で見る'}).click();
+    const unlocated=mapPanel.locator('[data-unlocated]');
+    assert(await unlocated.evaluate(el=>el.open&&!el.hidden));
+    await unlocated.getByRole('button',{name:'模擬施設の場所を登録',exact:true}).click();
+    const missingPinEditor=page.getByRole('dialog',{name:'掲示先を編集',exact:true});
+    assert.equal(await missingPinEditor.getByLabel('施設名').inputValue(),'模擬施設');
+    assert(await missingPinEditor.locator('.flyer-place-settings').evaluate(el=>el.open));
+    await missingPinEditor.getByRole('button',{name:'一覧に戻る',exact:true}).click();
     const centralPin=mapPanel.getByRole('button',{name:'中央図書館 掲示済み'});
     await centralPin.click();
     await mapPanel.locator('[data-pin-details]').getByText('会員用の試験メモ',{exact:true}).waitFor();
