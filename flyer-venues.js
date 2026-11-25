@@ -1,5 +1,5 @@
 import {previewFlyerMigration} from './flyer-migration.js?v=20261125-regions1';
-import {flyerLocation,flyerLocationInfo,exactAddressPosition,normalizeLocationAddress,flyerLinkConflicts} from './flyer-locations.js?v=20261125-link1';
+import {flyerLocation,flyerLocationInfo,googleSharePreview,exactAddressPosition,normalizeLocationAddress,flyerLinkConflicts} from './flyer-locations.js?v=20261125-link1';
 import {startEditor,finishEditor,leaveEditor,guardEditor,editorState} from './editor-dialog.js?v=20261125-regions1';
 import {cloud} from './cloud.js?v=20261125-regions1';
 
@@ -175,7 +175,7 @@ export function openFlyerVenues(event){
   const shareSection=document.createElement('section');shareSection.className='flyer-share-link';
   shareSection.append(linkLabel,pasteLink,' ',lookupLink,linkMessage);
   placeSection.prepend(shareSection);
-  if(!data.googleShare){lookupLink.disabled=true;linkMessage.textContent='リンクの読み取りは共通保存の更新後に使えます。地図で位置を指定できます。'}
+  if(!data.googleShare)linkMessage.textContent='短縮リンクの読み取りは共通保存の更新後に使えます。';
   const previewButton=document.createElement('button');
   previewButton.type='button';previewButton.className='secondary';previewButton.textContent='地図を開いて場所を指定';
   placeSection.insertBefore(previewButton,locationDetails);
@@ -276,7 +276,7 @@ export function openFlyerVenues(event){
    if(!url){linkInput.focus();linkMessage.textContent='共有リンクを貼り付けてください。';return}
    resolvingLink=true;lookupLink.disabled=true;linkMessage.textContent='リンクを確認しています…';
    try{
-    const place=await request('flyerResolveGoogleLink',{url});
+    const place=data.googleShare?await request('flyerResolveGoogleLink',{url}):googleSharePreview(url);
     if(!form.isConnected||linkInput.value.trim()!==url)return;
     const name=place.name||form.elements.name.value.trim();
     if(!Number.isFinite(place.lat)||!Number.isFinite(place.lng)){
@@ -307,7 +307,7 @@ export function openFlyerVenues(event){
     if(!form.isConnected||linkInput.value.trim()!==url)return;
     if(confirmation.hidden)linkMessage.textContent='リンクを確認できませんでした。'+error.message;
     else preview.textContent='地図を開けませんでした。「場所を変更」で地図を開き直せます。';
-   }finally{resolvingLink=false;lookupLink.disabled=!data.googleShare}
+   }finally{resolvingLink=false;lookupLink.disabled=false}
   };
   let removePreview;
   previewButton.onclick=async()=>{

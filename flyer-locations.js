@@ -145,6 +145,21 @@ export const normalizeLocationAddress=value=>String(value||'').normalize('NFKC')
   })
   .replace(/丁目|番地の?|番(?!地)/g,'-').replace(/[−‐－]/g,'-').replace(/\s/g,'').replace(/[-号]$/,'');
 
+export function googleSharePreview(raw){
+ const url=new URL(raw);
+ if(url.protocol!=='https:'||url.username||url.password||url.port)throw Error('Googleマップの共有リンクを入れてください。');
+ if(['maps.app.goo.gl','goo.gl'].includes(url.hostname))throw Error('短縮リンクは共通保存の更新後に確認できます。地図で位置を指定できます。');
+ if(!/^(?:(?:www|maps)\.)?google\.(?:com|co\.jp)$/.test(url.hostname))throw Error('Googleマップの共有リンクを入れてください。');
+ const path=decodeURIComponent(url.pathname);
+ const place=path.match(/^\/maps\/place\/([^/]+)/);
+ const coordinates=place?[...path.matchAll(/!8m2!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)(?=!|$)/g)]:[];
+ const explicitQuery=!url.searchParams.has('query_place_id')&&/^(?:\/|\/maps(?:\/search)?\/?)$/.test(path)&&
+  (url.searchParams.get('query')||url.searchParams.get('q')||'').match(/^(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)$/);
+ const xy=coordinates.length===1?coordinates[0]:explicitQuery;
+ const name=place?.[1].replace(/\+/g,' ').slice(0,120)||'';
+ return {name:/^[-+0-9.,°'" NSEW]+$/i.test(name)?'':name,address:'',...(xy&&Math.abs(Number(xy[1]))<=90&&Math.abs(Number(xy[2]))<=180?{lat:Number(xy[1]),lng:Number(xy[2])}:{})};
+}
+
 export function exactAddressPosition(address,features){
  const exact=features.filter(feature=>normalizeLocationAddress(feature.properties?.title)===normalizeLocationAddress(address));
  const xy=exact.length===1&&exact[0].geometry?.coordinates;
