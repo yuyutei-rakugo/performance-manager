@@ -76,7 +76,7 @@ export function openFlyerVenues(event){
    let cached=rowNodes.get(row.id);
    if(!cached||cached.signature!==signature){
     const template=document.createElement('template');
-    template.innerHTML=`<article class="flyer-item" data-venue-id="${esc(row.id)}" data-status="${statuses.indexOf(row.status)}"><div class="flyer-heading"><span class="flyer-badge">${esc(row.status)}</span><h3>${esc(row.name)}${flyerLocation(row)?'':`<small class="flyer-unlocated" title="${esc(position?.reason||'緯度と経度が登録されていません。')}">位置未確認</small>`}</h3><a class="flyer-map" href="${esc(mapUrl(row))}" target="_blank" rel="noopener noreferrer" aria-label="${esc(row.name)}をGoogleマップで検索">地図</a></div>${row.memo?`<p class="memo flyer-visible-memo">${esc(row.memo)}</p>`:''}${data.archived?'':`<button type="button" class="secondary" data-edit-flyer="${esc(row.id)}">状況・メモを編集</button>`}${history?'<p class="flyer-meta">以前お断りあり</p>':''}<details class="flyer-row-details" ${cached?.node.querySelector('.flyer-row-details').open?'open':''}><summary class="secondary flyer-disclosure"><span>施設の詳細</span><span>閉じる</span></summary>${mapAllowed&&flyerLocation(row)?`<button type="button" class="secondary" data-focus-pin="${esc(row.id)}">地図でこの施設を見る</button>`: ''}<p data-row-message role="status"></p><p class="flyer-meta">${esc(row.region)} ／ ${esc(row.category)}</p>${position?.address?`<p class="flyer-meta">${esc(position.address)}</p>`:''}${!flyerLocation(row)?`<p class="flyer-meta">${esc(position?.reason||'緯度と経度が登録されていません。')}</p>`:''}${data.archived?'':`${!flyerLocation(row)?`<button type="button" class="secondary" data-find-flyer="${esc(row.id)}">場所を探す</button>`:''}`}${row.source?`<p><a href="${esc(row.source.url)}" target="_blank" rel="noopener noreferrer">確認元</a> <time>${esc(row.source.date)}</time></p>`:''}</details></article>`;
+    template.innerHTML=`<article class="flyer-item" data-venue-id="${esc(row.id)}" data-status="${statuses.indexOf(row.status)}"><div class="flyer-heading"><span class="flyer-badge">${esc(row.status)}</span><h3>${esc(row.name)}${flyerLocation(row)?'':`<small class="flyer-unlocated" title="${esc(position?.reason||'緯度と経度が登録されていません。')}">位置未確認</small>`}</h3><a class="flyer-map" href="${esc(mapUrl(row))}" target="_blank" rel="noopener noreferrer" aria-label="${esc(row.name)}をGoogleマップで検索">地図</a></div>${row.memo?`<p class="memo flyer-visible-memo">${esc(row.memo)}</p>`:''}${data.archived?'':`<button type="button" class="secondary" data-edit-flyer="${esc(row.id)}">状況・メモを編集</button>`}${history?'<p class="flyer-meta">以前お断りあり</p>':''}<details class="flyer-row-details" ${cached?.node.querySelector('.flyer-row-details').open?'open':''}><summary class="secondary flyer-disclosure"><span>施設の詳細</span><span>閉じる</span></summary>${mapAllowed&&flyerLocation(row)?`<button type="button" class="secondary" data-focus-pin="${esc(row.id)}">地図でこの施設を見る</button>`: ''}<p data-row-message role="status"></p><p class="flyer-meta">${esc(row.region)} ／ ${esc(row.category)}</p>${position?.address?`<p class="flyer-meta">${esc(position.address)}</p>`:''}${!flyerLocation(row)?`<p class="flyer-meta">${esc(position?.reason||'緯度と経度が登録されていません。')}</p>`:''}${data.archived?'':`<button type="button" class="secondary" data-find-flyer="${esc(row.id)}">場所を登録・変更</button>`}${row.source?`<p><a href="${esc(row.source.url)}" target="_blank" rel="noopener noreferrer">確認元</a> <time>${esc(row.source.date)}</time></p>`:''}</details></article>`;
     cached={signature,node:template.content.firstElementChild};rowNodes.set(row.id,cached);
    }
    const feedback=cached.node.querySelector('[data-row-message]'),result=rowMessages.get(row.id);
@@ -136,7 +136,7 @@ export function openFlyerVenues(event){
   const locationDetails=form.querySelector('[data-picker]').closest('details');
   const placeSection=document.createElement('section');
   placeSection.className='flyer-place-steps';
-  placeSection.innerHTML='<h3>施設を検索してピンを付ける</h3><p>① 施設名を入力 → ② 検索して候補を選ぶ → ③ 変更を保存する</p>';
+  placeSection.innerHTML='<p>施設名で探して場所を確認し、最後に保存してください。</p>';
   placeSection.append(form.elements.name.closest('label'),form.elements.region.closest('div'),form.querySelector('[data-find-place]'),form.querySelector('[data-place-results]'));
   const pinStatus=document.createElement('p');pinStatus.setAttribute('role','status');
   placeSection.append(pinStatus);
@@ -147,12 +147,38 @@ export function openFlyerVenues(event){
   for(const name of ['mapUrl','lat','lng'])coordinates.append(form.elements[name].closest('label'));
   locationDetails.querySelector('.muted').remove();locationDetails.append(coordinates);
   placeSection.append(locationDetails);
-  form.querySelector('.editor-bar').after(placeSection);
+  const googleButton=document.createElement('button');
+  googleButton.type='button';googleButton.className='primary';googleButton.textContent='Googleマップで探す';
+  const linkInput=placeSection.querySelector('[name=mapUrl]');
+  const linkLabel=linkInput.closest('label');
+  linkLabel.firstChild.textContent='Googleマップの共有リンク（任意）';
+  linkInput.placeholder='コピーしたリンクを貼り付け';
+  const hint=document.createElement('p');hint.className='muted';
+  hint.textContent='Googleマップの「共有」でリンクをコピーして、ここに貼り付けます。';
+  placeSection.insertBefore(googleButton,placeSection.querySelector('[data-find-place]'));
+  placeSection.insertBefore(linkLabel,pinStatus);
+  placeSection.insertBefore(hint,pinStatus);
+  const previewButton=document.createElement('button');
+  previewButton.type='button';previewButton.className='secondary';previewButton.textContent='登録するピンを地図で確認・指定';
+  placeSection.insertBefore(previewButton,locationDetails);
+  const preview=document.createElement('div');placeSection.insertBefore(preview,locationDetails);
+  if(row.id&&!openPlace){
+   const extra=document.createElement('details');extra.className='flyer-place-settings';
+   extra.innerHTML='<summary>施設名・場所を変更</summary>';extra.append(placeSection);
+   form.append(extra);
+  }else{
+   form.querySelector('.editor-bar').after(placeSection);
+   const optional=document.createElement('details');optional.innerHTML='<summary>状況・メモも登録する（任意）</summary>';
+   const fields=[form.querySelector('.flyer-choices'),form.querySelector('[data-decline-field]'),form.elements.memo.closest('label')].filter(Boolean);
+   optional.append(...fields);form.append(optional);
+   if(openPlace)editor.querySelector('h2').textContent='施設の場所を登録';
+  }
+  form.elements.memo.rows=2;
   facilityDetails.querySelector('summary').textContent='区分・施設の共有について';
   facilityDetails.open=false;
   const updatePinStatus=()=>{
    const hasPin=form.elements.lat.value!==''&&form.elements.lng.value!=='';
-   pinStatus.textContent=hasPin?'✓ ピンの位置を選択済み。「変更を保存する」で登録します。':'ピンはまだ選ばれていません。施設名で検索してください。';
+   pinStatus.textContent=hasPin?'✓ ピンの位置を選択済み。最後に保存してください。':form.elements.mapUrl.value.trim()?'リンクは保存できます。ピンは未設定です。「地図で確認・指定」で場所を押してください。':'場所は後からでも登録できます。';
   };
   form.elements.memo.value=row.memo||'';
   const declineField=form.querySelector('[data-decline-field]');
@@ -161,15 +187,44 @@ export function openFlyerVenues(event){
   const readRegion=wireChoice(form,'region'),readCategory=wireChoice(form,'category');
   const search=form.querySelector('[data-find-place]'),results=form.querySelector('[data-place-results]');
   const picker=form.querySelector('[data-picker]');
-  let removePicker;
-  function usePlace(lat,lng,address){
+  let removePicker,positionChosen=false;
+  function usePlace(lat,lng,address,keepLink=false){
+   positionChosen=true;
    [form.elements.lat.value,form.elements.lng.value]=[lat,lng];
-   form.elements.mapUrl.value='';
+   if(!keepLink)form.elements.mapUrl.value='';
    if(address!==undefined)form.elements.address.value=address;
    updateAddressButton();updatePinStatus();
    form.dispatchEvent(new Event('input',{bubbles:true}));
   }
-  search.textContent='施設名で場所を検索';
+  search.textContent='帳面の候補からピンを探す';
+  googleButton.onclick=()=>{
+   const name=form.elements.name.value.trim();
+   if(!name){results.textContent='施設名を入力してください。';form.elements.name.focus();return}
+   window.open('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent([name,readRegion(),form.elements.address.value.trim()].filter(Boolean).join(' ')),'_blank','noopener,noreferrer');
+  };
+  const importLink=()=>{
+   try{
+    const xy=positionFromUrl(form.elements.mapUrl.value.trim());
+    if(xy){positionChosen=true;[form.elements.lat.value,form.elements.lng.value]=xy;results.textContent='リンクからピンの位置を読み取りました。地図で確認して保存してください。'}
+    else if(form.elements.mapUrl.value.trim())results.textContent='このリンクからはピンの位置を読み取れません。リンクはそのまま保存できます。';
+    if(!xy&&form.elements.mapUrl.value.trim()!==(position?.mapUrl||'')){form.elements.lat.value='';form.elements.lng.value='';positionChosen=false}
+   }catch(error){results.textContent=error.message}
+   updatePinStatus();
+  };
+  form.elements.mapUrl.addEventListener('input',importLink);
+  form.elements.mapUrl.addEventListener('change',importLink);
+  let removePreview;
+  previewButton.onclick=async()=>{
+   if(removePreview){removePreview();removePreview=null;preview.replaceChildren();return}
+   previewButton.disabled=true;
+   try{
+    const {mountPlacePicker}=await import('./flyer-place-picker.js?v=20261124-ux1');
+    const xy=form.elements.lat.value!==''&&form.elements.lng.value!==''?[Number(form.elements.lat.value),Number(form.elements.lng.value)]:null;
+    removePreview=await mountPlacePicker(preview,xy,([lat,lng])=>{usePlace(lat,lng,undefined,true);results.textContent='ピンの位置を選びました。最後に保存してください。'});
+   }catch{preview.textContent='地図を開けませんでした。リンクだけでも保存できます。'}
+   finally{previewButton.disabled=false}
+  };
+  editor.addEventListener('close',()=>removePreview?.(),{once:true});
   form.elements.name.addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();if(!search.disabled)search.click()}});
   search.onclick=async()=>{
    const name=form.elements.name.value.trim(),region=readRegion();
@@ -232,7 +287,7 @@ export function openFlyerVenues(event){
   form.elements.address.addEventListener('input',updateAddressButton);
   addressButton.onclick=()=>window.open('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(form.elements.address.value.trim()),'_blank','noopener,noreferrer');
   updateAddressButton();updatePinStatus();
-  for(const name of ['lat','lng'])form.elements[name].addEventListener('input',updatePinStatus);
+  for(const name of ['lat','lng'])form.elements[name].addEventListener('input',()=>{positionChosen=true;updatePinStatus()});
   document.body.append(editor);
   startEditor(editor,form);const unguard=guardEditor(editor);
   // Keep the form open while the confirmed save is outstanding.
@@ -255,10 +310,10 @@ export function openFlyerVenues(event){
      if(Boolean(lat)!==Boolean(lng))throw Error('緯度と経度は両方入力してください。');
      const coordinatesChanged=lat!==String(position?.lat??'')||lng!==String(position?.lng??'');
      const addressChanged=address.trim()!==(position?.address||'');
-     const manual=lat&&lng&&(!addressChanged||coordinatesChanged)?[Number(lat),Number(lng)]:null;
+     const manual=lat&&lng&&(!addressChanged||coordinatesChanged||positionChosen)?[Number(lat),Number(lng)]:null;
      const fromUrl=positionFromUrl(mapUrl.trim());
      const changedUrl=mapUrl.trim()!==(position?.mapUrl||'');
-     const coordinates=fromUrl&&changedUrl?fromUrl:manual||(!addressChanged?fromUrl:null);
+     const coordinates=positionChosen&&manual?manual:fromUrl&&changedUrl?fromUrl:manual||(!addressChanged?fromUrl:null);
      const location={address:address.trim(),mapUrl:mapUrl.trim(),...(coordinates?{lat:coordinates[0],lng:coordinates[1]}:{})};
      if(location.address||location.mapUrl||coordinates)entry.location=location;
      else if(original||position)entry.location=null;
@@ -283,7 +338,7 @@ export function openFlyerVenues(event){
    }finally{busy=false;cancel.disabled=false;if(dialog.open){redraw();if(refreshQueued&&!editor?.open)void refreshRead()}}
   };
   editor.showModal();
-  if(openPlace)search.click();
+  if(openPlace)form.elements.mapUrl.focus();
   else if(!row.id)form.elements.name.focus();
  }
  q('[data-search]').oninput=redraw;
