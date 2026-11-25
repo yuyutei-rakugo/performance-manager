@@ -543,8 +543,8 @@ async function main(){
       {properties:{name:'模擬施設',city:'銚子市',street:'模擬町',housenumber:'1'},geometry:{coordinates:[140.83,35.73]}},
       {properties:{name:'模擬施設',city:'別の市'},geometry:{coordinates:[140.9,36]}}
     ]}}));
-    await flyerForm.getByRole('button',{name:'帳面の候補からピンを探す'}).click();
-    const choosePlace=flyerForm.getByRole('button',{name:'この施設を選ぶ（ピンを付ける）'});
+    await flyerForm.getByRole('button',{name:'施設名で場所を検索'}).click();
+    const choosePlace=flyerForm.getByRole('button',{name:'この場所を地図で確認'});
     await choosePlace.waitFor();
     assert.equal(await choosePlace.count(),1);
     await choosePlace.click();
@@ -588,6 +588,13 @@ async function main(){
     assert.equal(tiles,0);
     await page.route('https://msearch.gsi.go.jp/**',route=>route.fulfill({json:[]}));
     await mapPanel.getByRole('button',{name:'地図で見る'}).click();
+    const unlocated=mapPanel.locator('[data-unlocated]');
+    assert(await unlocated.evaluate(el=>el.open&&!el.hidden));
+    await unlocated.getByRole('button',{name:'模擬施設の場所を登録',exact:true}).click();
+    const missingPinEditor=page.getByRole('dialog',{name:'掲示先を編集',exact:true});
+    assert.equal(await missingPinEditor.getByLabel('施設名').inputValue(),'模擬施設');
+    assert(await missingPinEditor.getByRole('button',{name:'施設名で場所を検索',exact:true}).isVisible());
+    await missingPinEditor.getByRole('button',{name:'一覧に戻る',exact:true}).click();
     const centralPin=mapPanel.getByRole('button',{name:'中央図書館 掲示済み'});
     await centralPin.click();
     await mapPanel.locator('[data-pin-details]').getByText('会員用の試験メモ',{exact:true}).waitFor();
@@ -622,7 +629,7 @@ async function main(){
     await page.route('https://msearch.gsi.go.jp/**',route=>route.fulfill({json:[
       {properties:{title:'茨城県神栖市知手'},geometry:{coordinates:[140.70,35.86]}}
     ]}));
-    await mapPanel.locator('[data-unlocated] summary').click();
+    if(!await unlocated.evaluate(el=>el.open))await unlocated.locator('summary').click();
     await mapPanel.getByRole('button',{name:'住所から位置を探す'}).click();
     await popup.getByText('概略位置（住所に基づく目安）').waitFor();
     assert.equal(await mapPanel.locator('.flyer-pin-approx').count(),1);
@@ -670,6 +677,7 @@ async function main(){
     await fromMap.getByText('見つからないとき：住所・地図から指定',{exact:true}).click();
     await fromMap.getByText('詳細入力（地図URL・緯度・経度）',{exact:true}).click();
     await fromMap.getByLabel('住所',{exact:true}).fill('銚子市模擬町1');
+    await fromMap.locator('.flyer-google-help > summary').click();
     await fromMap.locator('input[name=mapUrl]').fill('https://www.google.com/maps?q=35.73,140.83');
     await fromMap.locator('.editor-bar button[type=submit]').first().click();
     await fromMap.waitFor({state:'hidden'});
@@ -691,6 +699,33 @@ async function main(){
     await mapPanel.getByRole('button',{name:'住所だけの施設 未依頼 概略位置',exact:true}).waitFor();
     assert.equal(addressLookups,1);
     assert.equal(flyerRows.find(row=>row.id==='address-only').location.lat,undefined);
+
+    // A search candidate opens an internal map and saves without a clipboard or another page.
+    await page.route('https://photon.komoot.io/api/**',route=>route.fulfill({json:{features:[
+      {properties:{name:'模擬施設',city:'銚子市',street:'模擬町',housenumber:'1'},geometry:{coordinates:[140.83,35.73]}}
+    ]}}));
+    await unknown.getByRole('button',{name:'状況・メモを編集',exact:true}).click();
+    await fromMap.getByText('施設名・場所を変更',{exact:true}).click();
+    assert(!await fromMap.getByLabel('Googleマップの共有リンク（任意）').isVisible());
+    const pageCount=page.context().pages().length;
+    await fromMap.getByRole('button',{name:'施設名で場所を検索',exact:true}).click();
+    assert.equal(await fromMap.locator('.flyer-place-candidate a').count(),0);
+    await fromMap.getByRole('button',{name:'この場所を地図で確認',exact:true}).click();
+    await fromMap.getByRole('button',{name:'この場所を保存する',exact:true}).waitFor();
+    await fromMap.getByLabel('施設名',{exact:true}).fill('別の施設');
+    assert.equal(await fromMap.locator('[name=lat]').inputValue(),'');
+    assert.equal(await fromMap.getByRole('button',{name:'この場所を保存する',exact:true}).count(),0);
+    await fromMap.getByLabel('施設名',{exact:true}).fill('模擬施設');
+    await fromMap.getByRole('button',{name:'施設名で場所を検索',exact:true}).click();
+    await fromMap.getByRole('button',{name:'この場所を地図で確認',exact:true}).click();
+    failFlyer=true;
+    await fromMap.getByRole('button',{name:'この場所を保存する',exact:true}).click();
+    await fromMap.locator('[data-editor-status]').filter({hasText:'保存できませんでした'}).waitFor();
+    await fromMap.getByRole('button',{name:'この場所を保存する',exact:true}).click();
+    await fromMap.waitFor({state:'hidden'});
+    assert.equal(page.context().pages().length,pageCount);
+    assert.equal(flyerRows.find(row=>row.id==='test-flyer').location.mapUrl,'');
+    assert.deepEqual([flyerRows.find(row=>row.id==='test-flyer').location.lat,flyerRows.find(row=>row.id==='test-flyer').location.lng],[35.73,140.83]);
 
     await invited.setViewportSize({width:320,height:680});
     await invited.locator('#event-dialog [data-close]').click();

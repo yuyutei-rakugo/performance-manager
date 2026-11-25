@@ -16,6 +16,8 @@ const tick=()=>new Promise(r=>setImmediate(r));
  const openEdit=()=>{panel.querySelector('[data-edit-flyer]').click();return w.document.querySelector('[aria-label="掲示先を編集"] form')};
  let form=openEdit();
  const placeSteps=form.querySelector('.flyer-place-steps');
+ assert(!placeSteps.querySelector('.flyer-google-help').open,'Google copying is an optional fallback');
+ assert.equal(placeSteps.querySelector('[data-find-place]').textContent,'施設名で場所を検索');
  let opened;w.open=url=>{opened=new URL(url)};
  [...placeSteps.querySelectorAll('button')].find(b=>b.textContent==='Googleマップで探す').click();
  assert.equal(opened.origin,'https://www.google.com');assert.match(opened.searchParams.get('query'),/〇〇公民館 神栖市/);
@@ -138,3 +140,12 @@ assert.equal(addressWindow.exact('〒314-0253 茨城県神栖市須田２３４�
 assert.deepEqual(Array.from(addressWindow.approx('〒314-0253 茨城県神栖市須田２３４０－１２７','神栖市',[featureForAddress])),[35.83,140.74]);
 assert.equal(addressWindow.approx('茨城県神栖市須田23401','神栖市',[featureForAddress]),undefined);
 console.log('PASS coordinate-link fallback and postal address exact/approximate distinction');
+
+referenceWindow.eval('window.conflicts=flyerLinkConflicts;');
+const linkedA={name:'若松郵便局',region:'神栖市',location:{mapUrl:'https://maps.app.goo.gl/example'}};
+const linkedB={name:'矢田部郵便局',region:'神栖市',location:{mapUrl:'https://maps.app.goo.gl/example?g_st=ac'}};
+assert.deepEqual(Array.from(referenceWindow.conflicts(linkedB,[linkedA,linkedB])),['若松郵便局']);
+assert.equal(referenceWindow.conflicts(linkedA,[linkedA,{...linkedB,location:{mapUrl:'https://maps.app.goo.gl/other'}}]).length,0);
+assert.equal(referenceWindow.conflicts({...linkedA,location:null},[linkedB]).length,0);
+assert.equal(resolvePin(linkedB),null,'a duplicated short link never manufactures a coordinate');
+console.log('PASS duplicated facility links warn without manufacturing coordinates or changing saved data');

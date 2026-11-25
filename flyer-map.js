@@ -16,7 +16,7 @@ export function loadStyles(){
 }
 export async function mountFlyerMap(host,actions){
  await loadStyles();
- host.innerHTML='<p class="flyer-map-legend"></p><div class="flyer-map-actions"><button type="button" class="secondary" data-locate-me>現在地を表示</button> <button type="button" class="secondary" data-nearby hidden>近い順に見る</button></div><p data-location-result role="status"></p><div class="flyer-map-canvas" role="region" aria-label="掲示先の地図"></div><section data-pin-details class="flyer-pin-details" aria-label="選んだ施設" hidden></section><p data-map-count></p><div data-nearby-list hidden></div><details data-unlocated hidden><summary>位置未確認の施設</summary><ul></ul></details><p data-tile-warning role="status" hidden>地図の背景を取得できませんでした。ピンの情報は開けます。</p>';
+ host.innerHTML='<p class="flyer-map-legend"></p><div class="flyer-map-actions"><button type="button" class="secondary" data-locate-me>現在地を表示</button> <button type="button" class="secondary" data-nearby hidden>近い順に見る</button></div><p data-location-result role="status"></p><details data-unlocated hidden open><summary>ピンのない施設</summary><p>施設は登録済みです。場所を登録すると、この地図にピンが出ます。</p><ul></ul></details><div class="flyer-map-canvas" role="region" aria-label="掲示先の地図"></div><section data-pin-details class="flyer-pin-details" aria-label="選んだ施設" hidden></section><p data-map-count></p><div data-nearby-list hidden></div><p data-tile-warning role="status" hidden>地図の背景を取得できませんでした。ピンの情報は開けます。</p>';
  const legend=host.querySelector('.flyer-map-legend'),canvas=host.querySelector('.flyer-map-canvas');
  for(const [index,status] of statuses.entries()){
   const item=document.createElement('span');item.className='flyer-status';item.dataset.status=index;item.textContent=status;legend.append(item);
@@ -75,17 +75,22 @@ export async function mountFlyerMap(host,actions){
    locateButton.disabled=false;
   },{timeout:10000,maximumAge:30000});
  };
- function showUnlocated(rows){
+ function showUnlocated(rows,archived,busy){
   const panel=host.querySelector('[data-unlocated]'),list=panel.querySelector('ul');
   const missing=rows.filter(row=>!position(row));
-  const signature=JSON.stringify(missing.map(row=>[row.name,row.region,flyerLocationInfo(row)?.address]));
+  const signature=JSON.stringify([archived,busy,missing.map(row=>[row.id,row.name,row.region,flyerLocationInfo(row)?.address,flyerLocationInfo(row)?.mapUrl])]);
   if(list.dataset.signature===signature)return;
-  list.dataset.signature=signature;panel.hidden=!missing.length;
+  const wasHidden=panel.hidden;list.dataset.signature=signature;panel.hidden=!missing.length;
+  panel.querySelector('summary').textContent='ピンのない施設（'+missing.length+'件）';
+  if(wasHidden&&missing.length)panel.open=true;
   const items=missing.map(row=>{
    const item=document.createElement('li'),address=flyerLocationInfo(row)?.address;
    const search=document.createElement('a');
    search.href=flyerSearchUrl(row);search.textContent='Googleマップで探す';search.target='_blank';search.rel='noopener noreferrer';
-   item.append(row.name+' ／ '+(address?'座標未登録':'住所・座標未登録')+' ',search);
+   item.append(row.name+' ／ '+(address?'座標未登録':flyerLocationInfo(row)?.mapUrl?'地図リンクのみ・ピン未設定':'住所・座標未登録')+' ',search);
+   if(!archived&&actions.find){
+    const register=document.createElement('button');register.type='button';register.className='secondary';register.textContent='場所を登録';register.setAttribute('aria-label',row.name+'の場所を登録');register.disabled=busy;register.onclick=()=>actions.find(row.id);item.append(' ',register);
+   }
    if(address){
     const button=document.createElement('button');button.type='button';button.textContent='住所から位置を探す';
     const feedback=document.createElement('span');feedback.setAttribute('role','status');
@@ -200,7 +205,7 @@ export async function mountFlyerMap(host,actions){
    previousIds=idsKey;
    const approximateCount=located.filter(row=>!flyerLocation(row)).length;
    host.querySelector('[data-map-count]').textContent='表示対象 '+rows.length+'件 ／ 位置確認済み '+(located.length-approximateCount)+'件 ／ 概略位置 '+approximateCount+'件 ／ 表示位置なし '+(rows.length-located.length)+'件';
-   showUnlocated(rows);renderNearby();
+   showUnlocated(rows,archived,busy);renderNearby();
  }
  return {focus,update,destroy(){active=false;view.remove();host.replaceChildren()}
  };

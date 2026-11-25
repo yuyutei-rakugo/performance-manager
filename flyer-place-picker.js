@@ -1,7 +1,6 @@
 import {loadStyles} from './flyer-map.js?v=20261124-ux1';
 import {map, tileLayer, circleMarker} from './vendor/leaflet/leaflet-src.esm.js';
 
-const query=text=>'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(text);
 const clean=value=>String(value||'').normalize('NFKC').toLowerCase().replace(/\s+/g,'');
 const valid=xy=>Array.isArray(xy)&&xy.length===2&&xy.every(Number.isFinite)&&Math.abs(xy[1])<=90&&Math.abs(xy[0])<=180;
 export function placeCandidates(features,name,region){
@@ -23,23 +22,22 @@ export async function searchPlaces(name,region){
 }
 export function showPlaceCandidates(host,candidates,choose){
  host.replaceChildren();
- if(!candidates.length){host.textContent='候補が見つかりません。住所・地図URL・地図上の位置指定も使えます。';return}
+ if(!candidates.length){host.textContent='候補が見つかりません。「地図を開いて場所を指定」か、下のGoogleマップから確認できます。';return}
  for(const candidate of candidates){
   const row=document.createElement('div');row.className='flyer-place-candidate';
   const title=document.createElement('strong');title.textContent=candidate.name;
   const address=document.createElement('p');address.textContent=candidate.address;
-  const link=document.createElement('a');link.href=query(candidate.lat+','+candidate.lng);link.rel='noopener noreferrer';link.target='_blank';link.textContent='候補を地図で確認';
-  const button=document.createElement('button');button.type='button';button.className='secondary';button.textContent='この施設を選ぶ（ピンを付ける）';
+  const button=document.createElement('button');button.type='button';button.className='secondary';button.textContent='この場所を地図で確認';
   button.onclick=()=>choose(candidate);
-  row.append(title,address,link,' ',button);host.append(row);
+  row.append(title,address,button);host.append(row);
  }
 }
-export async function mountPlacePicker(host,initial,choose){
+export async function mountPlacePicker(host,initial,choose,options={}){
  await loadStyles();
  if(!host.isConnected)return ()=>{};
  const canvas=document.createElement('div');canvas.className='flyer-map-canvas';canvas.setAttribute('aria-label','施設の位置を地図で指定');
  const feedback=document.createElement('p');feedback.textContent='地図を拡大し、施設の位置を押してください。';
- const submit=document.createElement('button');submit.type='button';submit.className='secondary';submit.textContent='この位置を使う';submit.disabled=true;
+ const submit=document.createElement('button');submit.type='button';submit.className='secondary';submit.textContent=options.submitLabel||'この位置を使う';submit.disabled=true;
  host.replaceChildren(feedback,canvas,submit);
  const view=map(canvas,{scrollWheelZoom:false,maxZoom:21}).setView(initial||[35.85,140.72],initial?16:11);
  tileLayer('https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png',{attribution:'<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener noreferrer">地理院タイル</a>',maxNativeZoom:18,maxZoom:21,referrerPolicy:'no-referrer'}).addTo(view);
