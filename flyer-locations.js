@@ -104,15 +104,15 @@ export function flyerLocationInfo(row){
  const saved=row.location;
  // Explicit removal, changed addresses and manually selected pins always win.
  if(!saved||!reference||Number.isFinite(saved.lat)||Number.isFinite(saved.lng))return saved;
- const normalizeAddress=value=>String(value||'').normalize('NFKC').replace(/^〒?\s*\d{3}[-‐－]?\d{4}\s*/,'').replace(/[−‐－]/g,'-').replace(/番地$|番地の?/g,'-').replace(/[-号]$/,'').replace(/\s+/g,'');
- if(!saved.address||normalizeAddress(saved.address)!==normalizeAddress(reference.address))return saved;
+ if(!saved.address||normalizeLocationAddress(saved.address)!==normalizeLocationAddress(reference.address))return saved;
  // A coordinate-bearing link can designate a different entrance; never replace it.
  try{if(positionFromUrl(saved.mapUrl))return saved}catch{return saved}
  return {...reference,...saved,lat:reference.lat,lng:reference.lng};
 }
 export function flyerLocation(row){
  const saved=flyerLocationInfo(row);
- if(Number.isFinite(saved?.lat)&&Number.isFinite(saved?.lng))return [saved.lat,saved.lng];
+ if(Number.isFinite(saved?.lat)&&Number.isFinite(saved?.lng)&&Math.abs(saved.lat)<=90&&Math.abs(saved.lng)<=180)return [saved.lat,saved.lng];
+ try{return positionFromUrl(saved?.mapUrl)}catch{return undefined}
 }
 export function positionFromUrl(value){
  if(!value)return;
@@ -130,15 +130,17 @@ export function positionFromUrl(value){
  if(coordinates&&Math.abs(Number(coordinates[1]))<=90&&Math.abs(Number(coordinates[2]))<=180)return coordinates.slice(1).map(Number);
 }
 
-export function exactAddressPosition(address,features){
- const normalize=value=>String(value||'').normalize('NFKC')
+export const normalizeLocationAddress=value=>String(value||'').normalize('NFKC')
+  .replace(/^〒?\s*\d{3}[-‐－]?\d{4}\s*/,'')
   .replace(/([一二三四五六七八九十]+)丁目/g,(_,n)=>{
    const digits='〇一二三四五六七八九';
    const parts=n.split('十');
    return (parts.length===1?digits.indexOf(n):(parts[0]?digits.indexOf(parts[0]):1)*10+(parts[1]?digits.indexOf(parts[1]):0))+'-';
   })
-  .replace(/丁目|番地の?|番(?!地)/g,'-').replace(/[−‐]/g,'-').replace(/\s/g,'').replace(/[-号]$/,'');
- const exact=features.filter(feature=>normalize(feature.properties?.title)===normalize(address));
+  .replace(/丁目|番地の?|番(?!地)/g,'-').replace(/[−‐－]/g,'-').replace(/\s/g,'').replace(/[-号]$/,'');
+
+export function exactAddressPosition(address,features){
+ const exact=features.filter(feature=>normalizeLocationAddress(feature.properties?.title)===normalizeLocationAddress(address));
  const xy=exact.length===1&&exact[0].geometry?.coordinates;
  if(Array.isArray(xy)&&xy.length===2&&xy.every(Number.isFinite)&&Math.abs(xy[0])<=180&&Math.abs(xy[1])<=90)return [xy[1],xy[0]];
 }
@@ -149,7 +151,7 @@ export function flyerSearchUrl(row){
 }
 
 export function approximateAddressPosition(address,region,features){
- const compact=value=>value.normalize('NFKC').replace(/\s+/g,'');
+ const compact=normalizeLocationAddress;
  const city=compact(region);
  const input=compact(address);
  if(!city||!input.includes(city)||input.endsWith(city)||!Array.isArray(features))return;
@@ -160,7 +162,7 @@ export function approximateAddressPosition(address,region,features){
   const district=title.split(city)[1];
   const fromCity=input.slice(input.indexOf(city));
   const candidate=district&&city+district;
-  return candidate&&district.length>=2&&fromCity.startsWith(candidate)&&(!fromCity.slice(candidate.length)||(!/\d$/.test(candidate)&&/^\d/.test(fromCity.slice(candidate.length))));
+  return candidate&&district.length>=2&&fromCity.startsWith(candidate)&&(!fromCity.slice(candidate.length)||(/\d$/.test(candidate)?/^[-]/.test(fromCity.slice(candidate.length)):/^\d/.test(fromCity.slice(candidate.length))));
  });
  if(candidates.length!==1)return;
  const xy=candidates[0].geometry?.coordinates;
