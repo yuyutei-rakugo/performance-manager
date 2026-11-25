@@ -1,5 +1,5 @@
 import {previewFlyerMigration} from './flyer-migration.js?v=20261124-ux1';
-import {flyerLocation,flyerLocationInfo,positionFromUrl,exactAddressPosition,normalizeLocationAddress} from './flyer-locations.js?v=20261124-ux1';
+import {flyerLocation,flyerLocationInfo,positionFromUrl,exactAddressPosition,normalizeLocationAddress,flyerLinkConflicts} from './flyer-locations.js?v=20261124-ux1';
 import {startEditor,finishEditor,leaveEditor,guardEditor,editorState} from './editor-dialog.js?v=20261124-ux1';
 import {cloud} from './cloud.js?v=20261124-ux1';
 
@@ -70,13 +70,14 @@ export function openFlyerVenues(event){
    }
    const mapAllowed=visibleOnMap(row);
    const position=flyerLocationInfo(row);
+   const linkConflicts=flyerLinkConflicts(row,rows);
    const aliases=[venueKey(row),...(row.keys||[])];
    const history=aliases.some(key=>pastDeclines.has(key));
-   const signature=JSON.stringify([row,!!data.archived,mapAllowed,history,data.declineFields]);
+   const signature=JSON.stringify([row,!!data.archived,mapAllowed,history,data.declineFields,linkConflicts]);
    let cached=rowNodes.get(row.id);
    if(!cached||cached.signature!==signature){
     const template=document.createElement('template');
-    template.innerHTML=`<article class="flyer-item" data-venue-id="${esc(row.id)}" data-status="${statuses.indexOf(row.status)}"><div class="flyer-heading"><span class="flyer-badge">${esc(row.status)}</span><h3>${esc(row.name)}${flyerLocation(row)?'':`<small class="flyer-unlocated" title="${esc(position?.reason||'緯度と経度が登録されていません。')}">位置未確認</small>`}</h3><a class="flyer-map" href="${esc(mapUrl(row))}" target="_blank" rel="noopener noreferrer" aria-label="${esc(row.name)}をGoogleマップで検索">地図</a></div>${row.memo?`<p class="memo flyer-visible-memo">${esc(row.memo)}</p>`:''}${data.archived?'':`<button type="button" class="secondary" data-edit-flyer="${esc(row.id)}">状況・メモを編集</button>`}${history?'<p class="flyer-meta">以前お断りあり</p>':''}<details class="flyer-row-details" ${cached?.node.querySelector('.flyer-row-details').open?'open':''}><summary class="secondary flyer-disclosure"><span>施設の詳細</span><span>閉じる</span></summary>${mapAllowed&&flyerLocation(row)?`<button type="button" class="secondary" data-focus-pin="${esc(row.id)}">地図でこの施設を見る</button>`: ''}<p data-row-message role="status"></p><p class="flyer-meta">${esc(row.region)} ／ ${esc(row.category)}</p>${position?.address?`<p class="flyer-meta">${esc(position.address)}</p>`:''}${!flyerLocation(row)?`<p class="flyer-meta">${esc(position?.reason||'緯度と経度が登録されていません。')}</p>`:''}${data.archived?'':`<button type="button" class="secondary" data-find-flyer="${esc(row.id)}">場所を登録・変更</button>`}${row.source?`<p><a href="${esc(row.source.url)}" target="_blank" rel="noopener noreferrer">確認元</a> <time>${esc(row.source.date)}</time></p>`:''}</details></article>`;
+    template.innerHTML=`<article class="flyer-item" data-venue-id="${esc(row.id)}" data-status="${statuses.indexOf(row.status)}"><div class="flyer-heading"><span class="flyer-badge">${esc(row.status)}</span><h3>${esc(row.name)}${flyerLocation(row)?'':`<small class="flyer-unlocated" title="${esc(position?.reason||'緯度と経度が登録されていません。')}">位置未確認</small>`}</h3><a class="flyer-map" href="${esc(linkConflicts.length?'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(row.region+' '+row.name):mapUrl(row))}" target="_blank" rel="noopener noreferrer" aria-label="${esc(row.name)}をGoogleマップで検索">地図</a></div>${linkConflicts.length?`<p class="flyer-meta">${esc(linkConflicts.join('・'))}と同じ地図リンクです。施設名で検索して場所を確認してください。</p>`:''}${row.memo?`<p class="memo flyer-visible-memo">${esc(row.memo)}</p>`:''}${data.archived?'':`<button type="button" class="secondary" data-edit-flyer="${esc(row.id)}">状況・メモを編集</button>`}${history?'<p class="flyer-meta">以前お断りあり</p>':''}<details class="flyer-row-details" ${cached?.node.querySelector('.flyer-row-details').open?'open':''}><summary class="secondary flyer-disclosure"><span>施設の詳細</span><span>閉じる</span></summary>${mapAllowed&&flyerLocation(row)?`<button type="button" class="secondary" data-focus-pin="${esc(row.id)}">地図でこの施設を見る</button>`: ''}<p data-row-message role="status"></p><p class="flyer-meta">${esc(row.region)} ／ ${esc(row.category)}</p>${position?.address?`<p class="flyer-meta">${esc(position.address)}</p>`:''}${!flyerLocation(row)?`<p class="flyer-meta">${esc(position?.reason||'緯度と経度が登録されていません。')}</p>`:''}${data.archived?'':`<button type="button" class="secondary" data-find-flyer="${esc(row.id)}">場所を登録・変更</button>`}${row.source?`<p><a href="${esc(row.source.url)}" target="_blank" rel="noopener noreferrer">確認元</a> <time>${esc(row.source.date)}</time></p>`:''}</details></article>`;
     cached={signature,node:template.content.firstElementChild};rowNodes.set(row.id,cached);
    }
    const feedback=cached.node.querySelector('[data-row-message]'),result=rowMessages.get(row.id);
@@ -209,6 +210,8 @@ export function openFlyerVenues(event){
     else if(form.elements.mapUrl.value.trim())results.textContent='このリンクからはピンの位置を読み取れません。リンクはそのまま保存できます。';
     if(!xy&&form.elements.mapUrl.value.trim()!==(position?.mapUrl||'')){form.elements.lat.value='';form.elements.lng.value='';positionChosen=false}
    }catch(error){results.textContent=error.message}
+   const conflicts=flyerLinkConflicts({...row,location:{mapUrl:form.elements.mapUrl.value.trim()}},data.rows);
+   if(conflicts.length)results.textContent=conflicts.join('・')+'と同じ地図リンクです。施設が合っているか確認してください。';
    updatePinStatus();
   };
   form.elements.mapUrl.addEventListener('input',importLink);
@@ -405,7 +408,8 @@ export function openFlyerVenues(event){
    const {mountFlyerMap}=await import('./flyer-map.js?v=20261124-ux1');
    if(!dialog.open)return;
    mapView=await mountFlyerMap(host,{
-    edit:id=>{const row=data?.rows.find(row=>row.id===id);if(row)edit(row)}
+    edit:id=>{const row=data?.rows.find(row=>row.id===id);if(row)edit(row)},
+    find:id=>{const row=data?.rows.find(row=>row.id===id);if(row)edit(row,true)}
    });
    if(!dialog.open){mapView.destroy();mapView=null;return}
    button.textContent='地図を閉じる';redraw();
