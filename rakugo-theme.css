@@ -209,3 +209,9 @@ output[data-end-time]{font-size:1.1rem;font-weight:800;color:var(--red)}
 .flyer-editor-content{overflow:auto;min-height:0;overscroll-behavior:contain;padding:0 2px}
 .flyer-editor .flyer-save-footer{position:static;flex:none;margin-top:12px}
 .flyer-confirming .flyer-editor-extras{display:none}
+
+.flyer-list-search{min-width:0;display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end}
+.flyer-list-search>label{flex:1 1 150px;min-width:0}
+.flyer-list-search>button{min-height:48px;white-space:nowrap}
+.flyer-quick-filters:has(.flyer-list-search){grid-template-columns:minmax(0,1fr)}
+.flyer-quick-filters:has(.flyer-list-search)>label{max-width:220px}

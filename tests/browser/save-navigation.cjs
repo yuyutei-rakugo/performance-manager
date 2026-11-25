@@ -538,7 +538,10 @@ async function main(){
     await invited.route('https://msearch.gsi.go.jp/**',route=>route.fulfill({json:[]}));
     let tiles=0;
     await invited.route('https://cyberjapandata.gsi.go.jp/xyz/**',route=>{tiles++;return route.fulfill({status:404,body:''})});
-    await flyerPanel.getByRole('button',{name:'施設を追加',exact:true}).click();
+    await flyerPanel.getByLabel('登録済みの施設を探す',{exact:true}).fill('未収録の試験施設');
+    await flyerPanel.getByRole('button',{name:'検索する',exact:true}).click();
+    await flyerPanel.getByRole('button',{name:'「未収録の試験施設」を新しく追加',exact:true}).click();
+    assert.equal(await flyerForm.getByLabel('施設名',{exact:true}).inputValue(),'未収録の試験施設');
     assert.equal(await flyerForm.locator('button[type=submit]').count(),1,'one save button');
     assert(!await flyerForm.getByLabel('住所',{exact:true}).isVisible(),'optional address stays hidden');
     assert(!await flyerForm.getByLabel('Googleマップの共有リンク（任意）').isVisible());
