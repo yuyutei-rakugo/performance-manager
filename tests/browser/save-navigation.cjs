@@ -746,14 +746,21 @@ async function main(){
     assert(await flyerForm.evaluate(el=>el.scrollWidth<=el.clientWidth+2),'facility editor has no horizontal overflow on a phone');
     const regionalSave=await flyerForm.getByRole('button',{name:'この場所で登録する',exact:true}).boundingBox();
     assert(regionalSave.height>=44,'registration has a finger-sized target');
+    const pinBefore=await flyerForm.locator('[name=lat]').inputValue();
+    await flyerForm.locator('.flyer-inline-map .flyer-map-canvas').click({position:{x:110,y:100}});
+    const stagedPin=await flyerForm.locator('[name=lat]').inputValue();
+    assert.notEqual(stagedPin,pinBefore,'moving the map pin stages the location for every save button');
+    await flyerForm.evaluate(()=>document.fonts.ready);
+
     await flyerForm.screenshot({path:'test-artifacts/regional-registration-mobile.png'});
     failFlyer=true;
-    await flyerForm.getByRole('button',{name:'この場所で登録する',exact:true}).click();
+    await flyerForm.locator('.flyer-save-footer button[type=submit]').click();
     await flyerForm.locator('[data-editor-status]').filter({hasText:'保存できませんでした'}).waitFor();
     await flyerForm.getByRole('button',{name:'この場所で登録する',exact:true}).click();
     await flyerForm.waitFor({state:'hidden'});
     assert.equal(flyerRows.length,beforeRegional+1);
     const regionalRow=flyerRows.find(row=>row.name==='矢田部郵便局');
+    assert.equal(regionalRow.location.lat,Number(stagedPin),'the staged pin survives failure and retry');
     assert(regionalRow.location.lat>35.7&&regionalRow.location.lat<36);
     assert(regionalRow.location.lng>140.5&&regionalRow.location.lng<140.9);
     assert.equal(fallbackSearches,0,'local hits never contact the external search service');

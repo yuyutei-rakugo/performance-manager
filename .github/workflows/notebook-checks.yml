@@ -14,6 +14,8 @@ jobs:
           node-version: '24'
       - name: Install test dependencies
         run: npm install --no-save --package-lock=false jsdom@31.0.1 playwright@1.65.1
+      - name: Install Japanese fonts for mobile UI review
+        run: sudo apt-get update -qq && sudo apt-get install -y fonts-noto-cjk
       - name: Check JavaScript syntax
         run: |
           for file in *.js tests/*.cjs tests/browser/*.cjs; do node --check "$file"; done

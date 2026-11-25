@@ -64,7 +64,7 @@ export async function mountPlacePicker(host,initial,choose,options={}){
   selected=[latlng.lat,latlng.lng];
   if(positionMarker)positionMarker.setLatLng(selected);
   else positionMarker=circleMarker(selected,{radius:8,color:'#a92530',fillOpacity:1,interactive:false}).addTo(view);
-  submit.disabled=false;feedback.textContent='ピンの位置を確認してください。';
+  submit.disabled=false;feedback.textContent='ピンの位置を確認してください。';options.onMove?.(selected);
  });
  submit.onclick=()=>choose(selected);
  return ()=>{active=false;view.remove()};

@@ -162,9 +162,9 @@ output[data-end-time]{font-size:1.1rem;font-weight:800;color:var(--red)}
 .flyer-dialog [data-count]{margin:8px 0;font-size:.95rem}.flyer-dialog [data-updated]{font-size:.875rem;margin:8px 0 16px}
 @media(max-width:400px){.flyer-actions.form-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0}.flyer-actions>button{padding:8px 5px;font-size:.9rem}.flyer-quick-filters{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}}
 
-.flyer-editor .flyer-save-footer{top:auto;bottom:-24px;margin:20px 0 -24px;padding:12px 0 max(12px,env(safe-area-inset-bottom));border-top:1px solid var(--line);border-bottom:0}
+.flyer-editor .flyer-save-footer{top:auto;bottom:0;margin:20px 0 0;padding:10px 0 max(10px,env(safe-area-inset-bottom));border-top:1px solid var(--line);border-bottom:0}
 .flyer-save-footer>button{width:100%}.flyer-save-footer p{margin:8px 0 0}
-@media(max-width:600px){.flyer-editor .flyer-save-footer{bottom:-18px;margin-bottom:-18px}}
+
 
 /* Keep the facility task readable at phone widths and with the keyboard open. */
 .flyer-editor{width:min(680px,calc(100% - 20px))}
@@ -179,3 +179,6 @@ output[data-end-time]{font-size:1.1rem;font-weight:800;color:var(--red)}
 .flyer-editor .flyer-map-canvas{height:clamp(220px,40dvh,360px)}
 .flyer-editor [data-editor-status][data-save-phase=dirty]{font-weight:700;color:#835400}
 @media(max-width:400px){.flyer-actions.form-actions{grid-template-columns:repeat(2,minmax(0,1fr))}.flyer-actions>button{min-height:48px;font-size:1rem}.flyer-actions>[data-refresh]{grid-column:1/-1}}
+
+.flyer-inline-map{scroll-margin-top:125px}.flyer-inline-map .flyer-map-canvas{height:clamp(180px,32dvh,280px)}
+.flyer-place-steps>.muted{font-size:.75rem;margin:6px 0}
