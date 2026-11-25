@@ -149,3 +149,16 @@ assert.equal(referenceWindow.conflicts(linkedA,[linkedA,{...linkedB,location:{ma
 assert.equal(referenceWindow.conflicts({...linkedA,location:null},[linkedB]).length,0);
 assert.equal(resolvePin(linkedB),null,'a duplicated short link never manufactures a coordinate');
 console.log('PASS duplicated facility links warn without manufacturing coordinates or changing saved data');
+
+// The member's confirmed short link must render the correct Marutake pin without changing stored data.
+const marutake={name:'丸竹',region:'神栖市',location:{address:'',mapUrl:'https://maps.app.goo.gl/g2AV4mKkUri1t9MS9'}};
+const marutakeBefore=JSON.stringify(marutake);
+assert.deepEqual(resolvePin(marutake),[35.79461386,140.77759256]);
+assert.equal(JSON.stringify(marutake),marutakeBefore);
+assert.deepEqual(resolvePin({...marutake,location:{address:'',mapUrl:'https://maps.app.goo.gl/17Sgq87wKKxGt7vj8?g_st=ac'}}),[35.79461386,140.77759256]);
+assert.equal(resolvePin({...marutake,location:{address:'',mapUrl:'https://maps.app.goo.gl/unknown'}}),null);
+assert.equal(resolvePin({...marutake,location:{...marutake.location,address:'神栖市の別の場所'}}),null);
+assert.equal(resolvePin({...marutake,name:'マルトモ'}),null);
+assert.equal(resolvePin({...marutake,location:null}),null);
+assert.deepEqual(resolvePin({...marutake,location:{...marutake.location,lat:35.8,lng:140.7}}),[35.8,140.7]);
+console.log('PASS confirmed Marutake short-link pin, tracking suffix, no stored-data mutation, unknown-link/changed-address protection, Marutomo separation and manual-pin precedence');
