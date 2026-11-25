@@ -536,18 +536,22 @@ async function main(){
     const flyerForm=invited.getByRole('dialog',{name:'掲示先を編集',exact:true});
     await flyerForm.getByLabel('施設名').fill('模擬施設');
     await flyerForm.getByLabel('地域',{exact:true}).selectOption('銚子市');
+    await flyerForm.getByText('区分・施設の共有について',{exact:true}).click();
     await flyerForm.getByLabel('区分',{exact:true}).selectOption('');
     await flyerForm.getByLabel('新しい区分',{exact:true}).fill('公共施設');
     await invited.route('https://photon.komoot.io/api/**',route=>route.fulfill({json:{features:[
       {properties:{name:'模擬施設',city:'銚子市',street:'模擬町',housenumber:'1'},geometry:{coordinates:[140.83,35.73]}},
       {properties:{name:'模擬施設',city:'別の市'},geometry:{coordinates:[140.9,36]}}
     ]}}));
-    await flyerForm.getByRole('button',{name:'場所を探す'}).click();
-    const choosePlace=flyerForm.getByRole('button',{name:'この場所で登録'});
+    await flyerForm.getByRole('button',{name:'施設名で場所を検索'}).click();
+    const choosePlace=flyerForm.getByRole('button',{name:'この施設を選ぶ（ピンを付ける）'});
     await choosePlace.waitFor();
     assert.equal(await choosePlace.count(),1);
     await choosePlace.click();
     assert.equal(await flyerForm.getByLabel('緯度',{exact:true}).inputValue(),'35.73');
+    await flyerForm.getByText(/ピンの位置を選択済み/).waitFor();
+    await flyerForm.getByText('見つからないとき：住所・地図から指定',{exact:true}).click();
+    await flyerForm.getByText('詳細入力（地図URL・緯度・経度）',{exact:true}).click();
     await flyerForm.getByLabel('住所',{exact:true}).clear();
     await flyerForm.getByLabel('緯度',{exact:true}).clear();
     await flyerForm.getByLabel('経度',{exact:true}).clear();
