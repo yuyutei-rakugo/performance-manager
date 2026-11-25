@@ -1,5 +1,5 @@
 import {map, tileLayer, circleMarker, marker, divIcon, latLngBounds} from './vendor/leaflet/leaflet-src.esm.js';
-import {flyerLocation,flyerLocationInfo,flyerSearchUrl,approximateAddressPosition,normalizeLocationAddress} from './flyer-locations.js?v=20261125-marutake1';
+import {flyerLocation,flyerLocationInfo,flyerSearchUrl,approximateAddressPosition,normalizeLocationAddress} from './flyer-locations.js?v=20261125-simple1';
 
 const statuses=['未依頼','依頼済み','掲示済み','今回は見送り'];
 let styles;
@@ -16,7 +16,7 @@ export function loadStyles(){
 }
 export async function mountFlyerMap(host,actions){
  await loadStyles();
- host.innerHTML='<p class="flyer-map-legend"></p><div class="flyer-map-actions"><button type="button" class="secondary" data-locate-me>現在地を表示</button> <button type="button" class="secondary" data-nearby hidden>近い順に見る</button></div><p data-location-result role="status"></p><details data-unlocated hidden open><summary>ピンのない施設</summary><p>施設は登録済みです。場所を登録すると、この地図にピンが出ます。</p><ul></ul></details><div class="flyer-map-canvas" role="region" aria-label="掲示先の地図"></div><section data-pin-details class="flyer-pin-details" aria-label="選んだ施設" hidden></section><p data-map-count></p><div data-nearby-list hidden></div><p data-tile-warning role="status" hidden>地図の背景を取得できませんでした。ピンの情報は開けます。</p>';
+ host.innerHTML='<p class="flyer-map-legend"></p><div class="flyer-map-actions"><button type="button" class="secondary" data-locate-me>現在地を表示</button> <button type="button" class="secondary" data-nearby hidden>近い順に見る</button></div><p data-location-result role="status"></p><details data-unlocated hidden><summary>ピンのない施設</summary><p>施設は登録済みです。場所を登録すると、この地図にピンが出ます。</p><ul></ul></details><div class="flyer-map-canvas" role="region" aria-label="掲示先の地図"></div><section data-pin-details class="flyer-pin-details" aria-label="選んだ施設" hidden></section><p data-map-count></p><div data-nearby-list hidden></div><p data-tile-warning role="status" hidden>地図の背景を取得できませんでした。ピンの情報は開けます。</p>';
  const legend=host.querySelector('.flyer-map-legend'),canvas=host.querySelector('.flyer-map-canvas');
  for(const [index,status] of statuses.entries()){
   const item=document.createElement('span');item.className='flyer-status';item.dataset.status=index;item.textContent=status;legend.append(item);
@@ -80,9 +80,9 @@ export async function mountFlyerMap(host,actions){
   const missing=rows.filter(row=>!position(row));
   const signature=JSON.stringify([archived,busy,missing.map(row=>[row.id,row.name,row.region,flyerLocationInfo(row)?.address,flyerLocationInfo(row)?.mapUrl])]);
   if(list.dataset.signature===signature)return;
-  const wasHidden=panel.hidden;list.dataset.signature=signature;panel.hidden=!missing.length;
+  list.dataset.signature=signature;panel.hidden=!missing.length;
   panel.querySelector('summary').textContent='ピンのない施設（'+missing.length+'件）';
-  if(wasHidden&&missing.length)panel.open=true;
+  // Keep the optional review list collapsed so the map remains visible.
   const items=missing.map(row=>{
    const item=document.createElement('li'),address=flyerLocationInfo(row)?.address;
    const search=document.createElement('a');
@@ -142,7 +142,7 @@ export async function mountFlyerMap(host,actions){
   const search=document.createElement('a');
   search.href=flyerSearchUrl(row);search.textContent='Googleマップで探す';search.target='_blank';search.rel='noopener noreferrer';content.append(search);
   if(!archived){
-   const button=document.createElement('button');button.type='button';button.className='secondary';button.textContent='状況・メモを編集';
+   const button=document.createElement('button');button.type='button';button.className='secondary';button.textContent='状況を変更';
    button.disabled=busy;button.onclick=event=>{event.stopPropagation();actions.edit(row.id)};
    content.append(button);
   }
