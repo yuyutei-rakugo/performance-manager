@@ -261,14 +261,16 @@ export function openFlyerVenues(event){
   form.elements.mapUrl.addEventListener('change',importLink);
   let removePreview;
   previewButton.onclick=async()=>{
-   fallback.after(preview);
-   if(removePreview){removePreview();removePreview=null;preview.replaceChildren();return}
-   previewButton.disabled=true;
+   previewButton.after(preview);preview.hidden=false;
+   if(previewButton.disabled)return;
+   if(removePreview){removePreview();removePreview=null;preview.replaceChildren();previewButton.textContent='地図を開いて場所を指定';return}
+   previewButton.disabled=true;previewButton.textContent='地図を読み込み中…';preview.textContent='地図を読み込んでいます…';preview.scrollIntoView?.({block:'nearest'});
    try{
-    const {mountPlacePicker}=await import('./flyer-place-picker.js?v=20261125-search1');
+    const {mountPlacePicker}=await import('./flyer-place-picker.js?v=20261125-mapfix1');
     const xy=form.elements.lat.value!==''&&form.elements.lng.value!==''?[Number(form.elements.lat.value),Number(form.elements.lng.value)]:null;
     removePreview=await mountPlacePicker(preview,xy,([lat,lng])=>{usePlace(lat,lng,undefined,true);results.textContent='ピンの位置を選びました。最後に保存してください。'},{onMove:([lat,lng])=>usePlace(lat,lng,undefined,true)});
-   }catch{preview.textContent='地図を開けませんでした。リンクだけでも保存できます。'}
+    previewButton.textContent='地図を閉じる';preview.querySelector('.flyer-map-canvas')?.scrollIntoView?.({block:'nearest'});
+   }catch{preview.textContent='地図を開けませんでした。もう一度押すと再試行できます。施設だけ先に登録しても構いません。';previewButton.textContent='地図をもう一度開く'}
    finally{previewButton.disabled=false}
   };
   editor.addEventListener('close',()=>removePreview?.(),{once:true});
@@ -278,7 +280,7 @@ export function openFlyerVenues(event){
    if(!name||!region){results.textContent='施設名と地域を入力してください。';return}
    search.disabled=true;results.textContent='保存済みの地域データから探しています…';
    try{
-    const {searchPlaces,showPlaceCandidates}=await import('./flyer-place-picker.js?v=20261125-search1');
+    const {searchPlaces,showPlaceCandidates}=await import('./flyer-place-picker.js?v=20261125-mapfix1');
     const seen=new Set();
     const local=[...data.rows,...await snapshotCatalog().catch(()=>[])].filter(item=>item.region===region&&matchesSearch([item.name,...(item.aliases||[]),...(flyerLocationInfo(item)?.aliases||[])],name)).flatMap(item=>{
      const location=flyerLocationInfo(item),xy=flyerLocation(item),key=JSON.stringify([item.name,xy]);
@@ -299,7 +301,7 @@ export function openFlyerVenues(event){
      confirmation.append(preview,changePlace,backToSearch);showConfirmation(candidate);
      removePreview?.();removePreview=null;preview.replaceChildren();
      try{
-      const {mountPlacePicker}=await import('./flyer-place-picker.js?v=20261125-search1');
+      const {mountPlacePicker}=await import('./flyer-place-picker.js?v=20261125-mapfix1');
       if(!form.isConnected||!candidateSelection)return;
       removePreview=await mountPlacePicker(preview,[candidate.lat,candidate.lng],()=>{},{readOnly:true});
       confirmation.scrollIntoView?.({block:'start'});
@@ -320,12 +322,13 @@ export function openFlyerVenues(event){
   form.elements.region.addEventListener('change',invalidateCandidate);
   form.elements.regionNew.addEventListener('input',invalidateCandidate);
   const pickButton=form.querySelector('[data-pick-place]');
+  pickButton.hidden=true;
   pickButton.onclick=async()=>{
    if(removePicker){removePicker();removePicker=null;picker.replaceChildren();pickButton.textContent='地図上で位置を指定';return}
    picker.closest('details').open=true;
    pickButton.disabled=true;
    try{
-    const {mountPlacePicker}=await import('./flyer-place-picker.js?v=20261125-search1');
+    const {mountPlacePicker}=await import('./flyer-place-picker.js?v=20261125-mapfix1');
     const initial=form.elements.lat.value&&form.elements.lng.value?[Number(form.elements.lat.value),Number(form.elements.lng.value)]:null;
     removePicker=await mountPlacePicker(picker,initial,([lat,lng])=>{
      usePlace(lat,lng);picker.replaceChildren();removePicker?.();removePicker=null;pickButton.textContent='地図上で位置を指定';
@@ -487,7 +490,7 @@ export function openFlyerVenues(event){
   if(mapView){mapView.destroy();mapView=null;host.hidden=true;q('[data-list]').hidden=false;button.textContent='地図で見る';return}
   mapOpening=true;host.hidden=false;host.textContent='地図を読み込み中…';
   try{
-   const {mountFlyerMap}=await import('./flyer-map.js?v=20261125-simple1');
+   const {mountFlyerMap}=await import('./flyer-map.js?v=20261125-mapfix1');
    if(!dialog.open)return;
    mapView=await mountFlyerMap(host,{
     edit:id=>{const row=data?.rows.find(row=>row.id===id);if(row)edit(row)},

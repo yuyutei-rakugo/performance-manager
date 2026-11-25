@@ -8,8 +8,10 @@ export function loadStyles(){
  styles=new Promise((resolve,reject)=>{
   const link=document.createElement('link');
   link.rel='stylesheet';link.href='./vendor/leaflet/leaflet.css';
-  link.onload=resolve;
-  link.onerror=()=>{styles=null;link.remove();reject(Error('地図のスタイルを読み込めませんでした。'))};
+  const failed=()=>{clearTimeout(timer);styles=null;link.remove();reject(Error('地図のスタイルを読み込めませんでした。'))};
+  const timer=setTimeout(failed,12000);
+  link.onload=()=>{clearTimeout(timer);resolve()};
+  link.onerror=failed;
   document.head.append(link);
  });
  return styles;
