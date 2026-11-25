@@ -1,5 +1,5 @@
 import {searchRegionalPlaces} from './regional-places.js?v=20261125-search1';
-import {loadStyles} from './flyer-map.js?v=20261125-link2';
+import {loadStyles} from './flyer-map.js?v=20261125-link3';
 import {map, tileLayer, circleMarker} from './vendor/leaflet/leaflet-src.esm.js';
 
 const clean=value=>String(value||'').normalize('NFKC').toLowerCase().replace(/\s+/g,'');
@@ -49,7 +49,7 @@ export async function mountPlacePicker(host,initial,choose,options={}){
  background.on('tileerror',()=>{if(tileWarning.hidden){tileWarning.hidden=false;feedback.hidden=true;tileWarning.scrollIntoView?.({block:'nearest'})}});
  background.on('loading',()=>{tileWarning.hidden=true;feedback.hidden=false});
  let selected=initial,positionMarker=initial?circleMarker(initial,{radius:8,color:'#a92530',fillOpacity:1,interactive:false}).addTo(view):null;
- if(initial){submit.disabled=false;feedback.textContent='赤い点が登録する位置です。違う場合は地図を押して変更できます。'}
+ if(initial){submit.disabled=!!options.requireMove;feedback.textContent='赤い点が登録する位置です。違う場合は地図を押して変更できます。'}
  const locate=document.createElement('button');locate.type='button';locate.className='secondary';locate.textContent='現在地の周辺を表示';
  if(!options.readOnly)host.insertBefore(locate,canvas);
  if(options.readOnly){feedback.textContent='この場所で登録します。違う場合だけ「場所を変更」を押してください。';canvas.setAttribute('aria-label','登録する施設の場所')}

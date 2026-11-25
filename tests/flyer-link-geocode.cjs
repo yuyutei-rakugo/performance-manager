@@ -1,0 +1,31 @@
+const assert=require('node:assert/strict');
+(async()=>{
+ const {resolveFlyerLinkPosition,addressCandidates,facilityCandidates}=await import('../flyer-link-geocode.js');
+ const place={name:'試験商店',address:'〒288-0051 千葉県銚子市飯沼町１−２５'};
+ const point=(title,lon=140.839,lat=35.732)=>({properties:{title},geometry:{coordinates:[lon,lat]}});
+ const approx=point('千葉県銚子市飯沼町１番');
+ const exact=point('千葉県銚子市飯沼町1-25',140.8393);
+ assert.equal(addressCandidates([approx],place.address)[0].quality,'approximate');
+ assert.deepEqual(addressCandidates([point('千葉県銚子市飯沼町11-25')],place.address),[]);
+ const facility={properties:{name:'株式会社 試験商店',state:'千葉県',city:'銚子市',street:'飯沼町',housenumber:'1-25'},geometry:{coordinates:[140.841,35.732]}};
+ assert.equal(facilityCandidates([facility],place).length,1);
+ assert.equal(facilityCandidates([{...facility,properties:{...facility.properties,housenumber:'1-26'}}],place).length,0);
+ const calls=[];
+ global.fetch=async raw=>{
+  const url=new URL(raw);calls.push(url);
+  const data=url.hostname.includes('gsi')?(calls.length===1?[approx]:[exact]):{features:[facility]};
+  return {ok:true,json:async()=>data};
+ };
+ assert.equal((await resolveFlyerLinkPosition({...place,lat:35,lng:140}))[0].quality,'link');
+ assert.equal(calls.length,0);
+ const results=await resolveFlyerLinkPosition(place,{region:'銚子市'});
+ assert.equal(results.length,2,'two separated exact candidates need a choice');
+ assert.deepEqual(results.map(row=>row.quality),['address','facility']);
+ assert.equal(calls[0].searchParams.get('q'),place.address);
+ assert.equal(calls[1].searchParams.get('q'),'千葉県銚子市飯沼町1-25');
+ assert.equal(calls[2].searchParams.get('q'),'試験商店 千葉県銚子市飯沼町1-25');
+ global.fetch=async raw=>({ok:true,json:async()=>new URL(raw).hostname.includes('gsi')?[approx]:{features:[]}});
+ assert.equal((await resolveFlyerLinkPosition(place))[0].quality,'approximate');
+ assert.equal((await resolveFlyerLinkPosition(place,{known:{lat:35.733,lng:140.84,address:'千葉県銚子市飯沼町1-25'}}))[0].quality,'facility');
+ console.log('PASS explicit pin, raw and normalized address, facility-name lookup, ambiguity and approximate locations');
+})().catch(error=>{console.error(error);process.exitCode=1});

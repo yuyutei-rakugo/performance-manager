@@ -146,6 +146,18 @@ export const normalizeLocationAddress=value=>String(value||'').normalize('NFKC')
   })
   .replace(/丁目|番地の?|番(?!地)/g,'-').replace(/[−‐－]/g,'-').replace(/\s/g,'').replace(/[-号]$/,'');
 
+export function verifiedLocationReferences(name,address){
+ const key=normalizeLocationAddress(address);
+ const normalizeName=value=>String(value||'').normalize('NFKC').toLowerCase().replace(/(?:株式会社|有限会社|\s)/g,'');
+ const requested=normalizeName(name);
+ if(!key||!requested)return [];
+ return [...locations].flatMap(([id,position])=>{
+  if(normalizeLocationAddress(position.address)!==key)return [];
+  const [region,label]=id.split('／');
+  return [label,...(position.aliases||[])].some(alias=>normalizeName(alias)===requested)?[{name:label,region,...position}]:[];
+ });
+}
+
 export function confirmedGoogleShare(raw){
  const url=new URL(raw);
  const link=url.origin+url.pathname;
