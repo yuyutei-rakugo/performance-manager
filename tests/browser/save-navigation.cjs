@@ -563,7 +563,9 @@ async function main(){
     await flyerForm.locator('.flyer-inline-map .flyer-tile-warning').waitFor();
     const manualBounds=await flyerForm.locator('.flyer-inline-map .flyer-map-canvas').boundingBox();
     const manualSave=await flyerForm.getByRole('button',{name:'登録する',exact:true}).boundingBox();
-    assert(manualBounds.y+manualBounds.height<=manualSave.y+2,'manual map stays above the save action');
+    const warningBounds=await flyerForm.locator('.flyer-inline-map .flyer-tile-warning').boundingBox();
+    assert(warningBounds.y>=0&&warningBounds.y+warningBounds.height<=manualSave.y,'connection failure is visible above save');
+    assert(manualBounds.y<manualSave.y,'manual map is reached without traversing the remaining options');
     await flyerForm.screenshot({path:'test-artifacts/facility-manual-map-mobile.png'});
     await flyerForm.getByRole('button',{name:'地図を閉じる',exact:true}).click();
     assert.equal(await flyerForm.locator('.flyer-inline-map .flyer-map-canvas').count(),0);
