@@ -543,7 +543,7 @@ async function main(){
       {properties:{name:'模擬施設',city:'銚子市',street:'模擬町',housenumber:'1'},geometry:{coordinates:[140.83,35.73]}},
       {properties:{name:'模擬施設',city:'別の市'},geometry:{coordinates:[140.9,36]}}
     ]}}));
-    await flyerForm.getByRole('button',{name:'施設名で場所を検索'}).click();
+    await flyerForm.getByRole('button',{name:'帳面の候補からピンを探す'}).click();
     const choosePlace=flyerForm.getByRole('button',{name:'この施設を選ぶ（ピンを付ける）'});
     await choosePlace.waitFor();
     assert.equal(await choosePlace.count(),1);
@@ -555,6 +555,7 @@ async function main(){
     await flyerForm.getByLabel('住所',{exact:true}).clear();
     await flyerForm.getByLabel('緯度',{exact:true}).clear();
     await flyerForm.getByLabel('経度',{exact:true}).clear();
+    await flyerForm.getByText('状況・メモも登録する（任意）',{exact:true}).click();
     await flyerForm.getByLabel('自由メモ（任意）').fill('入力を保持');
     failFlyer=true;
     await flyerForm.getByRole('button',{name:'変更を保存する'}).click();
@@ -664,10 +665,11 @@ async function main(){
     await fromMap.waitFor({state:'hidden'});
     assert.equal(flyerRows.find(row=>row.id==='known1').declined,false);
     await unknown.getByRole('button',{name:'状況・メモを編集'}).click();
+    await fromMap.getByText('施設名・場所を変更',{exact:true}).click();
     await fromMap.getByText('見つからないとき：住所・地図から指定',{exact:true}).click();
     await fromMap.getByText('詳細入力（地図URL・緯度・経度）',{exact:true}).click();
     await fromMap.getByLabel('住所',{exact:true}).fill('銚子市模擬町1');
-    await fromMap.getByLabel('地図URL',{exact:true}).fill('https://www.google.com/maps?q=35.73,140.83');
+    await fromMap.locator('input[name=mapUrl]').fill('https://www.google.com/maps?q=35.73,140.83');
     await fromMap.getByRole('button',{name:'変更を保存する'}).click();
     await fromMap.waitFor({state:'hidden'});
     assert.deepEqual(flyerRows.find(row=>row.id==='test-flyer').location,{address:'銚子市模擬町1',mapUrl:'https://www.google.com/maps?q=35.73,140.83',lat:35.73,lng:140.83});
