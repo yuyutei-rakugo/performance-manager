@@ -13,6 +13,8 @@ const tick=()=>new Promise(r=>setImmediate(r));
  assert.match(panel.querySelector('[data-updated]').textContent,/最終取得/);
  assert.match(panel.querySelector('.flyer-group').textContent,/神栖市.*公共施設/);
  const map=new URL(panel.querySelector('.flyer-map').href);assert.equal(map.origin,'https://www.google.com');assert.equal(map.searchParams.get('query'),'神栖市 〇〇公民館');
+ panel.querySelector('[data-search]').value='公民館 〇〇';panel.querySelector('[data-search-flyers]').click();
+ assert.equal(panel.querySelectorAll('[data-venue-id]').length,1,'search words may be reversed');
  panel.querySelector('[data-search]').value='石毛呉服店';
  panel.querySelector('[data-search-flyers]').click();
  assert.match(panel.querySelector('[data-list]').textContent,/登録済みの施設が見つかりません/);

@@ -1,4 +1,4 @@
-import {searchRegionalPlaces} from './regional-places.js?v=20261125-regions1';
+import {searchRegionalPlaces} from './regional-places.js?v=20261125-search1';
 import {loadStyles} from './flyer-map.js?v=20261125-simple1';
 import {map, tileLayer, circleMarker} from './vendor/leaflet/leaflet-src.esm.js';
 

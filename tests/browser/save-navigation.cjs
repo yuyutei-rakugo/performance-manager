@@ -572,6 +572,23 @@ async function main(){
     assert.equal(await flyerPanel.locator('[data-venue-id]').count(),1,'short link alone remains in review');
     await flyerPanel.getByRole('button',{name:'すべての施設に戻る',exact:true}).click();
 
+    // A different candidate name is presented explicitly; renaming is a draft until saved.
+    await invited.route('https://photon.komoot.io/api/**',route=>route.fulfill({json:{features:[
+      {properties:{name:'未収録の試験施設 本店',city:'神栖市'},geometry:{coordinates:[140.7,35.8]}}
+    ]}}));
+    await flyerPanel.getByRole('button',{name:'場所を設定する（任意）',exact:true}).click();
+    await flyerForm.getByRole('button',{name:'施設名で場所を検索',exact:true}).click();
+    await flyerForm.getByRole('button',{name:'この施設を選ぶ',exact:true}).click();
+    await flyerForm.getByText('現在の登録名：未収録の試験施設',{exact:true}).waitFor();
+    const candidateLatitude=await flyerForm.locator('[name=lat]').inputValue();
+    await flyerForm.getByRole('button',{name:'施設名を「未収録の試験施設 本店」に変更',exact:true}).click();
+    assert.equal(await flyerForm.locator('[name=name]').inputValue(),'未収録の試験施設 本店');
+    assert.equal(await flyerForm.locator('[name=lat]').inputValue(),candidateLatitude,'renaming preserves the selected position');
+    assert.equal(flyerRows[0].name,'未収録の試験施設','draft name does not change the database');
+    await flyerForm.getByRole('button',{name:'一覧に戻る',exact:true}).click();
+    await invited.getByRole('button',{name:'変更を破棄して一覧に戻る',exact:true}).click();
+    await invited.route('https://photon.komoot.io/api/**',route=>route.fulfill({json:{features:[]}}));
+
     // Selecting a known candidate opens a read-only confirmation, then saves the pin.
     await flyerPanel.getByRole('button',{name:'施設を追加',exact:true}).click();
     await flyerForm.getByLabel('施設名',{exact:true}).fill('矢田部郵便局');

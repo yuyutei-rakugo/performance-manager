@@ -91,12 +91,12 @@ async function catalog(region){
  return documents.get(key);
 }
 export function findRegionalPlaces(data,name,limit=12){
- const query=normalizePlaceName(name);
+ const query=normalizePlaceName(name),words=String(name||'').trim().split(/[\s　]+/).map(normalizePlaceName).filter(Boolean);
  if(!query)return [];
  return data.rows.flatMap(row=>{
   const names=[row.name,...row.aliases].map(normalizePlaceName);
   const score=names.some(n=>n===query)?0:names.some(n=>n.startsWith(query))?1:names.some(n=>n.includes(query))?2:3;
-  if(score===3)return [];
+  if(score===3&&!words.every(word=>names.some(n=>n.includes(word))))return [];
   return [{...row,region:data.region,datasetDate:data.sourceDate,cachedCopy:!!data.cachedCopy,score}];
  }).sort((a,b)=>a.score-b.score||compare(a.name,b.name)||compare(a.address,b.address)).slice(0,limit).map(({score,...row})=>row);
 }
