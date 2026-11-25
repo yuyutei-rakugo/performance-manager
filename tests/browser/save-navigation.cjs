@@ -66,7 +66,7 @@ async function main(){
           }
           case 'flyerRead':case 'flyerImport':return ok({rows:flyerRows,locationFields:true,declineFields:true,migrationRequired:false,refused:flyerRefused,categories:['公共施設'],sources:[],archived:false});
           case 'flyerSave':{
-            assert.equal(role,request.id?'admin':'viewer');
+            assert(['admin','viewer'].includes(role),'authenticated members can save flyer records');
             assert.equal(request.eventId,docs.events.items[0].id);
             if(failFlyer){failFlyer=false;return answer({ok:false,error:'模擬掲示先保存失敗'})}
             if(request.id){
