@@ -114,3 +114,16 @@ assert.equal(helpers.approx('茨城県神栖市知手中央123','神栖市',[dis
 assert.equal(helpers.approx('茨城県神栖市知手123-4','神栖市',[district,district]),undefined);
 assert.equal(helpers.approx('茨城県神栖市','神栖市',[{...district,properties:{title:'茨城県神栖市'}}]),undefined);
 helpers.close();
+
+// Address-only and short-link rows can use verified public reference positions.
+const referenceWindow=new JSDOM('',{runScripts:'outside-only'}).window;
+referenceWindow.eval(clean('flyer-locations.js')+'\nwindow.resolvePin=flyerLocation;');
+const resolvePin=row=>JSON.parse(JSON.stringify(referenceWindow.resolvePin(row)||null));
+const post={name:'若松郵便局',region:'神栖市',location:{address:'〒314-0253 茨城県神栖市須田２３４０－１２７',mapUrl:'https://maps.app.goo.gl/example'}};
+assert.deepEqual(resolvePin(post),[35.8391608,140.7424836]);
+assert.deepEqual(resolvePin({name:'ゆ〜ぽ〜とはさき',region:'神栖市',location:{address:'〒314-0255 茨城県神栖市砂山15',mapUrl:''}}),[35.84034367508438,140.74115608122614]);
+assert.deepEqual(resolvePin({...post,location:{...post.location,lat:35.8,lng:140.7}}),[35.8,140.7]);
+assert.equal(resolvePin({...post,location:{address:'茨城県神栖市別の住所',mapUrl:''}}),null);
+assert.equal(resolvePin({...post,location:null}),null);
+assert.equal(resolvePin({...post,location:{...post.location,mapUrl:'https://www.google.com/maps?q=35.7,140.8'}}),null);
+console.log('PASS verified reference pins, postal/full-width address matching, manual override and changed-address protection');
