@@ -727,6 +727,14 @@ async function main(){
     assert.equal(flyerRows.find(row=>row.id==='test-flyer').location.mapUrl,'');
     assert.deepEqual([flyerRows.find(row=>row.id==='test-flyer').location.lat,flyerRows.find(row=>row.id==='test-flyer').location.lng],[35.73,140.83]);
 
+    // The member's stored short link renders Marutake without changing its saved location.
+    const marutakeLocation={address:'',mapUrl:'https://maps.app.goo.gl/g2AV4mKkUri1t9MS9'};
+    flyerRows.push({id:'marutake-short',revision:1,name:'丸竹',region:'神栖市',category:'その他',status:'未依頼',memo:'',location:{...marutakeLocation}});
+    await mapPanel.getByRole('button',{name:'一覧を更新',exact:true}).click();
+    await mapPanel.getByRole('button',{name:'丸竹 未依頼',exact:true}).waitFor();
+    assert.equal(await mapPanel.locator('[data-unlocated] li').filter({hasText:'丸竹'}).count(),0);
+    assert.deepEqual(flyerRows.find(row=>row.id==='marutake-short').location,marutakeLocation);
+
     // Preloaded regional POIs register on the same screen without Photon or a bulk import.
     await mkdir('test-artifacts',{recursive:true});
     await invited.setViewportSize({width:360,height:740});

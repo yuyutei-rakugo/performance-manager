@@ -1,5 +1,6 @@
 // Public venue address and position references, checked 2026-11-24.
 const locations=new Map([
+ ["神栖市／丸竹",{"address":"茨城県神栖市土合本町3丁目9809-267","lat":35.79461386,"lng":140.77759256,"source":"https://www.mapion.co.jp/phonebook/M02014/08232/20830199416/","confirmedLinks":["https://maps.app.goo.gl/g2AV4mKkUri1t9MS9","https://maps.app.goo.gl/17Sgq87wKKxGt7vj8"]}],
  ["神栖市／若松郵便局",{"address":"茨城県神栖市須田2340-127","lat":35.8391608,"lng":140.7424836,"source":"https://map.japanpost.jp/p/search/dtl/300106211000/"}],
  ["神栖市／ゆ〜ぽ〜とはさき",{"address":"茨城県神栖市砂山15","lat":35.84034367508438,"lng":140.74115608122614,"source":"https://www.city.kamisu.ibaraki.jp/kanko_sports/ss_facility/1002393/1002408/1002411.html"}],
  ["銚子市／イオン銚子店",{"address":"千葉県銚子市三崎町2丁目2660-1","lat":35.710182,"lng":140.7876928,"source":"https://www.mapion.co.jp/phonebook/M02002/12202/ILSP0000682420_ipclm/"}],
@@ -104,10 +105,15 @@ export function flyerLocationInfo(row){
  const saved=row.location;
  // Explicit removal, changed addresses and manually selected pins always win.
  if(!saved||!reference||Number.isFinite(saved.lat)||Number.isFinite(saved.lng))return saved;
- if(!saved.address||normalizeLocationAddress(saved.address)!==normalizeLocationAddress(reference.address))return saved;
+ const addressMatches=!!saved.address&&normalizeLocationAddress(saved.address)===normalizeLocationAddress(reference.address);
+ let confirmedLink=false;
+ if(!saved.address&&reference.confirmedLinks){
+  try{const url=new URL(saved.mapUrl);confirmedLink=reference.confirmedLinks.includes(url.origin+url.pathname)}catch{}
+ }
+ if(!addressMatches&&!confirmedLink)return saved;
  // A coordinate-bearing link can designate a different entrance; never replace it.
  try{if(positionFromUrl(saved.mapUrl))return saved}catch{return saved}
- return {...reference,...saved,lat:reference.lat,lng:reference.lng};
+ return {...reference,...saved,address:saved.address||reference.address,lat:reference.lat,lng:reference.lng};
 }
 export function flyerLocation(row){
  const saved=flyerLocationInfo(row);
