@@ -586,6 +586,7 @@ async function main(){
     await mapPanel.getByRole('button',{name:'最新を取得'}).click();
     await mapPanel.getByText('神栖市 ／ 公共施設',{exact:true}).first().waitFor();
     assert.equal(tiles,0);
+    await page.route('https://msearch.gsi.go.jp/**',route=>route.fulfill({json:[]}));
     await mapPanel.getByRole('button',{name:'地図で見る'}).click();
     const centralPin=mapPanel.getByRole('button',{name:'中央図書館 掲示済み'});
     await centralPin.click();
@@ -622,7 +623,7 @@ async function main(){
       {properties:{title:'茨城県神栖市知手'},geometry:{coordinates:[140.70,35.86]}}
     ]}));
     await mapPanel.locator('[data-unlocated] summary').click();
-    await mapPanel.getByRole('button',{name:'住所から概略位置を探す'}).click();
+    await mapPanel.getByRole('button',{name:'住所から位置を探す'}).click();
     await popup.getByText('概略位置（住所に基づく目安）').waitFor();
     assert.equal(await mapPanel.locator('.flyer-pin-approx').count(),1);
     const searchUrl=new URL(await popup.getByRole('link',{name:'Googleマップで探す'}).getAttribute('href'));
