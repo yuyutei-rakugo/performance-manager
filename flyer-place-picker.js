@@ -42,8 +42,22 @@ export async function mountPlacePicker(host,initial,choose){
  const submit=document.createElement('button');submit.type='button';submit.className='secondary';submit.textContent='この位置を使う';submit.disabled=true;
  host.replaceChildren(feedback,canvas,submit);
  const view=map(canvas,{scrollWheelZoom:false,maxZoom:21}).setView(initial||[35.85,140.72],initial?16:11);
- tileLayer('https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png',{attribution:'地理院タイル',maxNativeZoom:18,maxZoom:21,referrerPolicy:'no-referrer'}).addTo(view);
- let positionMarker,selected;
+ tileLayer('https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png',{attribution:'<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener noreferrer">地理院タイル</a>',maxNativeZoom:18,maxZoom:21,referrerPolicy:'no-referrer'}).addTo(view);
+ let selected=initial,positionMarker=initial?circleMarker(initial,{radius:8,color:'#a92530',fillOpacity:1,interactive:false}).addTo(view):null;
+ if(initial){submit.disabled=false;feedback.textContent='赤い点が登録する位置です。違う場合は地図を押して変更できます。'}
+ const locate=document.createElement('button');locate.type='button';locate.className='secondary';locate.textContent='現在地の周辺を表示';
+ host.insertBefore(locate,canvas);
+ let active=true;
+ locate.onclick=()=>{
+  if(!navigator.geolocation){feedback.textContent='この端末では現在地を取得できません。';return}
+  locate.disabled=true;
+  navigator.geolocation.getCurrentPosition(({coords})=>{
+   if(!active)return;
+   view.setView([coords.latitude,coords.longitude],17);
+   circleMarker([coords.latitude,coords.longitude],{radius:7,color:'#fff',weight:2,fillColor:'#075cc3',fillOpacity:1,interactive:false}).addTo(view);
+   feedback.textContent='青い点が現在地です。施設の場所を押して赤いピンを置いてください。';locate.disabled=false;
+  },()=>{if(active){feedback.textContent='現在地を取得できません。地図を動かして指定できます。';locate.disabled=false}},{timeout:10000,maximumAge:30000});
+ };
  view.on('click',({latlng})=>{
   selected=[latlng.lat,latlng.lng];
   if(positionMarker)positionMarker.setLatLng(selected);
@@ -51,5 +65,5 @@ export async function mountPlacePicker(host,initial,choose){
   submit.disabled=false;feedback.textContent='ピンの位置を確認してください。';
  });
  submit.onclick=()=>choose(selected);
- return ()=>view.remove();
+ return ()=>{active=false;view.remove()};
 }
