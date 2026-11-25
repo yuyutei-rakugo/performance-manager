@@ -16,7 +16,7 @@ export function startEditor(dialog,form){
  if(status&&!status.textContent){status.hidden=false;status.dataset.savePhase='ready';status.textContent='編集中'}
  const actions=form.querySelector('.editor-bar .form-actions');
  if(actions){for(const button of actions.querySelectorAll('button')){
-  if(button.type==='submit'){button.textContent='変更を保存する';button.classList.add('primary')}
+  if(button.type==='submit'){button.textContent=button.dataset.saveLabel||'変更を保存する';button.classList.add('primary')}
   else if(button.textContent.trim()==='キャンセル')button.classList.add('secondary');
  }}
  return editor;
@@ -29,8 +29,10 @@ export function editorState(form,message,pending=false){
   for(const child of form.children){
    if(!child.classList.contains('editor-bar'))child.inert=pending;
   }
-  form.querySelector('.editor-bar button:not([type=button])').disabled=pending;
+  for(const button of form.querySelectorAll('.editor-bar button[type=submit],.editor-bar button:not([type])'))button.disabled=pending;
  }
+ const feedback=form.querySelector('[data-save-feedback]');
+ if(feedback)feedback.textContent=message;
  const status=form.querySelector('[data-editor-status]');
  if(status){status.textContent=message;status.hidden=!message;status.dataset.savePhase=pending?'pending':/できません|失敗|確認してください|更新されています/.test(message)?'error':/保存しました/.test(message)?'saved':'ready'}
 }
