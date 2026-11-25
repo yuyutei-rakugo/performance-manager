@@ -664,6 +664,8 @@ async function main(){
     await fromMap.waitFor({state:'hidden'});
     assert.equal(flyerRows.find(row=>row.id==='known1').declined,false);
     await unknown.getByRole('button',{name:'状況・メモを編集'}).click();
+    await fromMap.getByText('見つからないとき：住所・地図から指定',{exact:true}).click();
+    await fromMap.getByText('詳細入力（地図URL・緯度・経度）',{exact:true}).click();
     await fromMap.getByLabel('住所',{exact:true}).fill('銚子市模擬町1');
     await fromMap.getByLabel('地図URL',{exact:true}).fill('https://www.google.com/maps?q=35.73,140.83');
     await fromMap.getByRole('button',{name:'変更を保存する'}).click();
