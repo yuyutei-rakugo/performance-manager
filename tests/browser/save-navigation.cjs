@@ -677,6 +677,20 @@ async function main(){
     await unknown.getByRole('button',{name:'地図でこの施設を見る'}).click();
     await mapPanel.locator('[data-pin-details]').getByText('模擬施設',{exact:true}).waitFor();
 
+    // Missing coordinates are supplemented from the address without changing stored rows.
+    let addressLookups=0;
+    await page.route('https://msearch.gsi.go.jp/address-search/AddressSearch**',route=>{
+      addressLookups++;
+      const query=new URL(route.request().url()).searchParams.get('q');
+      assert.equal(query,'茨城県神栖市須田2340-127');
+      return route.fulfill({json:[{properties:{title:'茨城県神栖市須田２３４０番地'},geometry:{coordinates:[140.74,35.83]}}]});
+    });
+    flyerRows.push({id:'address-only',revision:1,name:'住所だけの施設',region:'神栖市',category:'その他',status:'未依頼',memo:'',location:{address:'〒314-0253 茨城県神栖市須田２３４０－１２７',mapUrl:''}});
+    await mapPanel.getByRole('button',{name:'最新を取得'}).click();
+    await mapPanel.getByRole('button',{name:'住所だけの施設 未依頼 概略位置',exact:true}).waitFor();
+    assert.equal(addressLookups,1);
+    assert.equal(flyerRows.find(row=>row.id==='address-only').location.lat,undefined);
+
     await invited.setViewportSize({width:320,height:680});
     await invited.locator('#event-dialog [data-close]').click();
     await invited.getByRole('button',{name:'予約書類を追加'}).click();
