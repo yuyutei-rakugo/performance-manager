@@ -1,5 +1,7 @@
 // Public venue address and position references, checked 2026-11-24.
 const locations=new Map([
+ ["神栖市／若松郵便局",{"address":"茨城県神栖市須田2340-127","lat":35.8391608,"lng":140.7424836,"source":"https://map.japanpost.jp/p/search/dtl/300106211000/"}],
+ ["神栖市／ゆ〜ぽ〜とはさき",{"address":"茨城県神栖市砂山15","lat":35.84034367508438,"lng":140.74115608122614,"source":"https://www.city.kamisu.ibaraki.jp/kanko_sports/ss_facility/1002393/1002408/1002411.html"}],
  ["銚子市／イオン銚子店",{"address":"千葉県銚子市三崎町2丁目2660-1","lat":35.710182,"lng":140.7876928,"source":"https://www.mapion.co.jp/phonebook/M02002/12202/ILSP0000682420_ipclm/"}],
  ["銚子市／公正図書館",{"address":"千葉県銚子市新生町2丁目1-5","lat":35.732391,"lng":140.8333304,"source":"https://mapfan.com/spots/SC3AC%2CJ%2C14W"}],
  ["神栖市／カスミ 波崎店",{"address":"茨城県神栖市波崎8473-3","lat":35.7497229,"lng":140.8231211,"source":"https://www.mapion.co.jp/phonebook/M02002/08232/20830198003/"}],
@@ -97,8 +99,16 @@ const locations=new Map([
 ]);
 
 export function flyerLocationInfo(row){
- if(row.location!==undefined)return row.location;
- return locations.get(row.region+'／'+row.name);
+ const reference=locations.get(row.region+'／'+row.name);
+ if(row.location===undefined)return reference;
+ const saved=row.location;
+ // Explicit removal, changed addresses and manually selected pins always win.
+ if(!saved||!reference||Number.isFinite(saved.lat)||Number.isFinite(saved.lng))return saved;
+ const normalizeAddress=value=>String(value||'').normalize('NFKC').replace(/^〒?\s*\d{3}[-‐－]?\d{4}\s*/,'').replace(/[−‐－]/g,'-').replace(/番地$|番地の?/g,'-').replace(/[-号]$/,'').replace(/\s+/g,'');
+ if(!saved.address||normalizeAddress(saved.address)!==normalizeAddress(reference.address))return saved;
+ // A coordinate-bearing link can designate a different entrance; never replace it.
+ try{if(positionFromUrl(saved.mapUrl))return saved}catch{return saved}
+ return {...reference,...saved,lat:reference.lat,lng:reference.lng};
 }
 export function flyerLocation(row){
  const saved=flyerLocationInfo(row);
