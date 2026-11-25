@@ -550,7 +550,7 @@ async function main(){
     await choosePlace.click();
     assert.equal(await flyerForm.getByLabel('緯度',{exact:true}).inputValue(),'35.73');
     await flyerForm.getByText(/ピンの位置を選択済み/).waitFor();
-    await flyerForm.getByText('見つからないとき：住所・地図から指定',{exact:true}).click();
+    await flyerForm.getByText('住所・地図から指定',{exact:true}).click();
     await flyerForm.getByText('詳細入力（地図URL・緯度・経度）',{exact:true}).click();
     await flyerForm.getByLabel('住所',{exact:true}).clear();
     await flyerForm.getByLabel('緯度',{exact:true}).clear();
@@ -674,7 +674,7 @@ async function main(){
     assert.equal(flyerRows.find(row=>row.id==='known1').declined,false);
     await unknown.getByRole('button',{name:'状況・メモを編集'}).click();
     await fromMap.getByText('施設名・場所を変更',{exact:true}).click();
-    await fromMap.getByText('見つからないとき：住所・地図から指定',{exact:true}).click();
+    await fromMap.getByText('住所・地図から指定',{exact:true}).click();
     await fromMap.getByText('詳細入力（地図URL・緯度・経度）',{exact:true}).click();
     await fromMap.getByLabel('住所',{exact:true}).fill('銚子市模擬町1');
     await fromMap.locator('.flyer-google-help > summary').click();
@@ -740,6 +740,9 @@ async function main(){
     await flyerForm.getByLabel('地域',{exact:true}).selectOption('神栖市');
     await flyerForm.getByRole('button',{name:'施設名で場所を検索',exact:true}).click();
     await flyerForm.getByRole('button',{name:'この場所を地図で確認',exact:true}).first().waitFor();
+    await flyerForm.locator('.flyer-save-footer button[type=submit]').click();
+    await flyerForm.locator('[data-editor-status]').filter({hasText:'検索候補から場所を選んでください'}).waitFor();
+    assert.equal(flyerRows.length,beforeRegional,'a candidate must be selected before a searched facility is registered');
     await flyerForm.screenshot({path:'test-artifacts/regional-search-mobile.png'});
     await flyerForm.getByRole('button',{name:'この場所を地図で確認',exact:true}).first().click();
     await flyerForm.getByRole('button',{name:'この場所で登録する',exact:true}).waitFor();
