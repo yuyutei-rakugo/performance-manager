@@ -131,6 +131,29 @@ export function openFlyerVenues(event){
   editor.dataset.discardLabel='変更を破棄して一覧に戻る';
   editor.innerHTML=`<div class="dialog-body"><h2>${row.id?'状況・メモを編集':'配布・掲示する施設を追加'}</h2>${row.id?`<p class="flyer-editor-name">${esc(row.name)}</p>`:''}<form><div class="editor-bar"><div class="form-actions"><button type="submit" class="primary">変更を保存する</button><button type="button" data-cancel class="secondary">一覧に戻る</button></div><p data-editor-status role="status" hidden></p></div><fieldset class="flyer-choices"><legend>状況（１つ選択）</legend>${statuses.map((status,i)=>`<label class="flyer-choice flyer-status" data-status="${i}"><input type="radio" name="status" value="${status}" ${(row.status||statuses[0])===status?'checked':''} required><span>${status}</span></label>`).join('')}</fieldset>${data.declineFields?`<label class="flyer-decline" data-decline-field><input type="checkbox" name="declined" ${row.declined?'checked':''}>過去または今回、お断りがあったため見送り</label>`:''}<label>自由メモ（任意・この公演のみ）<textarea name="memo" aria-label="自由メモ（任意）" maxlength="2000" rows="4"></textarea></label><details class="quick-help" ${row.id?'':'open'}><summary>施設名・地域・区分</summary><label>施設名<input name="name" required maxlength="120" value="${esc(row.name)}"></label>${data.sharedFacilities?(!row.id||row.facilityId?'<p class="muted">施設情報は他の公演にも反映されます。</p>':!row.source?'<p class="muted">この施設は共通化前です。管理者が一覧で共通化を確認できます。</p>':''):'<p class="muted">共通保存の更新までは、この公演に保存されます。</p>'}${editorChoice('region','地域',['銚子市','神栖市',...(data.regions||[]),...data.rows.map(item=>item.region)],row.region||region.value||'神栖市')}${editorChoice('category','区分',data.categories,row.category||category.value||'その他')}<button type="button" class="secondary" data-find-place>場所を探す</button><div data-place-results aria-live="polite"></div></details><details ${row.id&&!flyerLocation(row)?'open':''}><summary>住所・地図の位置</summary><button type="button" class="secondary" data-pick-place>地図上で位置を指定</button><div data-picker></div><label>住所<input name="address" maxlength="250" value="${esc(position?.address)}"></label><button type="button" class="secondary" data-search-address>住所を地図で確認</button> <button type="button" class="secondary" data-locate-address>完全一致する住所から座標を入れる</button><p data-address-result role="status"></p><label>地図URL<input name="mapUrl" type="url" maxlength="1000" value="${esc(position?.mapUrl)}"></label><p class="muted">住所や地図リンクだけも保存できます。ピンを表示するには、ピンの座標が入った地図URL、または緯度・経度を入力してください。</p><label>緯度<input name="lat" type="number" min="-90" max="90" step="any" value="${esc(position?.lat)}"></label><label>経度<input name="lng" type="number" min="-180" max="180" step="any" value="${esc(position?.lng)}"></label></details></form></div>`;
   const form=editor.querySelector('form'),cancel=form.querySelector('[data-cancel]');
+  // Keep the common location task visible, before status and optional metadata.
+  const facilityDetails=form.querySelector('.quick-help');
+  const locationDetails=form.querySelector('[data-picker]').closest('details');
+  const placeSection=document.createElement('section');
+  placeSection.className='flyer-place-steps';
+  placeSection.innerHTML='<h3>施設を検索してピンを付ける</h3><p>① 施設名を入力 → ② 検索して候補を選ぶ → ③ 変更を保存する</p>';
+  placeSection.append(form.elements.name.closest('label'),form.elements.region.closest('div'),form.querySelector('[data-find-place]'),form.querySelector('[data-place-results]'));
+  const pinStatus=document.createElement('p');pinStatus.setAttribute('role','status');
+  placeSection.append(pinStatus);
+  locationDetails.open=false;
+  locationDetails.querySelector('summary').textContent='見つからないとき：住所・地図から指定';
+  const coordinates=document.createElement('details');
+  coordinates.innerHTML='<summary>詳細入力（地図URL・緯度・経度）</summary>';
+  for(const name of ['mapUrl','lat','lng'])coordinates.append(form.elements[name].closest('label'));
+  locationDetails.querySelector('.muted').remove();locationDetails.append(coordinates);
+  placeSection.append(locationDetails);
+  form.querySelector('.editor-bar').after(placeSection);
+  facilityDetails.querySelector('summary').textContent='区分・施設の共有について';
+  facilityDetails.open=false;
+  const updatePinStatus=()=>{
+   const hasPin=form.elements.lat.value!==''&&form.elements.lng.value!=='';
+   pinStatus.textContent=hasPin?'✓ ピンの位置を選択済み。「変更を保存する」で登録します。':'ピンはまだ選ばれていません。施設名で検索してください。';
+  };
   form.elements.memo.value=row.memo||'';
   const declineField=form.querySelector('[data-decline-field]');
   const updateStatus=()=>{if(declineField){declineField.hidden=form.elements.status.value!=='今回は見送り';form.elements.declined.disabled=declineField.hidden}};
@@ -143,8 +166,11 @@ export function openFlyerVenues(event){
    [form.elements.lat.value,form.elements.lng.value]=[lat,lng];
    form.elements.mapUrl.value='';
    if(address!==undefined)form.elements.address.value=address;
-   picker.closest('details').open=true;updateAddressButton();
+   updateAddressButton();updatePinStatus();
+   form.dispatchEvent(new Event('input',{bubbles:true}));
   }
+  search.textContent='施設名で場所を検索';
+  form.elements.name.addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();if(!search.disabled)search.click()}});
   search.onclick=async()=>{
    const name=form.elements.name.value.trim(),region=readRegion();
    if(!name||!region){results.textContent='施設名と地域を入力してください。';return}
@@ -158,8 +184,9 @@ export function openFlyerVenues(event){
     if(!form.isConnected||name!==form.elements.name.value.trim()||region!==readRegion()){results.textContent='施設名または地域が変わりました。もう一度検索してください。';return}
     showPlaceCandidates(results,candidates,candidate=>{
      if(name!==form.elements.name.value.trim()||region!==readRegion()){results.textContent='施設名または地域が変わりました。もう一度検索してください。';return}
+     if(!row.id)form.elements.name.value=candidate.name;
      usePlace(candidate.lat,candidate.lng,candidate.address);
-     results.textContent='候補の位置を入力しました。「変更を保存する」で登録します。';
+     results.textContent='「'+candidate.name+'」の場所を選びました。最後に「変更を保存する」を押してください。';
     });
    }catch{results.textContent='場所を検索できませんでした。住所・地図URL・地図上の位置指定も使えます。'}
    finally{search.disabled=false}
@@ -167,6 +194,7 @@ export function openFlyerVenues(event){
   const pickButton=form.querySelector('[data-pick-place]');
   pickButton.onclick=async()=>{
    if(removePicker){removePicker();removePicker=null;picker.replaceChildren();pickButton.textContent='地図上で位置を指定';return}
+   picker.closest('details').open=true;
    pickButton.disabled=true;
    try{
     const {mountPlacePicker}=await import('./flyer-place-picker.js?v=20261124-ux1');
@@ -195,7 +223,7 @@ export function openFlyerVenues(event){
     const candidate=exactAddressPosition(address,await response.json());
     if(!editor?.contains(form)||address!==form.elements.address.value.trim())return;
     if(candidate){
-     [form.elements.lat.value,form.elements.lng.value]=candidate;
+     usePlace(candidate[0],candidate[1]);
      addressResult.textContent='住所に一致する座標を入力しました。確認して保存してください。';
     }else addressResult.textContent='住所に完全一致する座標は見つかりませんでした。地図URLまたは緯度・経度を入力してください。';
    }catch{addressResult.textContent='住所を確認できませんでした。もう一度お試しください。'}
@@ -203,7 +231,8 @@ export function openFlyerVenues(event){
   };
   form.elements.address.addEventListener('input',updateAddressButton);
   addressButton.onclick=()=>window.open('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(form.elements.address.value.trim()),'_blank','noopener,noreferrer');
-  updateAddressButton();
+  updateAddressButton();updatePinStatus();
+  for(const name of ['lat','lng'])form.elements[name].addEventListener('input',updatePinStatus);
   document.body.append(editor);
   startEditor(editor,form);const unguard=guardEditor(editor);
   // Keep the form open while the confirmed save is outstanding.
@@ -255,6 +284,7 @@ export function openFlyerVenues(event){
   };
   editor.showModal();
   if(openPlace)search.click();
+  else if(!row.id)form.elements.name.focus();
  }
  q('[data-search]').oninput=redraw;
  q('[data-filter-status]').onchange=redraw;
