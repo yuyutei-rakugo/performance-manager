@@ -10,7 +10,10 @@ export function startEditor(dialog,form){
  const status=form.querySelector('[data-editor-status]');
  const changed=()=>{
   if(editor.pending||editor.committed||editors.get(dialog)!==editor)return;
-  if(status){status.hidden=false;status.dataset.savePhase=editor.dirty()?'dirty':'ready';status.textContent=editor.dirty()?'未保存':'編集中'}
+  const dirty=editor.dirty();
+  if(status){status.hidden=false;status.dataset.savePhase=dirty?'dirty':'ready';status.textContent=dirty?'未保存':'編集中'}
+  const feedback=form.querySelector('[data-save-feedback]');
+  if(feedback)feedback.textContent=dirty?'内容を確認して保存してください。':'入力後、このボタンで保存します。';
  };
  form.addEventListener('input',changed);form.addEventListener('change',changed);
  if(status&&!status.textContent){status.hidden=false;status.dataset.savePhase='ready';status.textContent='編集中'}
@@ -25,7 +28,7 @@ export function startEditor(dialog,form){
 export function editorState(form,message,pending=false){
  const dialog=form.closest('dialog'),editor=dialog&&editors.get(dialog);
  if(editor?.form===form){
-  editor.pending=pending;
+  editor.pending=pending;form.setAttribute('aria-busy',String(pending));
   for(const child of form.children){
    if(!child.classList.contains('editor-bar'))child.inert=pending;
   }

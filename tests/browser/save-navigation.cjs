@@ -1,5 +1,5 @@
 const assert = require('node:assert/strict');
-const {readFile}=require('node:fs/promises');
+const {readFile,mkdir}=require('node:fs/promises');
 const { chromium, devices } = require('playwright');
 
 const base = new URL(process.env.AUDIT_URL || 'http://127.0.0.1:8151/');
@@ -74,7 +74,7 @@ async function main(){
               assert(i>=0);
               assert.equal(request.revision,flyerRows[i].revision);
               flyerRows[i]={...flyerRows[i],...request.entry,revision:request.revision+1};
-            }else flyerRows.push({...request.entry,id:'test-flyer',revision:1});
+            }else flyerRows.push({...request.entry,id:flyerRows.some(row=>row.id==='test-flyer')?'test-flyer-'+(flyerRows.length+1):'test-flyer',revision:1});
             return ok({rows:flyerRows,locationFields:true,declineFields:true,migrationRequired:false,refused:flyerRefused,categories:['公共施設'],sources:[],archived:false});
           }
           case 'reservationList':return ok({documents:reservationRows,schedules:[],canReview:false});
@@ -550,7 +550,7 @@ async function main(){
     await choosePlace.click();
     assert.equal(await flyerForm.getByLabel('緯度',{exact:true}).inputValue(),'35.73');
     await flyerForm.getByText(/ピンの位置を選択済み/).waitFor();
-    await flyerForm.getByText('見つからないとき：住所・地図から指定',{exact:true}).click();
+    await flyerForm.getByText('住所・地図から指定',{exact:true}).click();
     await flyerForm.getByText('詳細入力（地図URL・緯度・経度）',{exact:true}).click();
     await flyerForm.getByLabel('住所',{exact:true}).clear();
     await flyerForm.getByLabel('緯度',{exact:true}).clear();
@@ -674,7 +674,7 @@ async function main(){
     assert.equal(flyerRows.find(row=>row.id==='known1').declined,false);
     await unknown.getByRole('button',{name:'状況・メモを編集'}).click();
     await fromMap.getByText('施設名・場所を変更',{exact:true}).click();
-    await fromMap.getByText('見つからないとき：住所・地図から指定',{exact:true}).click();
+    await fromMap.getByText('住所・地図から指定',{exact:true}).click();
     await fromMap.getByText('詳細入力（地図URL・緯度・経度）',{exact:true}).click();
     await fromMap.getByLabel('住所',{exact:true}).fill('銚子市模擬町1');
     await fromMap.locator('.flyer-google-help > summary').click();
@@ -726,6 +726,57 @@ async function main(){
     assert.equal(page.context().pages().length,pageCount);
     assert.equal(flyerRows.find(row=>row.id==='test-flyer').location.mapUrl,'');
     assert.deepEqual([flyerRows.find(row=>row.id==='test-flyer').location.lat,flyerRows.find(row=>row.id==='test-flyer').location.lng],[35.73,140.83]);
+
+    // Preloaded regional POIs register on the same screen without Photon or a bulk import.
+    await mkdir('test-artifacts',{recursive:true});
+    await invited.setViewportSize({width:360,height:740});
+    let fallbackSearches=0,regionalTransfers=0;
+    await invited.route('https://photon.komoot.io/api/**',route=>{fallbackSearches++;return route.abort()});
+    invited.on('request',request=>{if(request.url().includes('/place-catalog/kamisu.json'))regionalTransfers++});
+    await invited.locator('[data-flyers]').click();
+    const beforeRegional=flyerRows.length;
+    await flyerPanel.getByRole('button',{name:'施設を追加',exact:true}).click();
+    await flyerForm.getByLabel('施設名',{exact:true}).fill('矢田部郵便局');
+    await flyerForm.getByLabel('地域',{exact:true}).selectOption('神栖市');
+    await flyerForm.getByRole('button',{name:'施設名で場所を検索',exact:true}).click();
+    await flyerForm.getByRole('button',{name:'この場所を地図で確認',exact:true}).first().waitFor();
+    await flyerForm.locator('.flyer-save-footer button[type=submit]').click();
+    await flyerForm.locator('[data-editor-status]').filter({hasText:'検索候補から場所を選んでください'}).waitFor();
+    assert.equal(flyerRows.length,beforeRegional,'a candidate must be selected before a searched facility is registered');
+    await flyerForm.screenshot({path:'test-artifacts/regional-search-mobile.png'});
+    await flyerForm.getByRole('button',{name:'この場所を地図で確認',exact:true}).first().click();
+    await flyerForm.getByRole('button',{name:'この場所で登録する',exact:true}).waitFor();
+    assert(await flyerForm.evaluate(el=>el.scrollWidth<=el.clientWidth+2),'facility editor has no horizontal overflow on a phone');
+    const regionalSave=await flyerForm.getByRole('button',{name:'この場所で登録する',exact:true}).boundingBox();
+    assert(regionalSave.height>=44,'registration has a finger-sized target');
+    const pinBefore=await flyerForm.locator('[name=lat]').inputValue();
+    await flyerForm.locator('.flyer-inline-map .flyer-map-canvas').click({position:{x:110,y:100}});
+    const stagedPin=await flyerForm.locator('[name=lat]').inputValue();
+    assert.notEqual(stagedPin,pinBefore,'moving the map pin stages the location for every save button');
+    await flyerForm.evaluate(()=>document.fonts.ready);
+
+    await flyerForm.screenshot({path:'test-artifacts/regional-registration-mobile.png'});
+    failFlyer=true;
+    await flyerForm.locator('.flyer-save-footer button[type=submit]').click();
+    await flyerForm.locator('[data-editor-status]').filter({hasText:'保存できませんでした'}).waitFor();
+    await flyerForm.getByRole('button',{name:'この場所で登録する',exact:true}).click();
+    await flyerForm.waitFor({state:'hidden'});
+    assert.equal(flyerRows.length,beforeRegional+1);
+    const regionalRow=flyerRows.find(row=>row.name==='矢田部郵便局');
+    assert.equal(regionalRow.location.lat,Number(stagedPin),'the staged pin survives failure and retry');
+    assert(regionalRow.location.lat>35.7&&regionalRow.location.lat<36);
+    assert(regionalRow.location.lng>140.5&&regionalRow.location.lng<140.9);
+    assert.equal(fallbackSearches,0,'local hits never contact the external search service');
+    assert.equal(regionalTransfers,1,'only the selected regional file is fetched once');
+    await flyerPanel.getByRole('button',{name:'施設を追加',exact:true}).click();
+    await flyerForm.getByLabel('施設名',{exact:true}).fill('郵便局');
+    await flyerForm.getByLabel('地域',{exact:true}).selectOption('神栖市');
+    await flyerForm.getByRole('button',{name:'施設名で場所を検索',exact:true}).click();
+    await flyerForm.getByRole('button',{name:'この場所を地図で確認',exact:true}).first().waitFor();
+    assert.equal(regionalTransfers,1,'later searches reuse public data and saved locations');
+    await flyerForm.getByRole('button',{name:'一覧に戻る',exact:true}).click();
+    await invited.getByRole('button',{name:'変更を破棄して一覧に戻る',exact:true}).click();
+    await flyerPanel.locator('[data-close-flyers]').click();
 
     await invited.setViewportSize({width:320,height:680});
     await invited.locator('#event-dialog [data-close]').click();

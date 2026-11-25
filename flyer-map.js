@@ -1,5 +1,5 @@
 import {map, tileLayer, circleMarker, marker, divIcon, latLngBounds} from './vendor/leaflet/leaflet-src.esm.js';
-import {flyerLocation,flyerLocationInfo,flyerSearchUrl,approximateAddressPosition,normalizeLocationAddress} from './flyer-locations.js?v=20261124-ux1';
+import {flyerLocation,flyerLocationInfo,flyerSearchUrl,approximateAddressPosition,normalizeLocationAddress} from './flyer-locations.js?v=20261125-regions1';
 
 const statuses=['未依頼','依頼済み','掲示済み','今回は見送り'];
 let styles;
@@ -25,7 +25,7 @@ export async function mountFlyerMap(host,actions){
  approximateLabel.className='flyer-approx-label';approximateLabel.textContent='輪郭のピンは概略位置';legend.append(approximateLabel);
  const view=map(canvas,{scrollWheelZoom:false,maxZoom:21}).setView([35.85,140.72],11);
  const background=tileLayer('https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png',{
-  attribution:'<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener noreferrer">地理院タイル</a>',maxNativeZoom:18,maxZoom:21,referrerPolicy:'no-referrer'
+  attribution:'<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener noreferrer">地理院タイル</a> | © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap contributors</a>',maxNativeZoom:18,maxZoom:21,referrerPolicy:'no-referrer'
  }).addTo(view);
  const warning=host.querySelector('[data-tile-warning]');
  background.on('loading',()=>{warning.hidden=true});
