@@ -140,7 +140,9 @@ export function openFlyerVenues(event){
   placeSection.innerHTML='<p>施設名で検索 → この画面の地図で確認 → 登録</p>';
   placeSection.append(form.elements.name.closest('label'),form.elements.region.closest('div'),form.querySelector('[data-find-place]'),form.querySelector('[data-place-results]'));
   const pinStatus=document.createElement('p');pinStatus.setAttribute('role','status');
-  placeSection.append(pinStatus);
+  const searchCredit=document.createElement('p');searchCredit.className='muted';
+  searchCredit.innerHTML='<small>施設検索：© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap contributors</a></small>';
+  placeSection.append(searchCredit,pinStatus);
   locationDetails.open=false;
   locationDetails.querySelector('summary').textContent='見つからないとき：住所・地図から指定';
   const coordinates=document.createElement('details');
