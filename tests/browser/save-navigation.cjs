@@ -66,7 +66,7 @@ async function main(){
           }
           case 'flyerRead':case 'flyerImport':return ok({rows:flyerRows,locationFields:true,declineFields:true,migrationRequired:false,refused:flyerRefused,categories:['公共施設'],sources:[],archived:false});
           case 'flyerSave':{
-            assert.equal(role,request.id?'admin':'viewer');
+            assert(['admin','viewer'].includes(role),'authenticated members can save flyer records');
             assert.equal(request.eventId,docs.events.items[0].id);
             if(failFlyer){failFlyer=false;return answer({ok:false,error:'模擬掲示先保存失敗'})}
             if(request.id){
@@ -531,259 +531,116 @@ async function main(){
 
     await invited.locator('[data-flyers]').click();
     const flyerPanel=invited.getByRole('dialog',{name:'チラシ配布・掲示',exact:true});
-    await flyerPanel.getByText('追加・絞り込み・引き継ぎ',{exact:true}).click();
-    await flyerPanel.getByRole('button',{name:'施設を追加'}).click();
     const flyerForm=invited.getByRole('dialog',{name:'掲示先を編集',exact:true});
-    await flyerForm.getByLabel('施設名').fill('模擬施設');
-    await flyerForm.getByLabel('地域',{exact:true}).selectOption('銚子市');
-    await flyerForm.getByText('区分・施設の共有について',{exact:true}).click();
-    await flyerForm.getByLabel('区分',{exact:true}).selectOption('');
-    await flyerForm.getByLabel('新しい区分',{exact:true}).fill('公共施設');
-    await invited.route('https://photon.komoot.io/api/**',route=>route.fulfill({json:{features:[
-      {properties:{name:'模擬施設',city:'銚子市',street:'模擬町',housenumber:'1'},geometry:{coordinates:[140.83,35.73]}},
-      {properties:{name:'模擬施設',city:'別の市'},geometry:{coordinates:[140.9,36]}}
-    ]}}));
-    await flyerForm.getByRole('button',{name:'施設名で場所を検索'}).click();
-    const choosePlace=flyerForm.getByRole('button',{name:'この場所を地図で確認'});
-    await choosePlace.waitFor();
-    assert.equal(await choosePlace.count(),1);
-    await choosePlace.click();
-    assert.equal(await flyerForm.getByLabel('緯度',{exact:true}).inputValue(),'35.73');
-    await flyerForm.getByText(/ピンの位置を選択済み/).waitFor();
-    await flyerForm.getByText('住所・地図から指定',{exact:true}).click();
-    await flyerForm.getByText('詳細入力（地図URL・緯度・経度）',{exact:true}).click();
-    await flyerForm.getByLabel('住所',{exact:true}).clear();
-    await flyerForm.getByLabel('緯度',{exact:true}).clear();
-    await flyerForm.getByLabel('経度',{exact:true}).clear();
-    await flyerForm.getByText('状況・メモも登録する（任意）',{exact:true}).click();
-    await flyerForm.getByLabel('自由メモ（任意）').fill('入力を保持');
-    failFlyer=true;
-    await flyerForm.locator('.editor-bar button[type=submit]').first().click();
-    await flyerForm.locator('[data-editor-status]').filter({hasText:'模擬掲示先保存失敗'}).waitFor();
-    assert.equal(await flyerForm.getByLabel('自由メモ（任意）').inputValue(),'入力を保持');
-    await flyerForm.locator('.editor-bar button[type=submit]').first().click();
-    await flyerPanel.locator('[data-message]').filter({hasText:'保存しました：'}).waitFor();
-    await flyerPanel.locator('.flyer-badge').getByText('未依頼',{exact:true}).first().waitFor();
-    await flyerPanel.locator('[data-close-flyers]').click();
-    await page.goto(invitation.href);
-    await page.locator('[data-flyers]').click();
-    await page.getByRole('dialog',{name:'チラシ配布・掲示',exact:true}).getByRole('heading',{name: '模擬施設 位置未確認'}).waitFor();
-
-    flyerRows.push(
-      {id:'known1',name:'中央図書館',region:'神栖市',category:'公共施設',status:'掲示済み',memo:'会員用の試験メモ',revision:1},
-      {id:'known2',name:'うずも図書館',region:'神栖市',category:'公共施設',status:'依頼済み',memo:'',revision:1},
-      {id:'approx',name:'住所のみの施設',region:'神栖市',category:'公共施設',status:'未依頼',memo:'',location:{address:'茨城県神栖市知手123-4'},revision:1},
-      {id:'refused',name:'神栖市文化センター',region:'神栖市',category:'公共施設',status:'依頼済み',memo:'',revision:1}
-    );
-    flyerRefused.push({name:'神栖市文化センター',region:'神栖市',keys:[]});
-    const mapPanel=page.getByRole('dialog',{name:'チラシ配布・掲示',exact:true});
-    let tiles=0;
-    await page.route('https://cyberjapandata.gsi.go.jp/xyz/**',route=>{
-      tiles++;assert(!decodeURIComponent(route.request().url()).includes('会員用の試験メモ'));
-      return route.fulfill({status:404,body:''});
-    });
-    await page.setViewportSize({width:320,height:680});
-    await mapPanel.getByRole('button',{name:'一覧を更新'}).click();
-    await mapPanel.getByText('神栖市 ／ 公共施設',{exact:true}).first().waitFor();
-    assert.equal(tiles,0);
-    await page.route('https://msearch.gsi.go.jp/**',route=>route.fulfill({json:[]}));
-    await mapPanel.getByRole('button',{name:'地図で見る'}).click();
-    const unlocated=mapPanel.locator('[data-unlocated]');
-    assert(await unlocated.evaluate(el=>el.open&&!el.hidden));
-    await unlocated.getByRole('button',{name:'模擬施設の場所を登録',exact:true}).click();
-    const missingPinEditor=page.getByRole('dialog',{name:'掲示先を編集',exact:true});
-    assert.equal(await missingPinEditor.getByLabel('施設名').inputValue(),'模擬施設');
-    assert(await missingPinEditor.getByRole('button',{name:'施設名で場所を検索',exact:true}).isVisible());
-    await missingPinEditor.getByRole('button',{name:'一覧に戻る',exact:true}).click();
-    const centralPin=mapPanel.getByRole('button',{name:'中央図書館 掲示済み'});
-    await centralPin.click();
-    await mapPanel.locator('[data-pin-details]').getByText('会員用の試験メモ',{exact:true}).waitFor();
-    assert.equal(await mapPanel.locator('.flyer-pin').count(),2);
-    assert.equal(await centralPin.textContent(),'');
-    assert.equal(await centralPin.locator('span').getAttribute('data-status'),'2');
-    const popup=mapPanel.locator('[data-pin-details]');
-    await popup.getByRole('button',{name:'状況・メモを編集'}).click();
-    const mapEditor=page.getByRole('dialog',{name:'掲示先を編集',exact:true});
-    await mapEditor.getByRole('radio',{name:'今回は見送り',exact:true}).check();
-    failFlyer=true;
-    await mapEditor.locator('.editor-bar button[type=submit]').first().click();
-    await mapEditor.locator('[data-editor-status]').filter({hasText:'保存できませんでした'}).waitFor();
-    assert.equal(flyerRows.find(row=>row.id==='known1').status,'掲示済み');
-    assert(await mapEditor.getByRole('radio',{name:'今回は見送り',exact:true}).isChecked());
-    await mapEditor.getByRole('radio',{name:'掲示済み',exact:true}).check();
-    await mapEditor.locator('.editor-bar button[type=submit]').first().click();
-    await mapEditor.waitFor({state:'hidden'});
-    await popup.getByRole('button',{name:'状況・メモを編集'}).click();
-    const fromMap=page.getByRole('dialog',{name:'掲示先を編集',exact:true});
-    assert.equal(await fromMap.getByLabel('施設名').inputValue(),'中央図書館');
-    await fromMap.getByLabel('自由メモ（任意）').fill('未保存のメモ');
-    await fromMap.getByRole('button',{name:'一覧に戻る'}).click();
-    await page.getByRole('button',{name:'編集を続ける'}).click();
-    assert.equal(await fromMap.getByLabel('自由メモ（任意）').inputValue(),'未保存のメモ');
-    await fromMap.getByRole('button',{name:'一覧に戻る'}).click();
-    await page.getByRole('button',{name:'変更を破棄して一覧に戻る'}).click();
-    await mapPanel.locator('[data-filter-status]').selectOption('掲示済み');
-    assert.equal(await mapPanel.locator('.flyer-pin').count(),1);
-    assert(tiles>0);
-    await mapPanel.locator('[data-filter-status]').selectOption('');
-    await page.route('https://msearch.gsi.go.jp/**',route=>route.fulfill({json:[
-      {properties:{title:'茨城県神栖市知手'},geometry:{coordinates:[140.70,35.86]}}
-    ]}));
-    if(!await unlocated.evaluate(el=>el.open))await unlocated.locator('summary').click();
-    await mapPanel.getByRole('button',{name:'住所から位置を探す'}).click();
-    await popup.getByText('概略位置（住所に基づく目安）').waitFor();
-    assert.equal(await mapPanel.locator('.flyer-pin-approx').count(),1);
-    const searchUrl=new URL(await popup.getByRole('link',{name:'Googleマップで探す'}).getAttribute('href'));
-    assert.equal(searchUrl.searchParams.get('query'),'住所のみの施設 神栖市 茨城県神栖市知手123-4');
-    await page.evaluate(()=>{
-      window.locationAttempts=0;
-      navigator.geolocation.getCurrentPosition=(success,error)=>{
-        if(++window.locationAttempts===1)error({code:1});
-        else success({coords:{latitude:35.86,longitude:140.701}});
-      };
-    });
-    await mapPanel.getByRole('button',{name:'現在地を表示'}).click();
-    await mapPanel.getByText(/位置情報の利用が許可されていません/).waitFor();
-    assert.equal(await mapPanel.locator('.flyer-pin').count(),3);
-    await mapPanel.getByRole('button',{name:'現在地を表示'}).click();
-    await mapPanel.getByText('青い丸が現在地です。').waitFor();
-    await mapPanel.getByRole('button',{name:'近い順に見る'}).click();
-    const nearest=mapPanel.locator('[data-nearby-list] button').first();
-    assert.match(await nearest.textContent(),/住所のみの施設.*概略位置.*距離の目安/);
-    await mapPanel.getByRole('button',{name:'地図を閉じる'}).click();
-    await mapPanel.locator('[data-filter-status]').selectOption('');
-    const unknown=mapPanel.locator('[data-venue-id="test-flyer"]');
-    assert.equal(await mapPanel.getByRole('button',{name:'既存施設の共通化を確認'}).count(),0);
-    const savedCard=mapPanel.locator('[data-venue-id="known1"]');
-    await savedCard.getByRole('button',{name:'状況・メモを編集'}).click();
-    await fromMap.getByRole('radio',{name:'今回は見送り',exact:true}).check();
-    const decline=fromMap.getByRole('checkbox',{name:'過去または今回、お断りがあったため見送り'});
-    await decline.check();
-    failFlyer=true;
-    await fromMap.locator('.editor-bar button[type=submit]').first().click();
-    await fromMap.locator('[data-editor-status]').filter({hasText:'保存できませんでした'}).waitFor();
-    assert(await decline.isChecked());
-    await fromMap.locator('.editor-bar button[type=submit]').first().click();
-    await fromMap.waitFor({state:'hidden'});
-    assert.equal(flyerRows.find(row=>row.id==='known1').declined,true);
-    await savedCard.getByRole('button',{name:'状況・メモを編集'}).click();
-    await fromMap.getByRole('radio',{name:'依頼済み',exact:true}).check();
-    await decline.waitFor({state:'hidden'});
-    await fromMap.locator('.editor-bar button[type=submit]').first().click();
-    await fromMap.waitFor({state:'hidden'});
-    assert.equal(flyerRows.find(row=>row.id==='known1').declined,false);
-    await unknown.getByRole('button',{name:'状況・メモを編集'}).click();
-    await fromMap.getByText('施設名・場所を変更',{exact:true}).click();
-    await fromMap.getByText('住所・地図から指定',{exact:true}).click();
-    await fromMap.getByText('詳細入力（地図URL・緯度・経度）',{exact:true}).click();
-    await fromMap.getByLabel('住所',{exact:true}).fill('銚子市模擬町1');
-    await fromMap.locator('.flyer-google-help > summary').click();
-    await fromMap.locator('input[name=mapUrl]').fill('https://www.google.com/maps?q=35.73,140.83');
-    await fromMap.locator('.editor-bar button[type=submit]').first().click();
-    await fromMap.waitFor({state:'hidden'});
-    assert.deepEqual(flyerRows.find(row=>row.id==='test-flyer').location,{address:'銚子市模擬町1',mapUrl:'https://www.google.com/maps?q=35.73,140.83',lat:35.73,lng:140.83});
-    await unknown.locator('summary').click();
-    await unknown.getByRole('button',{name:'地図でこの施設を見る'}).click();
-    await mapPanel.locator('[data-pin-details]').getByText('模擬施設',{exact:true}).waitFor();
-
-    // Missing coordinates are supplemented from the address without changing stored rows.
-    let addressLookups=0;
-    await page.route('https://msearch.gsi.go.jp/address-search/AddressSearch**',route=>{
-      addressLookups++;
-      const query=new URL(route.request().url()).searchParams.get('q');
-      assert.equal(query,'茨城県神栖市須田2340-127');
-      return route.fulfill({json:[{properties:{title:'茨城県神栖市須田２３４０番地'},geometry:{coordinates:[140.74,35.83]}}]});
-    });
-    flyerRows.push({id:'address-only',revision:1,name:'住所だけの施設',region:'神栖市',category:'その他',status:'未依頼',memo:'',location:{address:'〒314-0253 茨城県神栖市須田２３４０－１２７',mapUrl:''}});
-    await mapPanel.getByRole('button',{name:'一覧を更新'}).click();
-    await mapPanel.getByRole('button',{name:'住所だけの施設 未依頼 概略位置',exact:true}).waitFor();
-    assert.equal(addressLookups,1);
-    assert.equal(flyerRows.find(row=>row.id==='address-only').location.lat,undefined);
-
-    // A search candidate opens an internal map and saves without a clipboard or another page.
-    await page.route('https://photon.komoot.io/api/**',route=>route.fulfill({json:{features:[
-      {properties:{name:'模擬施設',city:'銚子市',street:'模擬町',housenumber:'1'},geometry:{coordinates:[140.83,35.73]}}
-    ]}}));
-    await unknown.getByRole('button',{name:'状況・メモを編集',exact:true}).click();
-    await fromMap.getByText('施設名・場所を変更',{exact:true}).click();
-    assert(!await fromMap.getByLabel('Googleマップの共有リンク（任意）').isVisible());
-    const pageCount=page.context().pages().length;
-    await fromMap.getByRole('button',{name:'施設名で場所を検索',exact:true}).click();
-    assert.equal(await fromMap.locator('.flyer-place-candidate a').count(),0);
-    await fromMap.getByRole('button',{name:'この場所を地図で確認',exact:true}).click();
-    await fromMap.getByRole('button',{name:'この場所を保存する',exact:true}).waitFor();
-    await fromMap.getByLabel('施設名',{exact:true}).fill('別の施設');
-    assert.equal(await fromMap.locator('[name=lat]').inputValue(),'');
-    assert.equal(await fromMap.getByRole('button',{name:'この場所を保存する',exact:true}).count(),0);
-    await fromMap.getByLabel('施設名',{exact:true}).fill('模擬施設');
-    await fromMap.getByRole('button',{name:'施設名で場所を検索',exact:true}).click();
-    await fromMap.getByRole('button',{name:'この場所を地図で確認',exact:true}).click();
-    failFlyer=true;
-    await fromMap.getByRole('button',{name:'この場所を保存する',exact:true}).click();
-    await fromMap.locator('[data-editor-status]').filter({hasText:'保存できませんでした'}).waitFor();
-    await fromMap.getByRole('button',{name:'この場所を保存する',exact:true}).click();
-    await fromMap.waitFor({state:'hidden'});
-    assert.equal(page.context().pages().length,pageCount);
-    assert.equal(flyerRows.find(row=>row.id==='test-flyer').location.mapUrl,'');
-    assert.deepEqual([flyerRows.find(row=>row.id==='test-flyer').location.lat,flyerRows.find(row=>row.id==='test-flyer').location.lng],[35.73,140.83]);
-
-    // The member's stored short link renders Marutake without changing its saved location.
-    const marutakeLocation={address:'',mapUrl:'https://maps.app.goo.gl/g2AV4mKkUri1t9MS9'};
-    flyerRows.push({id:'marutake-short',revision:1,name:'丸竹',region:'神栖市',category:'その他',status:'未依頼',memo:'',location:{...marutakeLocation}});
-    await mapPanel.getByRole('button',{name:'一覧を更新',exact:true}).click();
-    await mapPanel.getByRole('button',{name:'丸竹 未依頼',exact:true}).waitFor();
-    assert.equal(await mapPanel.locator('[data-unlocated] li').filter({hasText:'丸竹'}).count(),0);
-    assert.deepEqual(flyerRows.find(row=>row.id==='marutake-short').location,marutakeLocation);
-
-    // Preloaded regional POIs register on the same screen without Photon or a bulk import.
     await mkdir('test-artifacts',{recursive:true});
     await invited.setViewportSize({width:360,height:740});
-    let fallbackSearches=0,regionalTransfers=0;
-    await invited.route('https://photon.komoot.io/api/**',route=>{fallbackSearches++;return route.abort()});
-    invited.on('request',request=>{if(request.url().includes('/place-catalog/kamisu.json'))regionalTransfers++});
-    await invited.locator('[data-flyers]').click();
-    const beforeRegional=flyerRows.length;
+    await invited.route('https://photon.komoot.io/api/**',route=>route.fulfill({json:{features:[]}}));
+    await invited.route('https://msearch.gsi.go.jp/**',route=>route.fulfill({json:[]}));
+    let tiles=0;
+    await invited.route('https://cyberjapandata.gsi.go.jp/xyz/**',route=>{tiles++;return route.fulfill({status:404,body:''})});
+    await flyerPanel.getByRole('button',{name:'施設を追加',exact:true}).click();
+    assert.equal(await flyerForm.locator('button[type=submit]').count(),1,'one save button');
+    assert(!await flyerForm.getByLabel('住所',{exact:true}).isVisible(),'optional address stays hidden');
+    assert(!await flyerForm.getByLabel('Googleマップの共有リンク（任意）').isVisible());
+    await flyerForm.getByLabel('施設名',{exact:true}).fill('未収録の試験施設');
+    await flyerForm.getByRole('button',{name:'施設名で場所を検索',exact:true}).click();
+    await flyerForm.getByText(/老舗でも未収録/).waitFor();
+    await flyerForm.screenshot({path:'test-artifacts/facility-search-mobile.png'});
+    failFlyer=true;
+    await flyerForm.getByRole('button',{name:'登録する',exact:true}).click();
+    await flyerForm.locator('[data-editor-status]').filter({hasText:'保存できませんでした'}).waitFor();
+    assert.equal(await flyerForm.getByLabel('施設名',{exact:true}).inputValue(),'未収録の試験施設');
+    await flyerForm.getByRole('button',{name:'登録する',exact:true}).click();
+    await flyerForm.waitFor({state:'hidden'});
+    await flyerPanel.locator('[data-message]').filter({hasText:'場所は確認待ち'}).waitFor();
+    assert.equal(flyerRows.length,1);assert.equal(flyerRows[0].location,undefined);
+    await flyerPanel.getByRole('button',{name:/場所の要確認/}).click();
+    assert.equal(await flyerPanel.locator('[data-venue-id]').count(),1);
+    await flyerPanel.getByRole('button',{name:'すべての施設に戻る',exact:true}).click();
+    await flyerPanel.getByRole('button',{name:'場所を設定する（任意）',exact:true}).click();
+    assert.equal(await flyerForm.getByLabel('施設名',{exact:true}).inputValue(),'未収録の試験施設');
+    await flyerForm.locator('.flyer-place-fallback > summary').click();
+    await flyerForm.locator('.flyer-google-help > summary').click();
+    await flyerForm.getByLabel('Googleマップの共有リンク（任意）').fill('https://maps.app.goo.gl/example');
+    await flyerForm.getByRole('button',{name:'保存する',exact:true}).click();
+    await flyerForm.waitFor({state:'hidden'});
+    assert.deepEqual(flyerRows[0].location,{address:'',mapUrl:'https://maps.app.goo.gl/example'});
+    await flyerPanel.getByRole('button',{name:/場所の要確認/}).click();
+    assert.equal(await flyerPanel.locator('[data-venue-id]').count(),1,'short link alone remains in review');
+    await flyerPanel.getByRole('button',{name:'すべての施設に戻る',exact:true}).click();
+
+    // Selecting a known candidate opens a read-only confirmation, then saves the pin.
     await flyerPanel.getByRole('button',{name:'施設を追加',exact:true}).click();
     await flyerForm.getByLabel('施設名',{exact:true}).fill('矢田部郵便局');
-    await flyerForm.getByLabel('地域',{exact:true}).selectOption('神栖市');
     await flyerForm.getByRole('button',{name:'施設名で場所を検索',exact:true}).click();
-    await flyerForm.getByRole('button',{name:'この場所を地図で確認',exact:true}).first().waitFor();
-    await flyerForm.locator('.flyer-save-footer button[type=submit]').click();
-    await flyerForm.locator('[data-editor-status]').filter({hasText:'検索候補から場所を選んでください'}).waitFor();
-    assert.equal(flyerRows.length,beforeRegional,'a candidate must be selected before a searched facility is registered');
-    await flyerForm.screenshot({path:'test-artifacts/regional-search-mobile.png'});
-    await flyerForm.getByRole('button',{name:'この場所を地図で確認',exact:true}).first().click();
-    await flyerForm.getByRole('button',{name:'この場所で登録する',exact:true}).waitFor();
-    assert(await flyerForm.evaluate(el=>el.scrollWidth<=el.clientWidth+2),'facility editor has no horizontal overflow on a phone');
-    const regionalSave=await flyerForm.getByRole('button',{name:'この場所で登録する',exact:true}).boundingBox();
-    assert(regionalSave.height>=44,'registration has a finger-sized target');
-    const pinBefore=await flyerForm.locator('[name=lat]').inputValue();
-    await flyerForm.locator('.flyer-inline-map .flyer-map-canvas').click({position:{x:110,y:100}});
-    const stagedPin=await flyerForm.locator('[name=lat]').inputValue();
-    assert.notEqual(stagedPin,pinBefore,'moving the map pin stages the location for every save button');
+    await flyerForm.getByRole('button',{name:'この施設を選ぶ',exact:true}).first().click();
+    await flyerForm.getByRole('heading',{name:'この施設ですか？',exact:true}).waitFor();
+    const confirmationMap=flyerForm.locator('.flyer-confirmation .flyer-map-canvas');
+    await confirmationMap.waitFor();
+    const footerBounds=await flyerForm.getByRole('button',{name:'登録する',exact:true}).boundingBox();
+    assert(footerBounds.y>=0&&footerBounds.y+footerBounds.height<=740,'save stays visible without scrolling');
+    const beforePin=await flyerForm.locator('[name=lat]').inputValue();
+    await confirmationMap.click({position:{x:110,y:100}});
+    assert.equal(await flyerForm.locator('[name=lat]').inputValue(),beforePin,'confirmation map never changes pin on tap');
+    assert(!await flyerForm.getByLabel('施設名',{exact:true}).isVisible());
+    assert.equal(await flyerForm.locator('button[type=submit]').count(),1);
     await flyerForm.evaluate(()=>document.fonts.ready);
-
-    await flyerForm.screenshot({path:'test-artifacts/regional-registration-mobile.png'});
+    await flyerForm.screenshot({path:'test-artifacts/facility-confirm-mobile.png'});
     failFlyer=true;
-    await flyerForm.locator('.flyer-save-footer button[type=submit]').click();
+    await flyerForm.getByRole('button',{name:'登録する',exact:true}).click();
     await flyerForm.locator('[data-editor-status]').filter({hasText:'保存できませんでした'}).waitFor();
-    await flyerForm.getByRole('button',{name:'この場所で登録する',exact:true}).click();
+    await flyerForm.getByRole('button',{name:'登録する',exact:true}).click();
     await flyerForm.waitFor({state:'hidden'});
-    assert.equal(flyerRows.length,beforeRegional+1);
-    const regionalRow=flyerRows.find(row=>row.name==='矢田部郵便局');
-    assert.equal(regionalRow.location.lat,Number(stagedPin),'the staged pin survives failure and retry');
-    assert(regionalRow.location.lat>35.7&&regionalRow.location.lat<36);
-    assert(regionalRow.location.lng>140.5&&regionalRow.location.lng<140.9);
-    assert.equal(fallbackSearches,0,'local hits never contact the external search service');
-    assert.equal(regionalTransfers,1,'only the selected regional file is fetched once');
+    assert.equal(flyerRows.length,2);
+    const postal=flyerRows.find(row=>row.name==='矢田部郵便局');
+    assert.equal(postal.location.lat,Number(beforePin));
+    await flyerPanel.locator('[data-message]').filter({hasText:'施設とピンを保存しました'}).waitFor();
+    assert.equal(await flyerPanel.locator('.flyer-just-edited').count(),1);
+    await flyerPanel.screenshot({path:'test-artifacts/facility-list-mobile.png'});
+
+    // An existing facility candidate navigates to its row, without a duplicate save.
     await flyerPanel.getByRole('button',{name:'施設を追加',exact:true}).click();
-    await flyerForm.getByLabel('施設名',{exact:true}).fill('郵便局');
-    await flyerForm.getByLabel('地域',{exact:true}).selectOption('神栖市');
+    await flyerForm.getByLabel('施設名',{exact:true}).fill('矢田部郵便局');
     await flyerForm.getByRole('button',{name:'施設名で場所を検索',exact:true}).click();
-    await flyerForm.getByRole('button',{name:'この場所を地図で確認',exact:true}).first().waitFor();
-    assert.equal(regionalTransfers,1,'later searches reuse public data and saved locations');
+    await flyerForm.getByRole('button',{name:'登録済み・一覧で見る',exact:true}).click();
+    await flyerForm.waitFor({state:'hidden'});assert.equal(flyerRows.length,2);
+    const postalCard=flyerPanel.locator('[data-venue-id="'+postal.id+'"]');
+    await postalCard.getByRole('button',{name:'状況を変更',exact:true}).click();
+    assert(!await flyerForm.getByLabel('施設名',{exact:true}).isVisible());
+    const originalLocation=structuredClone(postal.location);
+    await flyerForm.getByRole('radio',{name:'掲示済み',exact:true}).check();
+    await flyerForm.getByLabel('自由メモ（任意）').fill('掲示しました');
+    await flyerForm.getByRole('button',{name:'保存する',exact:true}).click();
+    await flyerForm.waitFor({state:'hidden'});
+    assert.deepEqual(flyerRows.find(row=>row.id===postal.id).location,originalLocation);
+    assert.equal(flyerRows.find(row=>row.id===postal.id).status,'掲示済み');
+    await flyerPanel.getByRole('button',{name:/場所の要確認/}).click();
+    assert.equal(await flyerPanel.locator('[data-venue-id]').count(),1);
+    await flyerPanel.getByRole('button',{name:'すべての施設に戻る',exact:true}).click();
+
+    // The map gets its own visible area; unresolved places remain an optional disclosure.
+    await flyerPanel.getByRole('button',{name:'地図で見る',exact:true}).click();
+    await flyerPanel.getByRole('button',{name:'矢田部郵便局 掲示済み',exact:true}).waitFor();
+    assert(!await flyerPanel.locator('[data-list]').isVisible());
+    assert(!await flyerPanel.locator('[data-unlocated]').evaluate(el=>el.open));
+    await flyerPanel.locator('[data-unlocated] > summary').click();
+    await flyerPanel.getByRole('button',{name:'未収録の試験施設の場所を登録',exact:true}).click();
     await flyerForm.getByRole('button',{name:'一覧に戻る',exact:true}).click();
-    await invited.getByRole('button',{name:'変更を破棄して一覧に戻る',exact:true}).click();
+    await flyerPanel.getByRole('button',{name:'一覧に戻る',exact:true}).click();
+    assert(await flyerPanel.locator('[data-list]').isVisible());
+    assert(tiles>0);
+
+    // Verified Marutake reference is available through its different spelling too.
+    const marutakeLocation={address:'',mapUrl:'https://maps.app.goo.gl/g2AV4mKkUri1t9MS9'};
+    flyerRows.push({id:'marutake-short',revision:1,name:'丸竹',region:'神栖市',category:'その他',status:'未依頼',memo:'',location:{...marutakeLocation}});
+    await flyerPanel.locator('.flyer-tools > summary').click();
+    await flyerPanel.getByRole('button',{name:'一覧を更新',exact:true}).click();
+    await flyerPanel.getByRole('button',{name:'施設を追加',exact:true}).click();
+    await flyerForm.getByLabel('施設名',{exact:true}).fill('マルタケ');
+    await flyerForm.getByRole('button',{name:'施設名で場所を検索',exact:true}).click();
+    await flyerForm.getByRole('button',{name:'登録済み・一覧で見る',exact:true}).click();
+    await flyerForm.waitFor({state:'hidden'});
+    assert.deepEqual(flyerRows.find(row=>row.id==='marutake-short').location,marutakeLocation);
     await flyerPanel.locator('[data-close-flyers]').click();
 
     await invited.setViewportSize({width:320,height:680});

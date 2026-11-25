@@ -1,5 +1,5 @@
 import {searchRegionalPlaces} from './regional-places.js?v=20261125-regions1';
-import {loadStyles} from './flyer-map.js?v=20261125-regions1';
+import {loadStyles} from './flyer-map.js?v=20261125-simple1';
 import {map, tileLayer, circleMarker} from './vendor/leaflet/leaflet-src.esm.js';
 
 const clean=value=>String(value||'').normalize('NFKC').toLowerCase().replace(/\s+/g,'');
@@ -31,7 +31,7 @@ export function showPlaceCandidates(host,candidates,choose){
   const title=document.createElement('strong');title.textContent=candidate.name;
   const address=document.createElement('p');address.textContent=candidate.address||candidate.region||'住所未収録：地図で場所を確認してください。';
   const info=document.createElement('p');info.className='muted';info.textContent=[candidate.cachedCopy?'前回保存した地域データ':null,candidate.category,candidate.datasetDate?'収録：'+candidate.datasetDate.slice(0,10):null,candidate.position==='representative'?'建物・敷地の代表位置：地図で確認':null].filter(Boolean).join(' ／ ');
-  const button=document.createElement('button');button.type='button';button.className='secondary';button.textContent='この場所を地図で確認';
+  const button=document.createElement('button');button.type='button';button.className='secondary';button.textContent=candidate.registered?'登録済み・一覧で見る':'この施設を選ぶ';
   button.onclick=()=>choose(candidate);
   row.append(title,address,info,button);host.append(row);
  }
@@ -42,13 +42,14 @@ export async function mountPlacePicker(host,initial,choose,options={}){
  const canvas=document.createElement('div');canvas.className='flyer-map-canvas';canvas.setAttribute('aria-label','施設の位置を地図で指定');
  const feedback=document.createElement('p');feedback.textContent='地図を拡大し、施設の位置を押してください。';
  const submit=document.createElement('button');submit.type='button';submit.className='secondary';submit.textContent=options.submitLabel||'この位置を使う';submit.disabled=true;
- host.replaceChildren(feedback,canvas,submit);
+ host.replaceChildren(feedback,canvas,...(options.readOnly?[]:[submit]));
  const view=map(canvas,{scrollWheelZoom:false,maxZoom:21}).setView(initial||[35.85,140.72],initial?16:11);
  tileLayer('https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png',{attribution:'<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener noreferrer">地理院タイル</a> | © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap contributors</a>',maxNativeZoom:18,maxZoom:21,referrerPolicy:'no-referrer'}).addTo(view);
  let selected=initial,positionMarker=initial?circleMarker(initial,{radius:8,color:'#a92530',fillOpacity:1,interactive:false}).addTo(view):null;
  if(initial){submit.disabled=false;feedback.textContent='赤い点が登録する位置です。違う場合は地図を押して変更できます。'}
  const locate=document.createElement('button');locate.type='button';locate.className='secondary';locate.textContent='現在地の周辺を表示';
- host.insertBefore(locate,canvas);
+ if(!options.readOnly)host.insertBefore(locate,canvas);
+ if(options.readOnly){feedback.textContent='この場所で登録します。違う場合だけ「場所を変更」を押してください。';canvas.setAttribute('aria-label','登録する施設の場所')}
  let active=true;
  locate.onclick=()=>{
   if(!navigator.geolocation){feedback.textContent='この端末では現在地を取得できません。';return}
@@ -61,6 +62,7 @@ export async function mountPlacePicker(host,initial,choose,options={}){
   },()=>{if(active){feedback.textContent='現在地を取得できません。地図を動かして指定できます。';locate.disabled=false}},{timeout:10000,maximumAge:30000});
  };
  view.on('click',({latlng})=>{
+  if(options.readOnly)return;
   selected=[latlng.lat,latlng.lng];
   if(positionMarker)positionMarker.setLatLng(selected);
   else positionMarker=circleMarker(selected,{radius:8,color:'#a92530',fillOpacity:1,interactive:false}).addTo(view);
