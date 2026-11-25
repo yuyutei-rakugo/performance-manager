@@ -64,7 +64,9 @@ async function main(){
             docs.rehearsals={items:docs.rehearsals.items.map(r=>r.id===transfer.id?{...r,archivedAt:'2026-11-21T08:00:00Z'}:r),revision:docs.rehearsals.revision+1};
             return ok({count:1,rehearsals:docs.rehearsals});
           }
-          case 'flyerRead':case 'flyerImport':return ok({rows:flyerRows,locationFields:true,declineFields:true,migrationRequired:false,refused:flyerRefused,categories:['公共施設'],sources:[],archived:false});
+          case 'flyerRead':case 'flyerImport':return ok({rows:flyerRows,locationFields:true,googleShare:true,declineFields:true,migrationRequired:false,refused:flyerRefused,categories:['公共施設'],sources:[],archived:false});
+          case 'flyerResolveGoogleLink':
+            return request.url.endsWith('/example')?ok({name:'',address:''}):ok({name:'地図の登録名',address:'試験住所',lat:35.81,lng:140.71});
           case 'flyerSave':{
             assert(['admin','viewer'].includes(role),'authenticated members can save flyer records');
             assert.equal(request.eventId,docs.events.items[0].id);
@@ -75,7 +77,7 @@ async function main(){
               assert.equal(request.revision,flyerRows[i].revision);
               flyerRows[i]={...flyerRows[i],...request.entry,revision:request.revision+1};
             }else flyerRows.push({...request.entry,id:flyerRows.some(row=>row.id==='test-flyer')?'test-flyer-'+(flyerRows.length+1):'test-flyer',revision:1});
-            return ok({rows:flyerRows,locationFields:true,declineFields:true,migrationRequired:false,refused:flyerRefused,categories:['公共施設'],sources:[],archived:false});
+            return ok({rows:flyerRows,locationFields:true,googleShare:true,declineFields:true,migrationRequired:false,refused:flyerRefused,categories:['公共施設'],sources:[],archived:false});
           }
           case 'reservationList':return ok({documents:reservationRows,schedules:[],canReview:false});
           case 'reservationAdd':{
@@ -544,7 +546,7 @@ async function main(){
     assert.equal(await flyerForm.getByLabel('施設名',{exact:true}).inputValue(),'未収録の試験施設');
     assert.equal(await flyerForm.locator('button[type=submit]').count(),1,'one save button');
     assert(!await flyerForm.getByLabel('住所',{exact:true}).isVisible(),'optional address stays hidden');
-    assert(!await flyerForm.getByLabel('Googleマップの共有リンク（任意）').isVisible());
+    assert(await flyerForm.getByLabel('Googleマップの共有リンク（任意）').isVisible());
     await flyerForm.getByLabel('施設名',{exact:true}).fill('未収録の試験施設');
     await invited.context().route('https://www.google.com/maps/**',route=>route.fulfill({contentType:'text/html',body:'<h1>Map search handoff fixture</h1>'}));
     // Manual map opens immediately beside its sole button, not below all fallback fields.
@@ -596,13 +598,29 @@ async function main(){
     assert.equal(await flyerForm.getByLabel('施設名',{exact:true}).inputValue(),'未収録の試験施設');
     await flyerForm.locator('.flyer-place-fallback > summary').click();
     await flyerForm.locator('.flyer-google-help > summary').click();
-    await flyerForm.getByLabel('Googleマップの共有リンク（任意）').fill('https://maps.app.goo.gl/example');
+    await invited.evaluate(()=>Object.defineProperty(navigator,'clipboard',{configurable:true,value:{readText:async()=> 'https://maps.app.goo.gl/example'}}));
+    await flyerForm.getByRole('button',{name:'貼り付け',exact:true}).click();
+    assert.equal(await flyerForm.getByLabel('Googleマップの共有リンク（任意）').inputValue(),'https://maps.app.goo.gl/example');
+    await flyerForm.getByRole('button',{name:'リンクから場所を確認',exact:true}).click();
+    await flyerForm.getByText(/施設の位置を読み取れませんでした/).waitFor();
+    assert.equal(await flyerForm.locator('[name=lat]').inputValue(),'');
     await flyerForm.getByRole('button',{name:'保存する',exact:true}).click();
     await flyerForm.waitFor({state:'hidden'});
     assert.deepEqual(flyerRows[0].location,{address:'',mapUrl:'https://maps.app.goo.gl/example'});
     await flyerPanel.getByRole('button',{name:/場所の要確認/}).click();
     assert.equal(await flyerPanel.locator('[data-venue-id]').count(),1,'short link alone remains in review');
     await flyerPanel.getByRole('button',{name:'すべての施設に戻る',exact:true}).click();
+
+    await flyerPanel.getByRole('button',{name:'場所を設定する（任意）',exact:true}).click();
+    await flyerForm.getByLabel('Googleマップの共有リンク（任意）').fill('https://maps.app.goo.gl/confirmed');
+    await flyerForm.getByRole('button',{name:'リンクから場所を確認',exact:true}).click();
+    await flyerForm.getByText('試験住所',{exact:true}).waitFor();
+    await flyerForm.locator('.flyer-confirmation .flyer-map-canvas').waitFor();
+    await flyerForm.getByRole('button',{name:'施設名を「地図の登録名」に変更',exact:true}).click();
+    assert.equal(await flyerForm.locator('[name=lat]').inputValue(),'35.81');
+    assert.equal(await flyerForm.locator('[name=mapUrl]').inputValue(),'https://maps.app.goo.gl/confirmed');
+    await flyerForm.getByRole('button',{name:'一覧に戻る',exact:true}).click();
+    await invited.getByRole('button',{name:'変更を破棄して一覧に戻る',exact:true}).click();
 
     // A different candidate name is presented explicitly; renaming is a draft until saved.
     await invited.route('https://photon.komoot.io/api/**',route=>route.fulfill({json:{features:[

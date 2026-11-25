@@ -234,3 +234,22 @@ console.log('PASS reservation matching, extra/missing time, issue-date ordering/
 for(let i=0;i<5;i++)expectError(call('login',{name:'ぐう',pin:'0000'}),/違います/);expectError(call('login',{name:'ぐう',pin:'1357'}),/しばらく/);assert(call('changePin',{token:member.token,pin:'8080'}).ok);expectError(call('session',{token:member.token}),/期限/);db=JSON.parse(files[properties.DB_FILE_ID]);const guu=db.members.find(m=>m.name==='ぐう');assert(call('memberSave',{token,member:{id:guu.id,name:'ぐう',role:'viewer',active:false,pin:''}}).ok);expectError(call('session',{token:member.token}),/期限/);assert(!call('roster',{token}).members.some(m=>m.name==='ぐう'));console.log('PASS server-side PIN login and lockout, single owner bootstrap, no PIN disclosure, role enforcement, owner-only admin grants, attendance ownership, invalid IDs, revision conflict, past-only atomic archival, session revocation');
 
 const manifest=JSON.parse(fs.readFileSync(path.join(root,'google-backend/appsscript.json')));assert.deepEqual(manifest.oauthScopes,['https://www.googleapis.com/auth/drive.file','https://www.googleapis.com/auth/script.external_request']);assert(!fs.readFileSync(path.join(root,'google-backend/Code.gs'),'utf8').includes('DriveApp'));console.log('PASS restricted scopes, dedicated file read/write, no broad DriveApp access');
+
+const ordinaryMap='https://www.google.com/maps/place/Test+Venue/@35,140,14z/data=!4m6!3m5!1s0x1!8m2!3d35.75!4d140.85!16s%2Fg%2Ftest';
+expectError(call('flyerResolveGoogleLink',{url:ordinaryMap}),/ログイン/);
+assert.deepEqual(call('flyerResolveGoogleLink',{token,url:ordinaryMap}),{ok:true,name:'Test Venue',address:'',lat:35.75,lng:140.85});
+assert(!('lat' in call('flyerResolveGoogleLink',{token,url:'https://www.google.com/maps/place/Test/@35,140,17z'})));
+assert.deepEqual(call('flyerResolveGoogleLink',{token,url:'https://www.google.com/maps/search/?api=1&query=35.7%2C140.8'}),{ok:true,name:'',address:'',lat:35.7,lng:140.8});
+const originalMapsFetch=sandbox.UrlFetchApp.fetch;
+let redirects=0;
+sandbox.UrlFetchApp.fetch=(url,options)=>{
+ if(!url.startsWith("https://maps.app.goo.gl/"))return originalMapsFetch(url,options);
+ redirects++;assert.equal(options.followRedirects,false);
+ return {getAllHeaders:()=>({location:url.endsWith('/valid')?ordinaryMap:'https://example.test/maps'}),getResponseCode:()=>302};
+};
+assert.equal(call('flyerResolveGoogleLink',{token,url:'https://maps.app.goo.gl/valid'}).lat,35.75);
+expectError(call('flyerResolveGoogleLink',{token,url:'https://maps.app.goo.gl/invalid'}),/共有リンク/);
+expectError(call('flyerResolveGoogleLink',{token,url:'https://maps.app.goo.gl@example.test/maps'}),/共有リンク/);
+assert.equal(redirects,2);
+sandbox.UrlFetchApp.fetch=originalMapsFetch;
+console.log('PASS authenticated Google share link parsing, safe short redirects and viewport rejection');

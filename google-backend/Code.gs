@@ -7,10 +7,10 @@ function initializeOwner(){
  const lock=LockService.getScriptLock();lock.waitLock(20000);
  try{const props=PropertiesService.getScriptProperties();if(props.getProperty('DB_FILE_ID'))throw Error('初期設定済みです。');const pin=props.getProperty('OWNER_PIN')||'1111';checkPin_(pin);const secret=Utilities.getUuid()+Utilities.getUuid();props.setProperty('AUTH_SECRET',secret);const owner={id:'owner',name:'勇水',role:'admin',active:true,epoch:1,salt:Utilities.getUuid(),owner:true};owner.pinHash=hashPin_(owner,pin);const file=Drive.Files.create({name:'結友亭の帳面-共通データ.json',mimeType:'application/json'},Utilities.newBlob(JSON.stringify({version:1,members:[owner],shared:{},attendance:{}}),'application/json'),{fields:'id'});props.setProperty('DB_FILE_ID',file.id);props.deleteProperty('OWNER_PIN');return '勇水を最初の管理者として登録しました。'}finally{lock.releaseLock()}
 }
-function doGet(){return output_({reservationDocuments:true,ok:true,service:'yuyutei-members',version:1,attendanceProxy:true,rehearsalArchiveToday:true,automaticBackup:true,backupRecoveryRevision:2,checklistExclusion:true,flyerVenues:true,flyerLocationFields:true,flyerSharedFacilities:true,flyerDeclineHistory:true})}
+function doGet(){return output_({reservationDocuments:true,ok:true,service:'yuyutei-members',version:1,attendanceProxy:true,rehearsalArchiveToday:true,automaticBackup:true,backupRecoveryRevision:2,checklistExclusion:true,flyerVenues:true,flyerLocationFields:true,flyerSharedFacilities:true,flyerDeclineHistory:true,flyerGoogleShare:true})}
 function doPost(event){
  const lock=LockService.getScriptLock();let locked=false;
- try{if(!event||!event.postData||event.postData.contents.length>1500000)throw Error('リクエストを確認してください。');const req=JSON.parse(event.postData.contents);if(!req||typeof req!=='object')throw Error('リクエストを確認してください。');lock.waitLock(20000);locked=true;const db=readDb_();if(req.action==='login')return output_({ok:true,...login_(db,req)});const member=authorize_(db,req.token);let data;
+ try{if(!event||!event.postData||event.postData.contents.length>1500000)throw Error('リクエストを確認してください。');const req=JSON.parse(event.postData.contents);if(!req||typeof req!=='object')throw Error('リクエストを確認してください。');if(req.action==='flyerResolveGoogleLink'){authorize_(readDb_(),req.token);return output_({ok:true,...flyerResolveGoogleLink_(req.url)})}lock.waitLock(20000);locked=true;const db=readDb_();if(req.action==='login')return output_({ok:true,...login_(db,req)});const member=authorize_(db,req.token);let data;
  switch(req.action){
  case 'reservationList':case 'reservationPhoto':case 'reservationAdd':case 'reservationReview':case 'reservationContact':data=reservationRequest_(db,member,req);break;
  case 'flyerMigrationPreview':case 'flyerMigrationApply':admin_(member);data=flyerMigration_(db,req);break;
@@ -300,6 +300,45 @@ function flyerMigration_(db,req){
  return {...preview,completed:true,applied:choices.length,backupCreatedAt:backup.createdAt};
 }
 
+function flyerGoogleUrl_(raw){
+ const url=typeof raw==='string'?raw.trim():'';
+ const parts=url.length<=1000&&url.match(/^https:\/\/((?:www\.|maps\.)?google\.(?:com|co\.jp)|maps\.app\.goo\.gl|goo\.gl)(\/[^\s\\]*)$/i);
+ if(!parts)throw Error('Googleマップの共有リンクを入れてください。');
+ const host=parts[1].toLowerCase(),path=parts[2];
+ const short=host==='maps.app.goo.gl'||host==='goo.gl';
+ if(short?!/^(?:\/maps)?\/[a-z0-9_-]+(?:[?#].*)?$/i.test(path):!/^\/maps(?:[/?#]|$)/.test(path)&&!(host.startsWith('maps.')&&path.startsWith('/?')))throw Error('Googleマップの共有リンクを入れてください。');
+ return {url,host,path,short};
+}
+function flyerDecodeGoogle_(text){
+ try{return decodeURIComponent(text.replace(/\+/g,' '))}catch{return ''}
+}
+function flyerResolveGoogleLink_(input){
+ let link=flyerGoogleUrl_(input);
+ for(let redirects=0;link.short&&redirects<4;redirects++){
+  const response=UrlFetchApp.fetch(link.url,{followRedirects:false,muteHttpExceptions:true});
+  const headers=response.getAllHeaders();
+  const next=headers[Object.keys(headers).find(key=>key.toLowerCase()==='location')];
+  if(response.getResponseCode()<300||response.getResponseCode()>=400||typeof next!=='string')throw Error('短縮リンクを開けませんでした。地図で位置を指定してください。');
+  link=flyerGoogleUrl_(next);
+ }
+ if(link.short)throw Error('短縮リンクを展開できませんでした。地図で位置を指定してください。');
+ const decode=flyerDecodeGoogle_;
+ const path=link.path.split(/[?#]/)[0];
+ const params={};
+ for(const part of (link.path.split('?')[1]||'').split('#')[0].split('&')){
+  const [key,...value]=part.split('=');
+  if(['query','q','query_place_id'].includes(key))params[key]=decode(value.join('='));
+ }
+ const query=params.query||params.q||'';
+ const numeric='(-?\\d+(?:\\.\\d+)?)';
+ const marker=/^(?:\/|\/maps(?:\/search)?\/?)$/.test(path)&&!params.query_place_id&&query.match(new RegExp('^'+numeric+'\\s*,\\s*'+numeric+'$'));
+ const explicit=path.startsWith('/maps/place/')?[...decode(path).matchAll(new RegExp('!8m2!3d'+numeric+'!4d'+numeric+'(?=!|$)','g'))]:[];
+ const xy=explicit.length===1?explicit[0]:marker;
+ const label=decode(path.match(/^\/maps\/place\/([^/]+)/)?.[1]||'');
+ const name=label&&!/^[-+0-9.,°'" NSEW]+$/i.test(label)?label.slice(0,120):'';
+ return {name,address:'',...(xy&&Math.abs(Number(xy[1]))<=90&&Math.abs(Number(xy[2]))<=180?{lat:Number(xy[1]),lng:Number(xy[2])}:{})};
+}
+
 function flyerRequest_(db,req){
  checkId_(req.eventId);
  const events=db.shared.events?.items||[];
@@ -321,6 +360,7 @@ function flyerRequest_(db,req){
   categories:[...new Set([...flyerCategories_,...Object.values(flyers.events).flat().map(row=>row.category),...rows.map(row=>row.category)])],
   sources:sources.map(({id,title,date})=>({id,title,date})),
   locationFields:true,
+  googleShare:true,
   sharedFacilities:true,
   regions:[...new Set(['銚子市','神栖市',...Object.values(flyers.events).flat().map(row=>row.region)])],
   archived:!upcoming

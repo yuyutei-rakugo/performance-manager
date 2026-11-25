@@ -47,7 +47,7 @@ const tick=()=>new Promise(r=>setImmediate(r));
  form.elements.lat.dispatchEvent(new w.Event('input'));
  form.elements.mapUrl.value='https://www.google.com/maps?q=35.8,140.7';
  form.elements.mapUrl.dispatchEvent(new w.Event('input'));
- assert.equal(form.elements.lat.value,'35.8');assert.equal(form.elements.lng.value,'140.7');
+ assert.equal(form.elements.lat.value,'');assert.equal(form.elements.lng.value,'');
  form.elements.mapUrl.value='https://maps.app.goo.gl/example';
  form.elements.mapUrl.dispatchEvent(new w.Event('input'));
  assert.equal(form.elements.lat.value,'');assert.match(placeSteps.textContent,/ピンは未設定/);
