@@ -335,8 +335,9 @@ function flyerResolveGoogleLink_(input){
  const explicit=path.startsWith('/maps/place/')?[...decode(path).matchAll(new RegExp('!8m2!3d'+numeric+'!4d'+numeric+'(?=!|$)','g'))]:[];
  const xy=explicit.length===1?explicit[0]:marker;
  const label=decode(path.match(/^\/maps\/place\/([^/]+)/)?.[1]||'');
- const name=label&&!/^[-+0-9.,°'" NSEW]+$/i.test(label)?label.slice(0,120):'';
- return {name,address:'',...(xy&&Math.abs(Number(xy[1]))<=90&&Math.abs(Number(xy[2]))<=180?{lat:Number(xy[1]),lng:Number(xy[2])}:{})};
+ const labelledAddress=label.normalize('NFKC').match(/^(?:〒\s*)?\d{3}-\d{4}\s+((?:東京都|北海道|[^\s]+?[県府])[^\s]*\d)\s+(.+)$/);
+ const name=labelledAddress?labelledAddress[2].slice(0,120):label&&!/^[-+0-9.,°'" NSEW]+$/i.test(label)?label.slice(0,120):'';
+ return {name,address:labelledAddress?.[1].slice(0,250)||'',...(xy&&Math.abs(Number(xy[1]))<=90&&Math.abs(Number(xy[2]))<=180?{lat:Number(xy[1]),lng:Number(xy[2])}:{})};
 }
 
 function flyerRequest_(db,req){

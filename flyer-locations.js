@@ -145,6 +145,15 @@ export const normalizeLocationAddress=value=>String(value||'').normalize('NFKC')
   })
   .replace(/丁目|番地の?|番(?!地)/g,'-').replace(/[−‐－]/g,'-').replace(/\s/g,'').replace(/[-号]$/,'');
 
+export function confirmedGoogleShare(raw,region){
+ const url=new URL(raw);
+ const link=url.origin+url.pathname;
+ const entries=[...locations].filter(([key,position])=>key.startsWith(region+'／')&&position.confirmedLinks?.includes(link));
+ if(entries.length!==1)return;
+ const [[name,position]]=entries;
+ return {name:name.slice(region.length+1),...position};
+}
+
 export function googleSharePreview(raw){
  const url=new URL(raw);
  if(url.protocol!=='https:'||url.username||url.password||url.port)throw Error('Googleマップの共有リンクを入れてください。');
@@ -156,8 +165,10 @@ export function googleSharePreview(raw){
  const explicitQuery=!url.searchParams.has('query_place_id')&&/^(?:\/|\/maps(?:\/search)?\/?)$/.test(path)&&
   (url.searchParams.get('query')||url.searchParams.get('q')||'').match(/^(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)$/);
  const xy=coordinates.length===1?coordinates[0]:explicitQuery;
- const name=place?.[1].replace(/\+/g,' ').slice(0,120)||'';
- return {name:/^[-+0-9.,°'" NSEW]+$/i.test(name)?'':name,address:'',...(xy&&Math.abs(Number(xy[1]))<=90&&Math.abs(Number(xy[2]))<=180?{lat:Number(xy[1]),lng:Number(xy[2])}:{})};
+ const label=place?.[1].replace(/\+/g,' ')||'';
+ const labelledAddress=label.normalize('NFKC').match(/^(?:〒\s*)?\d{3}-\d{4}\s+((?:東京都|北海道|[^\s]+?[県府])[^\s]*\d)\s+(.+)$/);
+ const name=labelledAddress?.[2]||label;
+ return {name:/^[-+0-9.,°'" NSEW]+$/i.test(name)?'':name.slice(0,120),address:labelledAddress?.[1].slice(0,250)||'',...(xy&&Math.abs(Number(xy[1]))<=90&&Math.abs(Number(xy[2]))<=180?{lat:Number(xy[1]),lng:Number(xy[2])}:{})};
 }
 
 export function exactAddressPosition(address,features){

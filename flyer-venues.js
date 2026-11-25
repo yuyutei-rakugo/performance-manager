@@ -1,5 +1,5 @@
 import {previewFlyerMigration} from './flyer-migration.js?v=20261125-regions1';
-import {flyerLocation,flyerLocationInfo,googleSharePreview,exactAddressPosition,normalizeLocationAddress,flyerLinkConflicts} from './flyer-locations.js?v=20261125-link1';
+import {flyerLocation,flyerLocationInfo,confirmedGoogleShare,googleSharePreview,exactAddressPosition,normalizeLocationAddress,flyerLinkConflicts} from './flyer-locations.js?v=20261125-link1';
 import {startEditor,finishEditor,leaveEditor,guardEditor,editorState} from './editor-dialog.js?v=20261125-regions1';
 import {cloud} from './cloud.js?v=20261125-regions1';
 
@@ -276,7 +276,9 @@ export function openFlyerVenues(event){
    if(!url){linkInput.focus();linkMessage.textContent='共有リンクを貼り付けてください。';return}
    resolvingLink=true;lookupLink.disabled=true;linkMessage.textContent='リンクを確認しています…';
    try{
-    const place=data.googleShare?await request('flyerResolveGoogleLink',{url}):googleSharePreview(url);
+    const confirmedLink=confirmedGoogleShare(url,readRegion());
+    const resolved=data.googleShare?await request('flyerResolveGoogleLink',{url}):confirmedLink||googleSharePreview(url);
+    const place=confirmedLink&&!Number.isFinite(resolved.lat)?{...confirmedLink,...resolved,address:resolved.address||confirmedLink.address,name:resolved.name||confirmedLink.name}:resolved;
     if(!form.isConnected||linkInput.value.trim()!==url)return;
     const name=place.name||form.elements.name.value.trim();
     if(!Number.isFinite(place.lat)||!Number.isFinite(place.lng)){
