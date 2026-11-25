@@ -546,6 +546,15 @@ async function main(){
     assert(!await flyerForm.getByLabel('住所',{exact:true}).isVisible(),'optional address stays hidden');
     assert(!await flyerForm.getByLabel('Googleマップの共有リンク（任意）').isVisible());
     await flyerForm.getByLabel('施設名',{exact:true}).fill('未収録の試験施設');
+    // Manual map opens immediately beside its sole button, not below all fallback fields.
+    await flyerForm.locator('.flyer-place-fallback > summary').click();
+    assert(!await flyerForm.getByRole('button',{name:'地図上で位置を指定',exact:true}).isVisible());
+    await flyerForm.getByRole('button',{name:'地図を開いて場所を指定',exact:true}).click();
+    await flyerForm.locator('.flyer-inline-map .flyer-map-canvas').waitFor();
+    assert(await flyerForm.locator('.flyer-inline-map').evaluate(el=>el.previousElementSibling?.textContent==='地図を閉じる'));
+    await flyerForm.getByRole('button',{name:'地図を閉じる',exact:true}).click();
+    assert.equal(await flyerForm.locator('.flyer-inline-map .flyer-map-canvas').count(),0);
+    await flyerForm.locator('.flyer-place-fallback > summary').click();
     await flyerForm.getByRole('button',{name:'施設名で場所を検索',exact:true}).click();
     await flyerForm.getByText(/老舗でも未収録/).waitFor();
     await flyerForm.screenshot({path:'test-artifacts/facility-search-mobile.png'});
