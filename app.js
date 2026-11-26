@@ -23,7 +23,7 @@ let cloudLoadError='';
 let memberNames=['勇水','小薔薇','懐古','華詩','世喜音','やすゑ','一悟','日光'],cloudRevision=0,cloudLoaded=false,stopCloud,cloudIdentity='',saving=false;
 fetch('./history-data.json').then(r=>r.json()).then(d=>{memberNames=d.names.filter(n=>n!=='藤本')}).catch(()=>{});
 const editable=()=>!cloud.state.configured||(['admin','editor'].includes(cloud.state.role)&&cloudLoaded);
-function assigneePicker(item,i){return `<fieldset class="assignee-picker"><legend>担当者（任意・複数選択可）</legend>${[...new Set([...memberNames,...(item.assignees||[])])].map(n=>`<label><input type="checkbox" data-owner="${i}" value="${esc(n)}" ${(item.assignees||[]).includes(n)?'checked':''}>${esc(n)}</label>`).join('')}</fieldset>`}
+function assigneePicker(item,i){const choices=cloud.state.configured&&cloud.state.provider==='apps-script'?performerNames:memberNames;return `<fieldset class="assignee-picker"><legend>担当者（任意・複数選択可）</legend>${[...new Set([...choices,...(item.assignees||[])])].map(n=>`<label><input type="checkbox" data-owner="${i}" value="${esc(n)}" ${(item.assignees||[]).includes(n)?'checked':''}>${esc(n)}</label>`).join('')}</fieldset>`}
 function progress(event){
  const applicable=event.checklist.filter(item=>!item.excluded);
  return {done:applicable.filter(item=>item.done).length,total:applicable.length,excluded:event.checklist.length-applicable.length};
@@ -216,6 +216,10 @@ function loadPerformerRoster(form,force=false){
   cloud.roster({force}).then(rows=>{
     if($('event-form')!==form||!eventDialog.open)return;
     performerNames=rows.map(row=>row.name);
+    for(const fieldset of form.querySelectorAll('.assignee-picker')){
+      const assignees=[...fieldset.querySelectorAll('[data-owner]:checked')].map(input=>input.value);
+      fieldset.outerHTML=assigneePicker({assignees},0);
+    }
     updatePerformerPickers(form,performerNames);
     showPerformerRoster(form,'ready',performerNames,retry);
   }).catch(()=>{
