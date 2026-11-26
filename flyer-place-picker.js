@@ -68,6 +68,8 @@ export async function mountPlacePicker(host,initial,choose,options={}){
  const placed=latlng=>{
   selected=[latlng.lat,latlng.lng];
   submit.disabled=false;feedback.textContent='ピンを移動しました。位置を確認して保存してください。';
+  // Keep the pin's full touch target clear of the map controls and attribution.
+  view.panInside(latlng,{paddingTopLeft:[60,60],paddingBottomRight:[24,60],animate:false});
   options.onMove?.(selected);
  };
  const setMarker=xy=>{
