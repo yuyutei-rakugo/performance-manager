@@ -215,3 +215,9 @@ output[data-end-time]{font-size:1.1rem;font-weight:800;color:var(--red)}
 .flyer-list-search>button{min-height:48px;white-space:nowrap}
 .flyer-quick-filters:has(.flyer-list-search){grid-template-columns:minmax(0,1fr)}
 .flyer-quick-filters:has(.flyer-list-search)>label{max-width:220px}
+
+.settings-dialog [data-push-settings]:not([hidden]){display:grid;gap:10px;margin:10px 0}
+.settings-dialog [data-push-settings] button{width:100%;min-width:0;white-space:normal;overflow-wrap:anywhere}
+.settings-dialog [data-push-settings] button[hidden]{display:none}
+.settings-dialog [data-push-settings] [role=status]{margin:0}
+.settings-dialog [data-push-settings] [role=status]:empty{display:none}
