@@ -151,8 +151,8 @@ export function mountAccount(){
  let loadPush;
  settings.onclick=()=>{
   menu.showModal();
-  if(cloud.state.provider==='apps-script'&&cloud.state.role&&'serviceWorker' in navigator){
-   (loadPush??=import('./push-settings.js?v=20261126-push-reliable1').then(mod=>mod.mountPushSettings(menu,cloud)).catch(()=>{loadPush=null})).then(open=>open?.());
+  if(cloud.state.provider==='apps-script'&&cloud.state.role){
+   (loadPush??=import('./push-settings.js?v=20261126-push-pilot2').then(mod=>mod.mountPushSettings(menu,cloud)).catch(()=>{loadPush=null})).then(open=>open?.());
   }
  };
  menu.querySelector('[data-install]').onclick=()=>menu.close();

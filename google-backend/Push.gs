@@ -72,7 +72,7 @@ function pushRequest_(member,session,req,events) {
   props.setProperty(id,JSON.stringify({...subscription,memberId:member.id,epoch:member.epoch,session,sent:{},registration:Utilities.getUuid()}));
   return {};
  }
- if(req.action==='pushTest'&&pushMode_()==='pilot'&&owns&&stored.session===session) {
+ if(req.action==='pushTest'&&owns&&stored.session===session) {
   const now=Date.now();
   if(now-(stored.testAt||0)<60000)throw Error('1分待ってからお試しください。');
   stored.testAt=now;

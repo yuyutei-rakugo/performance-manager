@@ -6,6 +6,8 @@ export function mountPushSettings(menu, cloud) {
   let state, busy = false;
   const request = (action, fields) => cloud.push(action, fields);
   const supported = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+  const appleMobile = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
   const options = subscription => ({endpoint:subscription.endpoint, keys:subscription.toJSON().keys});
 
   async function manage(action) {
@@ -43,7 +45,7 @@ export function mountPushSettings(menu, cloud) {
       const enabled = !!subscription && (await request('pushStatus',options(subscription))).enabled;
       toggle.dataset.enabled = String(enabled);
       toggle.textContent = enabled ? 'この端末の通知を停止する' : '公演のお知らせを受け取る';
-      test.hidden = !state.pilot || !enabled;
+      test.hidden = !enabled;
       if (action === 'status') status.textContent = enabled ? 'この端末では通知が有効です。' : 'この端末では通知が無効です。';
     } catch (error) {
       status.textContent = error.message;
@@ -61,6 +63,12 @@ export function mountPushSettings(menu, cloud) {
     if (!config?.allowed || !menu.open) return;
     state = config;
     section.hidden = false;
+    if (appleMobile && !matchMedia('(display-mode: standalone)').matches && !navigator.standalone) {
+      toggle.disabled = true;
+      test.hidden = true;
+      status.textContent = 'iPhone・iPadはホーム画面に追加し、そのアイコンから帳面を開いてください。';
+      return;
+    }
     await manage('status');
   };
 }
