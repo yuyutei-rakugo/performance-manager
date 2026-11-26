@@ -134,8 +134,21 @@ function archivePast_(db,req,actor){
  return detail?{count,rehearsals}:{count};
 }
 function importLocal_(db,req,actor){
- if(!req.documents||!req.attendance||typeof req.attendance!=='object')throw Error('移行データを確認してください。');for(const name of ['events','rehearsals','history']){const incoming=req.documents[name];validCollection_(name,incoming);if(!Array.isArray(incoming)||!incoming.every(r=>r&&typeof r.id==='string'&&typeof r.date==='string'))throw Error('予定・記録の形式を確認してください。');const current=db.shared[name]||{items:[],revision:0};const merged=new Map(current.items.map(r=>[r.id,r]));incoming.forEach(r=>{if(!merged.has(r.id)&&!(name!=='history'&&current.items.some(old=>old.date===r.date)))merged.set(r.id,r)});if(merged.size>500)throw Error('各一覧は500件までです。');db.shared[name]={items:Array.from(merged.values()),revision:current.revision+1,updatedBy:actor.id,updatedAt:new Date().toISOString()}}
- for(const id in req.attendance){const dest=db.attendance[id]||{};for(const name in req.attendance[id]){const status=req.attendance[id][name];if(!['出席','欠席','未定','未回答'].includes(status))throw Error('出欠の形式を確認してください。');if(!Object.values(dest).some(r=>r.stageName===name)){const m=db.members.find(m=>m.name===name);dest[m?m.id:'imported-'+name]={stageName:name,status,updatedAt:new Date().toISOString()}}}db.attendance[id]=dest}return {imported:true};
+ if(!req.documents||!req.attendance||typeof req.attendance!=='object'||Array.isArray(req.attendance))throw Error('移行データを確認してください。');for(const name of ['events','rehearsals','history']){const incoming=req.documents[name];validCollection_(name,incoming);if(!Array.isArray(incoming)||!incoming.every(r=>r&&typeof r.id==='string'&&typeof r.date==='string'))throw Error('予定・記録の形式を確認してください。');const current=db.shared[name]||{items:[],revision:0};const merged=new Map(current.items.map(r=>[r.id,r]));incoming.forEach(r=>{if(!merged.has(r.id)&&!(name!=='history'&&current.items.some(old=>old.date===r.date)))merged.set(r.id,r)});if(merged.size>500)throw Error('各一覧は500件までです。');db.shared[name]={items:Array.from(merged.values()),revision:current.revision+1,updatedBy:actor.id,updatedAt:new Date().toISOString()}}
+ for(const [id,answers] of Object.entries(req.attendance)){
+  checkId_(id);
+  if(!answers||typeof answers!=='object'||Array.isArray(answers))throw Error('出欠の形式を確認してください。');
+  const dest=db.attendance[id]||{};
+  for(const [name,status] of Object.entries(answers)){
+   if(!['出席','欠席','未定','未回答'].includes(status))throw Error('出欠の形式を確認してください。');
+   if(!Object.values(dest).some(row=>row.stageName===name)){
+    const member=db.members.find(m=>m.name===name);
+    dest[member?member.id:'imported-'+name]={stageName:name,status,updatedAt:new Date().toISOString()};
+   }
+  }
+  db.attendance[id]=dest;
+ }
+ return {imported:true};
 }
 function validCollection_(name,items){
  if(!Array.isArray(items)||items.length>500)throw Error('保存するデータを確認してください。');const ids=new Set();for(const r of items){if(!r||typeof r.id!=='string'||!r.id||ids.has(r.id)||typeof r.date!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(r.date))throw Error('日付・IDを確認してください。');ids.add(r.id);if(name==='history'){if(!['kind','occasion','note'].every(k=>typeof r[k]==='string')||!r.pieces||typeof r.pieces!=='object'||Array.isArray(r.pieces)||!Object.values(r.pieces).every(v=>typeof v==='string'))throw Error('記録の形式を確認してください。')}else{if(!['title','time','venue',name==='events'?'memo':'notes'].every(k=>typeof r[k]==='string')||!r.title.trim()||!r.venue.trim()||!(name==='events'&&r.time==='')&&!/^([01]\d|2[0-3]):[0-5]\d$/.test(r.time))throw Error('予定の形式を確認してください。');if(name==='events'&&(!Array.isArray(r.performers)||!Array.isArray(r.checklist)||!r.checklist.length||r.checklist.length>200||!r.checklist.every(t=>t&&typeof t.label==='string'&&t.label.trim()&&typeof t.done==='boolean'&&(t.excluded===undefined||typeof t.excluded==='boolean'&&!(t.excluded&&t.done)))))throw Error('出演者・準備項目を確認してください。')}}
