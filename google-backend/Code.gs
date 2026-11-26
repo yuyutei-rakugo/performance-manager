@@ -7,7 +7,7 @@ function initializeOwner(){
  const lock=LockService.getScriptLock();lock.waitLock(20000);
  try{const props=PropertiesService.getScriptProperties();if(props.getProperty('DB_FILE_ID'))throw Error('初期設定済みです。');const pin=props.getProperty('OWNER_PIN')||'1111';checkPin_(pin);const secret=Utilities.getUuid()+Utilities.getUuid();props.setProperty('AUTH_SECRET',secret);const owner={id:'owner',name:'勇水',role:'admin',active:true,epoch:1,salt:Utilities.getUuid(),owner:true};owner.pinHash=hashPin_(owner,pin);const file=Drive.Files.create({name:'結友亭の帳面-共通データ.json',mimeType:'application/json'},Utilities.newBlob(JSON.stringify({version:1,members:[owner],shared:{},attendance:{}}),'application/json'),{fields:'id'});props.setProperty('DB_FILE_ID',file.id);props.deleteProperty('OWNER_PIN');return '勇水を最初の管理者として登録しました。'}finally{lock.releaseLock()}
 }
-function doGet(){return output_({reservationDocuments:true,ok:true,service:'yuyutei-members',version:1,attendanceProxy:true,rehearsalArchiveToday:true,automaticBackup:true,backupRecoveryRevision:2,checklistExclusion:true,flyerVenues:true,flyerLocationFields:true,flyerSharedFacilities:true,flyerDeclineHistory:true,flyerGoogleShare:true})}
+function doGet(){return output_({reservationDocuments:true,ok:true,service:'yuyutei-members',version:1,attendanceProxy:true,rehearsalArchiveToday:true,automaticBackup:true,backupRecoveryRevision:2,checklistExclusion:true,flyerVenues:true,flyerLocationFields:true,flyerSharedFacilities:true,flyerDeclineHistory:true,flyerGoogleShare:true,performancePush:true})}
 function doPost(event){
  const lock=LockService.getScriptLock();let locked=false;
  try{if(!event||!event.postData||event.postData.contents.length>1500000)throw Error('リクエストを確認してください。');const req=JSON.parse(event.postData.contents);if(!req||typeof req!=='object')throw Error('リクエストを確認してください。');if(req.action==='flyerResolveGoogleLink'){authorize_(readDb_(),req.token);return output_({ok:true,...flyerResolveGoogleLink_(req.url)})}lock.waitLock(20000);locked=true;const db=readDb_();if(req.action==='login')return output_({ok:true,...login_(db,req)});const member=authorize_(db,req.token);let data;
@@ -19,6 +19,17 @@ function doPost(event){
  case 'roster':data={members:db.members.filter(m=>m.active).map(m=>({name:m.name}))};break;
  case 'archivePast':admin_(member);data=archivePast_(db,req,member);if(data.count)writeDb_(db);break;
  case 'importLocal':admin_(member);data=importLocal_(db,req,member);if(db.flyers?.facilities)seedFlyerFacilities_(db.flyers,db.shared.events.items);writeDb_(db);break;
+ case 'pushConfig':case 'pushStatus':case 'pushEnable':case 'pushDisable':case 'pushTest':{
+  const session=digest_(req.token);
+  data=pushRequest_(member,session,req,db.shared.events?.items);
+  if(data.test){
+   lock.releaseLock();locked=false;
+   const result=pushSendClaimed_(data.test.id,data.test.payload,120,session);
+   if(result<200||result>=300)throw Error('テスト通知を配信できませんでした。通知を有効にし直してお試しください。');
+   data={};
+  }
+  break;
+ }
  case 'session':if(req.remember===true){const props=PropertiesService.getScriptProperties(),key='SESSION_'+digest_(req.token),session=JSON.parse(props.getProperty(key));session.expires=Date.now()+30*24*60*60*1000;props.setProperty(key,JSON.stringify(session))}data={member:publicMember_(member)};break;
  case 'read':checkCollection_(req.name);data={doc:db.shared[req.name]||null};break;
  case 'save':if(!['admin','editor'].includes(member.role))throw Error('編集権限が必要です。');checkCollection_(req.name);validCollection_(req.name,req.items);if(!Array.isArray(req.items)||req.items.length>500)throw Error('データの形式を確認してください。');const current=db.shared[req.name];if(['events','rehearsals'].includes(req.name)){const old=new Map((current?current.items:[]).map(r=>[r.id,r]));for(const r of req.items){if((r.archivedAt||null)!==(old.get(r.id)?.archivedAt||null))throw Error('記録への移動は管理者ページから行ってください。')}for(const r of old.values())if(r.archivedAt&&!req.items.some(n=>n.id===r.id))throw Error('転記済みの予定は保持してください。')}if((current?current.revision:0)!==req.revision)throw Error('ほかの端末で更新されています。再読み込みしてください。');db.shared[req.name]={items:req.items,revision:req.revision+1,updatedBy:member.id,updatedAt:new Date().toISOString()};if(req.name==='events'&&db.flyers?.facilities)seedFlyerFacilities_(db.flyers,req.items);writeDb_(db);data={revision:req.revision+1};break;

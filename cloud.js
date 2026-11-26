@@ -28,6 +28,7 @@ export const cloud={
   try{return await pinClient.flyer(action,data)}
   catch(error){if(/この操作は利用できません/.test(error.message))throw Error('掲示先を利用するには共通保存の更新が必要です。');throw error}
  },
+ async push(action,fields){if(!pinClient||!state.role)throw Error('会員ログインが必要です。');return pinClient.push(action,fields)},
  async backups(){if(!pinClient)throw Error('共通保存に接続してください。');return pinClient.backups()},
  async createBackup(){if(!pinClient)throw Error('共通保存に接続してください。');return pinClient.createBackup()},
  async restoreBackup(id,expected){if(!pinClient)throw Error('共通保存に接続してください。');return pinClient.restoreBackup(id,expected)},
@@ -90,7 +91,7 @@ export async function startCloud(){
   state.configured=true;state.provider=config.provider||'firebase';state.message='ログイン状態を確認しています。';emit();
   if(config.provider==='apps-script'){if(!/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec$/.test(config.endpoint||'')){
    state.connectionIssue='configuration';state.ready=true;state.message='共通保存の接続先設定を確認してください。';emit();return
-  }const {createPinClient}=await import('./pin-cloud.js?v=20261125-regions1');pinClient=createPinClient(config.endpoint,state,emit);await pinClient.start();return}
+  }const {createPinClient}=await import('./pin-cloud.js?v=20261126-push1');pinClient=createPinClient(config.endpoint,state,emit);await pinClient.start();return}
   const base='https://www.gstatic.com/firebasejs/12.6.0/';
   const [app,authApi,store]=await Promise.all([import(base+'firebase-app.js'),import(base+'firebase-auth.js'),import(base+'firebase-firestore.js')]);
   api={...authApi,...store};const firebase=app.initializeApp(config.firebase);auth=api.getAuth(firebase);db=api.getFirestore(firebase);
@@ -121,6 +122,7 @@ export function mountAccount(){
   <a class="secondary" id="settings-admin" href="./admin.html?v=20261125-regions1" hidden>管理者ページ</a>
   <button type="button" class="secondary" id="cloud-logout" hidden>ログアウト</button>
  </div>
+ <section data-push-settings hidden><button type="button" class="secondary" data-push-toggle>公演のお知らせを受け取る</button> <button type="button" class="secondary" data-push-test hidden>テスト通知を送る</button><p role="status"></p></section>
  <details class="quick-help"><summary>帳面の使い方</summary>
  <h3>予定を見る・出欠を答える</h3><p>「公演一覧」「稽古出欠」「稽古・公演記録」で切り替えます。稽古は「出欠・詳細」から自分の回答を選び、登録できた表示を確認してください。</p>
  <h3>編集と保存</h3><p>編集担当・管理者は「編集する」を押し、「変更を保存する」で確定します。「キャンセル」は変更を保存しません。保存できなかった場合は入力を残して再試行できます。</p>
@@ -145,7 +147,13 @@ export function mountAccount(){
  const pinTools=menu.querySelector('#settings-pin'),pinForm=pinTools.querySelector('form'),pinMessage=pinForm.querySelector('p');
  const logout=menu.querySelector('#cloud-logout'),admin=menu.querySelector('#settings-admin');
  menu.querySelector('[data-settings-close]').onclick=()=>menu.close();
- settings.onclick=()=>menu.showModal();
+ let loadPush;
+ settings.onclick=()=>{
+  menu.showModal();
+  if(cloud.state.provider==='apps-script'&&cloud.state.role&&'serviceWorker' in navigator){
+   (loadPush??=import('./push-settings.js?v=20261126-push1').then(mod=>mod.mountPushSettings(menu,cloud)).catch(()=>{loadPush=null})).then(open=>open?.());
+  }
+ };
  menu.querySelector('[data-install]').onclick=()=>menu.close();
  cloud.onState(s=>{
   const administrator=s.role==='admin';
@@ -155,6 +163,7 @@ export function mountAccount(){
   login.hidden=!s.configured||!s.ready||!!s.user;
   login.textContent=s.provider==='apps-script'?'会員ログイン':'Googleで会員ログイン';
   logout.hidden=!s.user;
+  if(!s.user)menu.querySelector('[data-push-settings]').hidden=true;
   pinTools.hidden=!s.user||s.provider!=='apps-script';
   if(pinTools.hidden){pinTools.open=false;pinForm.reset();pinMessage.textContent=''}
   status.textContent=s.message;
