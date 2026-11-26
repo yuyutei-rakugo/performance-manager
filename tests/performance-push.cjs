@@ -94,12 +94,12 @@ assert.equal(run("pushRequest_(owner,'session',{action:'pushStatus',endpoint}).e
 console.log('PASS Web Push encryption, VAPID, endpoint validation, pilot access, timing, deduplication, schedule changes and opt-out');
 
 const listeners={};
-let notification, opened;
+let notification, opened, navigated, focused, openPages=[];
 const worker=vm.createContext({URL,self:{
  addEventListener:(name,callback)=>{listeners[name]=callback},
  registration:{scope:'https://notebook.example/performance-manager/',
   showNotification:async(title,options)=>{notification={title,...options,close(){}}}},
- clients:{openWindow:async url=>{opened=url}},
+ clients:{matchAll:async()=>openPages,openWindow:async url=>{opened=url}},
 }});
 vm.runInContext(read('sw.js'),worker);
 (async()=>{
@@ -111,5 +111,14 @@ vm.runInContext(read('sw.js'),worker);
  listeners.notificationclick({notification,waitUntil});
  await done;
  assert.equal(opened,'https://notebook.example/performance-manager/?detail=test');
+ opened=undefined;
+ openPages=[{url:'https://notebook.example/performance-manager/?source=homescreen',navigate:async url=>{
+  navigated=url;return {focus:async()=>{focused=true}};
+ }}];
+ listeners.notificationclick({notification,waitUntil});
+ await done;
+ assert.equal(navigated,'https://notebook.example/performance-manager/?detail=test');
+ assert.equal(focused,true);
+ assert.equal(opened,undefined);
  console.log('PASS service worker shows a tagged notification and opens the performance detail');
 })().catch(error=>{console.error(error);process.exitCode=1});

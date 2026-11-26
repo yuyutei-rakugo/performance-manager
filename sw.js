@@ -24,5 +24,21 @@ self.addEventListener('notificationclick',event=>{
  const url=new URL(event.notification.data?.url||'./',self.registration.scope);
  event.notification.close();
  if(!url.href.startsWith(self.registration.scope))return;
- event.waitUntil(self.clients.openWindow(url.href));
+ event.waitUntil((async()=>{
+  if(url.searchParams.has('detail')){
+   const windows=await self.clients.matchAll({type:'window',includeUncontrolled:true});
+   const home=new URL('./',self.registration.scope);
+   const existing=windows.find(client=>{
+    const page=new URL(client.url);
+    return page.origin===home.origin&&(page.pathname===home.pathname||page.pathname===home.pathname+'index.html');
+   });
+   if(existing){
+    try{
+     const destination=await existing.navigate(url.href);
+     if(destination){await destination.focus();return}
+    }catch{}
+   }
+  }
+  await self.clients.openWindow(url.href);
+ })());
 });
