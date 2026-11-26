@@ -91,7 +91,7 @@ export async function startCloud(){
   state.configured=true;state.provider=config.provider||'firebase';state.message='ログイン状態を確認しています。';emit();
   if(config.provider==='apps-script'){if(!/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec$/.test(config.endpoint||'')){
    state.connectionIssue='configuration';state.ready=true;state.message='共通保存の接続先設定を確認してください。';emit();return
-  }const {createPinClient}=await import('./pin-cloud.js?v=20261126-push1');pinClient=createPinClient(config.endpoint,state,emit);await pinClient.start();return}
+  }const {createPinClient}=await import('./pin-cloud.js?v=20261126-push-reliable1');pinClient=createPinClient(config.endpoint,state,emit);await pinClient.start();return}
   const base='https://www.gstatic.com/firebasejs/12.6.0/';
   const [app,authApi,store]=await Promise.all([import(base+'firebase-app.js'),import(base+'firebase-auth.js'),import(base+'firebase-firestore.js')]);
   api={...authApi,...store};const firebase=app.initializeApp(config.firebase);auth=api.getAuth(firebase);db=api.getFirestore(firebase);
@@ -123,6 +123,7 @@ export function mountAccount(){
   <button type="button" class="secondary" id="cloud-logout" hidden>ログアウト</button>
  </div>
  <section data-push-settings hidden><button type="button" class="secondary" data-push-toggle>公演のお知らせを受け取る</button> <button type="button" class="secondary" data-push-test hidden>テスト通知を送る</button><p role="status"></p></section>
+ <details id="push-report" hidden><summary>通知の配信状況</summary><button type="button" class="secondary">配信状況を確認する</button><p role="status"></p></details>
  <details class="quick-help"><summary>帳面の使い方</summary>
  <h3>予定を見る・出欠を答える</h3><p>「公演一覧」「稽古出欠」「稽古・公演記録」で切り替えます。稽古は「出欠・詳細」から自分の回答を選び、登録できた表示を確認してください。</p>
  <h3>編集と保存</h3><p>編集担当・管理者は「編集する」を押し、「変更を保存する」で確定します。「キャンセル」は変更を保存しません。保存できなかった場合は入力を残して再試行できます。</p>
@@ -151,15 +152,38 @@ export function mountAccount(){
  settings.onclick=()=>{
   menu.showModal();
   if(cloud.state.provider==='apps-script'&&cloud.state.role&&'serviceWorker' in navigator){
-   (loadPush??=import('./push-settings.js?v=20261126-push1').then(mod=>mod.mountPushSettings(menu,cloud)).catch(()=>{loadPush=null})).then(open=>open?.());
+   (loadPush??=import('./push-settings.js?v=20261126-push-reliable1').then(mod=>mod.mountPushSettings(menu,cloud)).catch(()=>{loadPush=null})).then(open=>open?.());
   }
  };
  menu.querySelector('[data-install]').onclick=()=>menu.close();
+ const report=menu.querySelector('#push-report'), reportButton=report.querySelector('button'), reportStatus=report.querySelector('[role=status]');
+ reportButton.onclick=async()=>{
+  const account=cloud.state.user?.uid;
+  reportButton.disabled=true;
+  reportStatus.textContent='確認中…';
+  try{
+   const result=await cloud.push('pushReport');
+   if(cloud.state.user?.uid!==account||cloud.state.role!=='admin')return;
+   const mode={off:'停止',pilot:'管理者テスト',members:'会員向け'}[result.mode];
+   const time=value=>new Date(value).toLocaleString('ja-JP',{timeZone:'Asia/Tokyo'});
+   const run=result.lastRun, test=result.lastTest;
+   reportStatus.textContent=[
+    mode+'。登録端末 '+result.registered+'／'+result.limit+'台。',
+    run?'定期配信 '+time(run.at)+'。受付 '+run.accepted+'件、再試行予定 '+run.retry+'件、失敗 '+run.failed+'件、失効 '+run.expired+'件。':'定期配信の記録はまだありません。',
+    test?'テスト '+time(test.at)+'。'+(test.accepted?'通知サービスが受付。':'通知サービスの受付を確認できませんでした。'):'',
+    '端末に届いたかは、端末の通知欄で確認してください。',
+   ].filter(Boolean).join(' ');
+  }catch{
+   if(cloud.state.user?.uid===account)reportStatus.textContent='確認できませんでした。再度お試しください。';
+  }finally{reportButton.disabled=false}
+ };
  cloud.onState(s=>{
   const administrator=s.role==='admin';
   settings.textContent=title.textContent=administrator?'管理者設定':'設定';
   if(dataButton)dataButton.hidden=!s.ready||s.configured&&!administrator;
   admin.hidden=!s.ready||!administrator;
+  report.hidden=!s.ready||!administrator||s.provider!=='apps-script';
+  if(report.hidden){report.open=false;reportStatus.textContent=''}
   login.hidden=!s.configured||!s.ready||!!s.user;
   login.textContent=s.provider==='apps-script'?'会員ログイン':'Googleで会員ログイン';
   logout.hidden=!s.user;

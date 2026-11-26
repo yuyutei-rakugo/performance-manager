@@ -49,8 +49,14 @@ function pushRequest_(member,session,req,events) {
  }
  const endpoint=pushEndpoint_(req.endpoint);
  const id='PUSH_SUB_'+digest_(endpoint), stored=JSON.parse(props.getProperty(id)||'null');
- const owns=stored?.memberId===member.id;
- if(req.action==='pushStatus')return {enabled:owns&&stored.session===session};
+ const owns=stored?.memberId===member.id&&stored.epoch===member.epoch;
+ if(req.action==='pushStatus'){
+  if(owns&&allowed&&stored.session!==session){
+   stored.session=session;
+   props.setProperty(id,JSON.stringify(stored));
+  }
+  return {enabled:owns&&allowed,differentMember:!!stored&&stored.memberId!==member.id};
+ }
  if(req.action==='pushDisable'){
   if(owns)props.deleteProperty(id);
   return {};
@@ -63,7 +69,7 @@ function pushRequest_(member,session,req,events) {
   const subscription=pushSubscription_({endpoint,keys:req.keys});
   // Validate the P-256 point before storing it.
   NotebookPushCrypto.validatePublicKey(pushBytes_(subscription.key));
-  props.setProperty(id,JSON.stringify({...subscription,memberId:member.id,epoch:member.epoch,session,sent:{}}));
+  props.setProperty(id,JSON.stringify({...subscription,memberId:member.id,epoch:member.epoch,session,sent:{},registration:Utilities.getUuid()}));
   return {};
  }
  if(req.action==='pushTest'&&pushMode_()==='pilot'&&owns&&stored.session===session) {
@@ -117,60 +123,107 @@ function pushDue_(events,now) {
    body:pushEventLabel_(event)}];
  });
 }
-function pushAvailableRow_(props,id,now) {
+function pushAvailableRow_(props,id,db) {
  const row=JSON.parse(props.getProperty(id)||'null');
  if(!row)return null;
- const session=JSON.parse(props.getProperty('SESSION_'+row.session)||'null');
- if(!session||session.expires<=now||session.id!==row.memberId||session.epoch!==row.epoch){
-  props.deleteProperty(id);return null;
+ const member=db.members.find(m=>m.id===row.memberId);
+ if(!member?.active||member.epoch!==row.epoch){props.deleteProperty(id);return null}
+ return pushAllowed_(member)?row:null;
+}
+function pushRemoveSession_(props,session) {
+ for(const id of props.getKeys().filter(key=>key.startsWith('PUSH_SUB_'))) {
+  const row=JSON.parse(props.getProperty(id)||'null');
+  if(row?.session===session)props.deleteProperty(id);
  }
- const member=readDb_().members.find(m=>m.id===row.memberId);
- if(!member||member.epoch!==row.epoch||!pushAllowed_(member))return null;
- return row;
+}
+function pushSameRegistration_(a,b) {
+ return a&&b&&a.registration===b.registration&&a.session===b.session&&a.key===b.key;
+}
+function pushTryDelivery_(row,payload,ttl) {
+ try{return pushDeliver_(row,payload,ttl)}
+ catch{return 0}
 }
 function pushSendClaimed_(id,payload,ttl,expected) {
  const props=PropertiesService.getScriptProperties();
- const row=pushAvailableRow_(props,id,Date.now());
- if(!row||row.session!==expected)return 0;
- if(payload.detail&&payload.kind!=='test'&&!pushDue_(readDb_().shared.events?.items||[],Date.now()).some(item=>item.id===payload.id&&item.body===payload.body))return 0;
- const code=pushDeliver_(row,payload,ttl);
- if(code===404||code===410){
-  const lock=LockService.getScriptLock();lock.waitLock(10000);
-  try {
-   const current=JSON.parse(props.getProperty(id)||'null');
-   if(current?.session===row.session&&current.key===row.key)props.deleteProperty(id);
-  }finally{lock.releaseLock()}
- }
+ const lock=LockService.getScriptLock();lock.waitLock(10000);
+ let row;
+ try {
+  row=pushAvailableRow_(props,id,readDb_());
+  if(!row||row.session!==expected)return 0;
+ }finally{lock.releaseLock()}
+ const code=pushTryDelivery_(row,payload,ttl);
+ lock.waitLock(10000);
+ try {
+  const current=JSON.parse(props.getProperty(id)||'null');
+  if(pushSameRegistration_(current,row)&&(code===404||code===410))props.deleteProperty(id);
+  props.setProperty('PUSH_LAST_TEST',JSON.stringify({at:new Date().toISOString(),code,
+   accepted:code>=200&&code<300}));
+ }finally{lock.releaseLock()}
  return code;
 }
-// Install a 5-minute time-driven trigger. Only the Japanese 08:00 hour is eligible.
-function sendPerformanceNotifications() {
- if(pushMode_()!=='members')return;
- const now=Date.now();
- if(Utilities.formatDate(new Date(now),'Asia/Tokyo','HH')!=='08')return;
+function pushReport_() {
  const props=PropertiesService.getScriptProperties();
- const due=pushDue_(readDb_().shared.events?.items||[],now);
- if(!due.length)return;
- const today=Utilities.formatDate(new Date(now),'Asia/Tokyo','yyyy-MM-dd');
- for(const id of props.getKeys().filter(key=>key.startsWith('PUSH_SUB_'))) {
-  for(const candidate of due) {
-   if(Date.now()-now>90000)return;
-   const lock=LockService.getScriptLock();
-   if(!lock.tryLock(1000))return;
-   let row, payload;
-   try {
-    row=pushAvailableRow_(props,id,Date.now());
-    if(!row)continue;
-    if(row.sentDate!==today){row.sent={};row.sentDate=today}
-    if(row.sent[candidate.id])continue;
-    // Re-read before claiming so a cancellation or reschedule isn't sent from a stale batch.
-    payload=pushDue_(readDb_().shared.events?.items||[],Date.now()).find(item=>item.id===candidate.id);
-    if(!payload)continue;
-    row.sent[payload.id]=true;
-    props.setProperty(id,JSON.stringify(row));
-   }finally{lock.releaseLock()}
-   try{pushSendClaimed_(id,payload,900,row.session)}
-   catch{console.warn('公演通知を送信できませんでした。')}
+ const rows=props.getKeys().filter(key=>key.startsWith('PUSH_SUB_'));
+ return {mode:pushMode_(),registered:rows.length,limit:50,
+  lastTest:JSON.parse(props.getProperty('PUSH_LAST_TEST')||'null'),
+  lastRun:JSON.parse(props.getProperty('PUSH_LAST_RUN')||'null')};
+}
+function pushClaim_(props,id,candidate,today,now) {
+ const prior=JSON.parse(props.getProperty(id)||'null');
+ if(!prior)return null;
+ const previous=prior.sentDate===today?prior.sent?.[candidate.id]:null;
+ if(previous===true||previous&&(!['retry','sending'].includes(previous.state)||previous.nextAt>now||previous.attempts>=3))return null;
+ const db=readDb_();
+ const row=pushAvailableRow_(props,id,db);
+ if(!row)return null;
+ const payload=pushDue_(db.shared.events?.items||[],now).find(item=>item.id===candidate.id);
+ if(!payload)return null;
+ if(row.sentDate!==today){row.sent={};row.sentDate=today}
+ const claim={state:'sending',attempts:(previous?.attempts||0)+1,nextAt:now+10*60000};
+ row.sent[payload.id]=claim;
+ props.setProperty(id,JSON.stringify(row));
+ return {row,payload,claim};
+}
+function pushRecordResult_(props,id,work,code,now) {
+ const {row,payload,claim}=work;
+ const current=JSON.parse(props.getProperty(id)||'null');
+ if(!pushSameRegistration_(current,row)||current.sentDate!==row.sentDate||
+    current.sent?.[payload.id]?.attempts!==claim.attempts)return 'skipped';
+ if(code===404||code===410){props.deleteProperty(id);return 'expired'}
+ const accepted=code>=200&&code<300;
+ const temporary=code===0||code===408||code===429||code>=500;
+ const state=accepted?'accepted':temporary&&claim.attempts<3?'retry':'failed';
+ current.sent[payload.id]={state,attempts:claim.attempts,nextAt:now+5*60000};
+ props.setProperty(id,JSON.stringify(current));
+ return state;
+}
+// A time-driven trigger checks the Japanese 08:00 hour.
+function sendPerformanceNotifications() {
+ const started=Date.now();
+ if(pushMode_()!=='members'||Utilities.formatDate(new Date(started),'Asia/Tokyo','HH')!=='08')return;
+ const props=PropertiesService.getScriptProperties();
+ const due=pushDue_(readDb_().shared.events?.items||[],started);
+ const today=Utilities.formatDate(new Date(started),'Asia/Tokyo','yyyy-MM-dd');
+ const totals={accepted:0,retry:0,failed:0,expired:0,skipped:0};
+ const lock=LockService.getScriptLock();
+ try {
+  for(const id of props.getKeys().filter(key=>key.startsWith('PUSH_SUB_'))) {
+   for(const candidate of due) {
+    const now=Date.now();
+    if(now-started>90000||Utilities.formatDate(new Date(now),'Asia/Tokyo','HH')!=='08'||pushMode_()!=='members')return;
+    if(!lock.tryLock(1000))return;
+    let work;
+    try{work=pushClaim_(props,id,candidate,today,now)}
+    finally{lock.releaseLock()}
+    if(!work)continue;
+    const code=pushTryDelivery_(work.row,work.payload,900);
+    lock.waitLock(10000);
+    try{totals[pushRecordResult_(props,id,work,code,Date.now())]++}
+    finally{lock.releaseLock()}
+   }
   }
+ }finally{
+  if(Object.values(totals).some(Boolean))
+   props.setProperty('PUSH_LAST_RUN',JSON.stringify({at:new Date().toISOString(),...totals}));
  }
 }

@@ -20,7 +20,9 @@ export function mountPushSettings(menu, cloud) {
         if (await Notification.requestPermission() !== 'granted') throw Error('端末の設定で通知を許可してください。');
       }
       const registration = await navigator.serviceWorker.getRegistration();
-      if (!registration?.active) throw Error('帳面を開き直してからお試しください。');
+      if (!registration?.active) throw Error(document.documentElement.dataset.workerUpdateFailed
+        ? '通知に必要な更新を取得できませんでした。通信を確認し、帳面を開き直してください。'
+        : '帳面を開き直してからお試しください。');
       let subscription = await registration.pushManager.getSubscription();
       if (action === 'enable') {
         if (!subscription) {

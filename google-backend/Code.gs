@@ -19,6 +19,7 @@ function doPost(event){
  case 'roster':data={members:db.members.filter(m=>m.active).map(m=>({name:m.name}))};break;
  case 'archivePast':admin_(member);data=archivePast_(db,req,member);if(data.count)writeDb_(db);break;
  case 'importLocal':admin_(member);data=importLocal_(db,req,member);if(db.flyers?.facilities)seedFlyerFacilities_(db.flyers,db.shared.events.items);writeDb_(db);break;
+ case 'pushReport':admin_(member);data=pushReport_();break;
  case 'pushConfig':case 'pushStatus':case 'pushEnable':case 'pushDisable':case 'pushTest':{
   const session=digest_(req.token);
   data=pushRequest_(member,session,req,db.shared.events?.items);
@@ -55,7 +56,12 @@ function doPost(event){
  case 'members':admin_(member);data={members:db.members.map(publicMember_)};break;
  case 'memberSave':admin_(member);data={member:saveMember_(db,member,req.member)};writeDb_(db);break;
  case 'changePin':checkPin_(req.pin);member.salt=Utilities.getUuid();member.pinHash=hashPin_(member,req.pin);member.epoch++;writeDb_(db);data={};break;
- case 'logout':PropertiesService.getScriptProperties().deleteProperty('SESSION_'+digest_(req.token));data={};break;
+ case 'logout':{
+  const props=PropertiesService.getScriptProperties(), session=digest_(req.token);
+  pushRemoveSession_(props,session);
+  props.deleteProperty('SESSION_'+session);
+  data={};break;
+ }
  default:throw Error('この操作は利用できません。');
  }
  return output_({ok:true,...data});
@@ -87,6 +93,7 @@ function saveMember_(db,actor,input){
  if(db.members.some(m=>m.name===name&&m.id!==(target&&target.id)))throw Error('同じ登録名が使われています。');
  if(target&&target.owner)throw Error('勇水の管理者権限は変更できません。');if((input.role==='admin'||target&&target.role==='admin')&&!actor.owner)throw Error('管理者の追加・変更は勇水のみ操作できます。');
  if(!target){if(db.members.length>=100)throw Error('会員は100名までです。');const initialPin=input.pin||'1111';checkPin_(initialPin);target={id:Utilities.getUuid(),salt:Utilities.getUuid(),epoch:1,owner:false};target.pinHash=hashPin_(target,initialPin);db.members.push(target)}else if(input.pin){checkPin_(input.pin);target.salt=Utilities.getUuid();target.pinHash=hashPin_(target,input.pin);target.epoch++}
+ if(target.active&&!input.active)target.epoch++;
  target.name=name;target.active=input.active;target.role=input.role;return publicMember_(target);
 }
 
