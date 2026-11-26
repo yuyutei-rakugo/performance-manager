@@ -13,31 +13,26 @@ self.addEventListener('push',event=>{
   try{message=event.data.json()}catch{return}
   if(!message?.id||typeof message.title!=='string'||typeof message.body!=='string')return;
   const url=new URL('./',self.registration.scope);
-  if(typeof message.detail==='string')url.searchParams.set('detail',message.detail);
   await self.registration.showNotification(message.title,{
    body:message.body,tag:message.id,renotify:false,
-   icon:new URL('notebook-pixel-any-192-v3.png',url).href,data:{url:url.href},
+   icon:new URL('notebook-pixel-any-192-v3.png',url).href,
   });
  })());
 });
 self.addEventListener('notificationclick',event=>{
- const url=new URL(event.notification.data?.url||'./',self.registration.scope);
+ const url=new URL('./',self.registration.scope);
  event.notification.close();
- if(!url.href.startsWith(self.registration.scope))return;
  event.waitUntil((async()=>{
-  if(url.searchParams.has('detail')){
-   const windows=await self.clients.matchAll({type:'window',includeUncontrolled:true});
-   const home=new URL('./',self.registration.scope);
-   const existing=windows.find(client=>{
-    const page=new URL(client.url);
-    return page.origin===home.origin&&(page.pathname===home.pathname||page.pathname===home.pathname+'index.html');
-   });
-   if(existing){
-    try{
-     const destination=await existing.navigate(url.href);
-     if(destination){await destination.focus();return}
-    }catch{}
-   }
+  const windows=await self.clients.matchAll({type:'window',includeUncontrolled:true});
+  const existing=windows.find(client=>{
+   const page=new URL(client.url);
+   return page.origin===url.origin&&(page.pathname===url.pathname||page.pathname===url.pathname+'index.html');
+  });
+  if(existing){
+   try{
+    const destination=await existing.navigate(url.href);
+    if(destination){await destination.focus();return}
+   }catch{}
   }
   await self.clients.openWindow(url.href);
  })());
