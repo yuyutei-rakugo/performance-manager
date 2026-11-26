@@ -1,6 +1,6 @@
 import {searchRegionalPlaces} from './regional-places.js?v=20261125-search1';
-import {loadStyles} from './flyer-map.js?v=20261125-link3';
-import {map, tileLayer, circleMarker} from './vendor/leaflet/leaflet-src.esm.js';
+import {loadStyles} from './flyer-map.js?v=20261126-pin1';
+import {map, tileLayer, circleMarker, marker, divIcon, control} from './vendor/leaflet/leaflet-src.esm.js';
 
 const clean=value=>String(value||'').normalize('NFKC').toLowerCase().replace(/\s+/g,'');
 const valid=xy=>Array.isArray(xy)&&xy.length===2&&xy.every(Number.isFinite)&&Math.abs(xy[1])<=90&&Math.abs(xy[0])<=180;
@@ -42,14 +42,44 @@ export async function mountPlacePicker(host,initial,choose,options={}){
  const canvas=document.createElement('div');canvas.className='flyer-map-canvas';canvas.setAttribute('aria-label','施設の位置を地図で指定');
  const feedback=document.createElement('p');feedback.textContent='地図を拡大し、施設の位置を押してください。';
  const submit=document.createElement('button');submit.type='button';submit.className='secondary';submit.textContent=options.submitLabel||'この位置を使う';submit.disabled=true;
- host.replaceChildren(feedback,canvas,...(options.readOnly?[]:[submit]));
- const view=map(canvas,{scrollWheelZoom:false,maxZoom:21}).setView(initial||[35.85,140.72],initial?16:11);
- const background=tileLayer('https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png',{attribution:'<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener noreferrer">地理院タイル</a> | © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap contributors</a>',maxNativeZoom:18,maxZoom:21,referrerPolicy:'no-referrer'}).addTo(view);
+ host.replaceChildren(feedback,canvas,...(options.readOnly||options.inline?[]:[submit]));
+ const view=map(canvas,{scrollWheelZoom:false,maxZoom:21,zoomControl:false}).setView(initial||[35.85,140.72],initial?16:11);
+ control.zoom({zoomInTitle:'拡大',zoomOutTitle:'縮小'}).addTo(view);
+ const tileOptions={attribution:'<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener noreferrer">地理院タイル</a> | © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap contributors</a>',maxNativeZoom:18,maxZoom:21,referrerPolicy:'no-referrer'};
+ const standard=tileLayer('https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png',tileOptions).addTo(view);
+ const aerial=tileLayer('https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg',tileOptions);
+ let background=standard;
  const tileWarning=document.createElement('p');tileWarning.className='flyer-tile-warning';tileWarning.setAttribute('role','status');tileWarning.hidden=true;tileWarning.textContent='地図の背景を取得できませんでした。地図を閉じて開き直すと再試行できます。施設だけ先に登録しても構いません。';host.prepend(tileWarning);
- background.on('tileerror',()=>{if(tileWarning.hidden){tileWarning.hidden=false;feedback.hidden=true;tileWarning.scrollIntoView?.({block:'nearest'})}});
- background.on('loading',()=>{tileWarning.hidden=true;feedback.hidden=false});
- let selected=initial,positionMarker=initial?circleMarker(initial,{radius:8,color:'#a92530',fillOpacity:1,interactive:false}).addTo(view):null;
- if(initial){submit.disabled=!!options.requireMove;feedback.textContent='赤い点が登録する位置です。違う場合は地図を押して変更できます。'}
+ for(const layer of [standard,aerial]){
+  layer.on('tileerror',()=>{if(layer===background&&tileWarning.hidden){tileWarning.hidden=false;tileWarning.scrollIntoView?.({block:'nearest'})}});
+  layer.on('loading',()=>{if(layer===background)tileWarning.hidden=true});
+ }
+ const switchLayer=document.createElement('button');
+ switchLayer.type='button';switchLayer.className='secondary';switchLayer.textContent='航空写真に切り替え';
+ switchLayer.onclick=()=>{
+  background.remove();tileWarning.hidden=true;
+  background=background===standard?aerial:standard;
+  background.addTo(view);
+  switchLayer.textContent=background===aerial?'通常の地図に切り替え':'航空写真に切り替え';
+ };
+ host.insertBefore(switchLayer,canvas);
+ let selected=initial,positionMarker;
+ const pin=divIcon({className:'flyer-adjust-pin',iconSize:[44,44],iconAnchor:[22,36]});
+ const placed=latlng=>{
+  selected=[latlng.lat,latlng.lng];
+  submit.disabled=false;feedback.textContent='ピンを移動しました。位置を確認して保存してください。';
+  // Keep the pin's full touch target clear of the map controls and attribution.
+  view.panInside(latlng,{paddingTopLeft:[60,60],paddingBottomRight:[24,60],animate:false});
+  options.onMove?.(selected);
+ };
+ const setMarker=xy=>{
+  if(positionMarker){positionMarker.setLatLng(xy);return}
+  positionMarker=marker(xy,{icon:pin,draggable:!options.readOnly,keyboard:false,autoPan:false}).addTo(view);
+  positionMarker.getElement().setAttribute('aria-label',options.readOnly?'施設のピン':'動かせる施設のピン');
+  positionMarker.on('dragend',()=>placed(positionMarker.getLatLng()));
+ };
+ if(initial)setMarker(initial);
+ if(initial){submit.disabled=!!options.requireMove;feedback.textContent='赤いピンを指で動かすか、正しい場所を押してください。拡大・縮小は＋／−で操作できます。'}
  const locate=document.createElement('button');locate.type='button';locate.className='secondary';locate.textContent='現在地の周辺を表示';
  if(!options.readOnly)host.insertBefore(locate,canvas);
  if(options.readOnly){feedback.textContent='この場所で登録します。違う場合だけ「場所を変更」を押してください。';canvas.setAttribute('aria-label','登録する施設の場所')}
@@ -66,10 +96,8 @@ export async function mountPlacePicker(host,initial,choose,options={}){
  };
  view.on('click',({latlng})=>{
   if(options.readOnly)return;
-  selected=[latlng.lat,latlng.lng];
-  if(positionMarker)positionMarker.setLatLng(selected);
-  else positionMarker=circleMarker(selected,{radius:8,color:'#a92530',fillOpacity:1,interactive:false}).addTo(view);
-  submit.disabled=false;feedback.textContent='ピンの位置を確認してください。';options.onMove?.(selected);
+  setMarker([latlng.lat,latlng.lng]);
+  placed(latlng);
  });
  submit.onclick=()=>choose(selected);
  return ()=>{active=false;view.remove()};

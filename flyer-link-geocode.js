@@ -1,4 +1,4 @@
-import {normalizeLocationAddress,verifiedLocationReferences} from './flyer-locations.js?v=20261125-link3';
+import {normalizeLocationAddress,verifiedLocationReferences} from './flyer-locations.js?v=20261126-pin1';
 
 const nameKey=value=>String(value||'').normalize('NFKC').toLowerCase().replace(/(?:株式会社|有限会社|（株）|\(株\)|\s)/g,'');
 const hasParcel=address=>/\d/.test(address.slice(-16))&&/\d$/.test(address);
