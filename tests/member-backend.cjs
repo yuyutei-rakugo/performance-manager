@@ -68,6 +68,7 @@ assert.equal(call('read',{token,name:'history'}).doc.items[0].note,record.note);
 assert.equal(call('attendanceRead',{token,id:'practice-1'}).rows[0].status,'出席');
 const beforeBadMigration=files[properties.DB_FILE_ID];
 expectError(call('importLocal',{...migration,token,attendance:{'practice-1':{'ぐう':'不正な値'}}}),/出欠の形式/);
+expectError(call("importLocal",{...migration,token,attendance:{"practice-1":[]}}),/出欠の形式/);
 assert.equal(files[properties.DB_FILE_ID],beforeBadMigration);
 const first='future-1',nextFlyer='next-flyer';
 const scheduleBefore=call('read',{token,name:'events'}).doc;

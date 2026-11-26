@@ -190,6 +190,20 @@ export function createPinClient(endpoint,state,emit){
   if((readStorage(localStorage)||readStorage(sessionStorage))!==token)signOut();
   else refreshVisible();
  });
+ async function deviceSubscription(){
+  try{
+   const registration=await navigator.serviceWorker?.getRegistration();
+   return await registration?.pushManager?.getSubscription();
+  }catch{return null}
+ }
+ async function reconcileDeviceSubscription(version){
+  const sub=await deviceSubscription();
+  if(!sub||version!==epoch)return;
+  try{
+   const status=await call('pushStatus',{endpoint:sub.endpoint},true);
+   if(status.differentMember&&version===epoch)await sub.unsubscribe();
+  }catch{} // A missing notification API must not block sign-in.
+ }
  return {
   async start(){
    state.provider='apps-script';
@@ -201,9 +215,15 @@ export function createPinClient(endpoint,state,emit){
     rememberMember(member);readViews();identity(member);
    }catch(error){if(!error.sessionInvalid)throw error}
   },
-  async login(name,pin,keep=true){const result=await call('login',{name,pin,remember:keep});clear();token=result.token;remember=keep;persist();rememberMember(result.member);identity(result.member)},
+  async login(name,pin,keep=true){const result=await call('login',{name,pin,remember:keep});clear();token=result.token;remember=keep;persist();rememberMember(result.member);identity(result.member);void reconcileDeviceSubscription(epoch)},
   push(action,data){return call(action,data,true)},
-  async logout(){const request=call('logout');signOut();await request},
+  async logout(){
+   const unsubscribe=deviceSubscription().then(sub=>sub?.unsubscribe());
+   const request=call('logout');signOut();
+   const [server,local]=await Promise.allSettled([request,unsubscribe]);
+   if(server.status==='rejected')throw server.reason;
+   if(local.status==='rejected')throw local.reason;
+  },
   reservation(action,data){return call(action,data,true)},
   flyer(action,data){return call(action,data,true)},
   backups(){return call('backupList',{},true)},

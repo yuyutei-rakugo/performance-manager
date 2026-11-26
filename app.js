@@ -1,12 +1,12 @@
-import {performanceCountdown} from './performance-countdown.js?v=20261126-countdown1';
-import {openFlyerVenues} from './flyer-venues.js?v=20261126-push1';
+import {performanceCountdown} from './performance-countdown.js?v=20261126-cancel1';
+import {openFlyerVenues} from './flyer-venues.js?v=20261126-push-reliable1';
 import {startEditor,finishEditor,leaveEditor,guardEditor,editorState,saveRecovery,recoveryScope,recoveredEditState} from './editor-dialog.js?v=20261125-regions1';
 import {performerPicker,updatePerformerPickers,readPerformer,showPerformerRoster} from './performer-picker.js?v=20261125-regions1';
 import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261125-regions1';
 import {readCategories,saveCategories,validCategories,categoryOptions,mountCategories,mountCategoryAdder} from './categories.js?v=20261125-regions1';
 import {mountScheduleImport} from './schedule-import.js?v=20261125-regions1';
-import {scheduleChange,scheduleChangeBadge,preparationTemplates,draftTask,duplicateSchedule,copyScheduleInvite,validPerformer,timeline,formatDuration,toRecord,transferRecord,readRecords,mergeRecords,mergedRecords} from './record-transfer.js?v=20261126-push1';
-import {cloud,startCloud,mountAccount} from './cloud.js?v=20261126-push1';
+import {scheduleChange,scheduleChangeBadge,preparationTemplates,draftTask,duplicateSchedule,copyScheduleInvite,validPerformer,timeline,formatDuration,toRecord,transferRecord,readRecords,mergeRecords,mergedRecords} from './record-transfer.js?v=20261126-push-reliable1';
+import {cloud,startCloud,mountAccount} from './cloud.js?v=20261126-push-reliable1';
 'use strict';
 
 const key = 'yuitei.events.v1';
@@ -23,7 +23,7 @@ let cloudLoadError='';
 let memberNames=['勇水','小薔薇','懐古','華詩','世喜音','やすゑ','一悟','日光'],cloudRevision=0,cloudLoaded=false,stopCloud,cloudIdentity='',saving=false;
 fetch('./history-data.json').then(r=>r.json()).then(d=>{memberNames=d.names.filter(n=>n!=='藤本')}).catch(()=>{});
 const editable=()=>!cloud.state.configured||(['admin','editor'].includes(cloud.state.role)&&cloudLoaded);
-function assigneePicker(item,i){return `<fieldset class="assignee-picker"><legend>担当者（任意・複数選択可）</legend>${[...new Set([...memberNames,...(item.assignees||[])])].map(n=>`<label><input type="checkbox" data-owner="${i}" value="${esc(n)}" ${(item.assignees||[]).includes(n)?'checked':''}>${esc(n)}</label>`).join('')}</fieldset>`}
+function assigneePicker(item,i){const choices=cloud.state.configured&&cloud.state.provider==='apps-script'?performerNames:memberNames;return `<fieldset class="assignee-picker"><legend>担当者（任意・複数選択可）</legend>${[...new Set([...choices,...(item.assignees||[])])].map(n=>`<label><input type="checkbox" data-owner="${i}" value="${esc(n)}" ${(item.assignees||[]).includes(n)?'checked':''}>${esc(n)}</label>`).join('')}</fieldset>`}
 function progress(event){
  const applicable=event.checklist.filter(item=>!item.excluded);
  return {done:applicable.filter(item=>item.done).length,total:applicable.length,excluded:event.checklist.length-applicable.length};
@@ -216,6 +216,10 @@ function loadPerformerRoster(form,force=false){
   cloud.roster({force}).then(rows=>{
     if($('event-form')!==form||!eventDialog.open)return;
     performerNames=rows.map(row=>row.name);
+    for(const fieldset of form.querySelectorAll('.assignee-picker')){
+      const assignees=[...fieldset.querySelectorAll('[data-owner]:checked')].map(input=>input.value);
+      fieldset.outerHTML=assigneePicker({assignees},0);
+    }
     updatePerformerPickers(form,performerNames);
     showPerformerRoster(form,'ready',performerNames,retry);
   }).catch(()=>{
@@ -487,6 +491,6 @@ reservationsButton.textContent='予約書類を追加';reservationsButton.hidden
 document.querySelector('.workspace')?.append(reservationsButton);
 cloud.onState(state=>{reservationsButton.hidden=state.provider!=='apps-script'||!state.role});
 reservationsButton.onclick=async()=>{
- const {openReservationDocuments}=await import('./reservation-documents.js?v=20261126-push1');
+ const {openReservationDocuments}=await import('./reservation-documents.js?v=20261126-push-reliable1');
  if(cloud.state.role)openReservationDocuments();
 };

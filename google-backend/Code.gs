@@ -19,6 +19,7 @@ function doPost(event){
  case 'roster':data={members:db.members.filter(m=>m.active).map(m=>({name:m.name}))};break;
  case 'archivePast':admin_(member);data=archivePast_(db,req,member);if(data.count)writeDb_(db);break;
  case 'importLocal':admin_(member);data=importLocal_(db,req,member);if(db.flyers?.facilities)seedFlyerFacilities_(db.flyers,db.shared.events.items);writeDb_(db);break;
+ case 'pushReport':admin_(member);data=pushReport_();break;
  case 'pushConfig':case 'pushStatus':case 'pushEnable':case 'pushDisable':case 'pushTest':{
   const session=digest_(req.token);
   data=pushRequest_(member,session,req,db.shared.events?.items);
@@ -55,7 +56,12 @@ function doPost(event){
  case 'members':admin_(member);data={members:db.members.map(publicMember_)};break;
  case 'memberSave':admin_(member);data={member:saveMember_(db,member,req.member)};writeDb_(db);break;
  case 'changePin':checkPin_(req.pin);member.salt=Utilities.getUuid();member.pinHash=hashPin_(member,req.pin);member.epoch++;writeDb_(db);data={};break;
- case 'logout':PropertiesService.getScriptProperties().deleteProperty('SESSION_'+digest_(req.token));data={};break;
+ case 'logout':{
+  const props=PropertiesService.getScriptProperties(), session=digest_(req.token);
+  pushRemoveSession_(props,session);
+  props.deleteProperty('SESSION_'+session);
+  data={};break;
+ }
  default:throw Error('この操作は利用できません。');
  }
  return output_({ok:true,...data});
@@ -87,6 +93,7 @@ function saveMember_(db,actor,input){
  if(db.members.some(m=>m.name===name&&m.id!==(target&&target.id)))throw Error('同じ登録名が使われています。');
  if(target&&target.owner)throw Error('勇水の管理者権限は変更できません。');if((input.role==='admin'||target&&target.role==='admin')&&!actor.owner)throw Error('管理者の追加・変更は勇水のみ操作できます。');
  if(!target){if(db.members.length>=100)throw Error('会員は100名までです。');const initialPin=input.pin||'1111';checkPin_(initialPin);target={id:Utilities.getUuid(),salt:Utilities.getUuid(),epoch:1,owner:false};target.pinHash=hashPin_(target,initialPin);db.members.push(target)}else if(input.pin){checkPin_(input.pin);target.salt=Utilities.getUuid();target.pinHash=hashPin_(target,input.pin);target.epoch++}
+ if(target.active&&!input.active)target.epoch++;
  target.name=name;target.active=input.active;target.role=input.role;return publicMember_(target);
 }
 
@@ -127,8 +134,21 @@ function archivePast_(db,req,actor){
  return detail?{count,rehearsals}:{count};
 }
 function importLocal_(db,req,actor){
- if(!req.documents||!req.attendance||typeof req.attendance!=='object')throw Error('移行データを確認してください。');for(const name of ['events','rehearsals','history']){const incoming=req.documents[name];validCollection_(name,incoming);if(!Array.isArray(incoming)||!incoming.every(r=>r&&typeof r.id==='string'&&typeof r.date==='string'))throw Error('予定・記録の形式を確認してください。');const current=db.shared[name]||{items:[],revision:0};const merged=new Map(current.items.map(r=>[r.id,r]));incoming.forEach(r=>{if(!merged.has(r.id)&&!(name!=='history'&&current.items.some(old=>old.date===r.date)))merged.set(r.id,r)});if(merged.size>500)throw Error('各一覧は500件までです。');db.shared[name]={items:Array.from(merged.values()),revision:current.revision+1,updatedBy:actor.id,updatedAt:new Date().toISOString()}}
- for(const id in req.attendance){const dest=db.attendance[id]||{};for(const name in req.attendance[id]){const status=req.attendance[id][name];if(!['出席','欠席','未定','未回答'].includes(status))throw Error('出欠の形式を確認してください。');if(!Object.values(dest).some(r=>r.stageName===name)){const m=db.members.find(m=>m.name===name);dest[m?m.id:'imported-'+name]={stageName:name,status,updatedAt:new Date().toISOString()}}}db.attendance[id]=dest}return {imported:true};
+ if(!req.documents||!req.attendance||typeof req.attendance!=='object'||Array.isArray(req.attendance))throw Error('移行データを確認してください。');for(const name of ['events','rehearsals','history']){const incoming=req.documents[name];validCollection_(name,incoming);if(!Array.isArray(incoming)||!incoming.every(r=>r&&typeof r.id==='string'&&typeof r.date==='string'))throw Error('予定・記録の形式を確認してください。');const current=db.shared[name]||{items:[],revision:0};const merged=new Map(current.items.map(r=>[r.id,r]));incoming.forEach(r=>{if(!merged.has(r.id)&&!(name!=='history'&&current.items.some(old=>old.date===r.date)))merged.set(r.id,r)});if(merged.size>500)throw Error('各一覧は500件までです。');db.shared[name]={items:Array.from(merged.values()),revision:current.revision+1,updatedBy:actor.id,updatedAt:new Date().toISOString()}}
+ for(const [id,answers] of Object.entries(req.attendance)){
+  checkId_(id);
+  if(!answers||typeof answers!=='object'||Array.isArray(answers))throw Error('出欠の形式を確認してください。');
+  const dest=db.attendance[id]||{};
+  for(const [name,status] of Object.entries(answers)){
+   if(!['出席','欠席','未定','未回答'].includes(status))throw Error('出欠の形式を確認してください。');
+   if(!Object.values(dest).some(row=>row.stageName===name)){
+    const member=db.members.find(m=>m.name===name);
+    dest[member?member.id:'imported-'+name]={stageName:name,status,updatedAt:new Date().toISOString()};
+   }
+  }
+  db.attendance[id]=dest;
+ }
+ return {imported:true};
 }
 function validCollection_(name,items){
  if(!Array.isArray(items)||items.length>500)throw Error('保存するデータを確認してください。');const ids=new Set();for(const r of items){if(!r||typeof r.id!=='string'||!r.id||ids.has(r.id)||typeof r.date!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(r.date))throw Error('日付・IDを確認してください。');ids.add(r.id);if(name==='history'){if(!['kind','occasion','note'].every(k=>typeof r[k]==='string')||!r.pieces||typeof r.pieces!=='object'||Array.isArray(r.pieces)||!Object.values(r.pieces).every(v=>typeof v==='string'))throw Error('記録の形式を確認してください。')}else{if(!['title','time','venue',name==='events'?'memo':'notes'].every(k=>typeof r[k]==='string')||!r.title.trim()||!r.venue.trim()||!(name==='events'&&r.time==='')&&!/^([01]\d|2[0-3]):[0-5]\d$/.test(r.time))throw Error('予定の形式を確認してください。');if(name==='events'&&(!Array.isArray(r.performers)||!Array.isArray(r.checklist)||!r.checklist.length||r.checklist.length>200||!r.checklist.every(t=>t&&typeof t.label==='string'&&t.label.trim()&&typeof t.done==='boolean'&&(t.excluded===undefined||typeof t.excluded==='boolean'&&!(t.excluded&&t.done)))))throw Error('出演者・準備項目を確認してください。')}}
