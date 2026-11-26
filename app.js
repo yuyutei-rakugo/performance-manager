@@ -1,3 +1,4 @@
+import {performanceCountdown} from './performance-countdown.js?v=20261126-countdown1';
 import {openFlyerVenues} from './flyer-venues.js?v=20261126-pin1';
 import {startEditor,finishEditor,leaveEditor,guardEditor,editorState,saveRecovery,recoveryScope,recoveredEditState} from './editor-dialog.js?v=20261125-regions1';
 import {performerPicker,updatePerformerPickers,readPerformer,showPerformerRoster} from './performer-picker.js?v=20261125-regions1';
@@ -114,9 +115,6 @@ function renderSavedList(){
  catch{notify('保存しました。一覧を更新できませんでした。再読み込みして確認してください。')}
 }
 
-function upcoming(event) {
-  return new Date(event.date + 'T' + (event.time||'23:59')) >= new Date();
-}
 function sortedEvents(list) {
   const filter=document.getElementById('event-kind-filter'),order=document.getElementById('event-sort');list=list.filter(e=>!filter?.value||(e.kind||'その他公演')===filter.value);if(order?.value==='kind'){const kinds=readCategories(events.map(e=>e.kind));return [...list].sort((a,b)=>kinds.indexOf(a.kind||'その他公演')-kinds.indexOf(b.kind||'その他公演')||(a.date+a.time).localeCompare(b.date+b.time))}
   return [...list].sort((a,b) => (a.date + a.time).localeCompare(b.date + b.time));
@@ -126,10 +124,10 @@ function progressMarkup(event) {
   const label=total?done+'／'+total+'件 完了':'対象作業なし';
   return `<div class="progress"><div class="progress-label"><span>${label}</span>${excluded?`<small>対象外 ${excluded}件</small>`:''}</div>${total?`<progress aria-label="準備進捗" value="${done}" max="${total}"></progress>`:''}</div>`;
 }
-let nextEventId;
-function card(event,featured=false) {
+let nextEventId, countdownTimer;
+function card(event,featured=false,countdownText='') {
   const [year, mon, day] = event.date.split('-');
-  return `<article class="event-card${featured?' featured-performance':''}"><div class="date-badge" aria-hidden="true"><small>${Number(mon)}月</small><strong>${Number(day)}</strong></div><div>${featured?'<h2 class="next-event-label">次回の公演</h2>':''}<h3>${esc(event.title)}</h3>${scheduleChangeBadge(event,esc)}<div class="meta"><span>${featured?esc(dateLabel(event.date)):year+'/'+mon+'/'+day} ${esc(event.time||'時間未定')}</span><span>＠ ${esc(event.venue)}</span></div></div>${progressMarkup(event)}<div class="event-actions"><button class="secondary" data-event="${esc(event.id)}" aria-label="${esc(event.title)}の詳細">詳細を見る</button></div></article>`;
+  return `<article class="event-card${featured?' featured-performance':''}"><div class="date-badge" aria-hidden="true"><small>${Number(mon)}月</small><strong>${Number(day)}</strong></div><div>${featured?'<h2 class="next-event-label">次回の公演</h2>':''}<h3>${esc(event.title)}</h3>${scheduleChangeBadge(event,esc)}<div class="meta"><span>${featured?esc(dateLabel(event.date)):year+'/'+mon+'/'+day} ${esc(event.time||'時間未定')}</span><span>＠ ${esc(event.venue)}</span></div></div>${featured?`<p class="performance-countdown" role="status">${esc(countdownText)}</p>`:''}${progressMarkup(event)}<div class="event-actions"><button class="secondary" data-event="${esc(event.id)}" aria-label="${esc(event.title)}の詳細">詳細を見る</button></div></article>`;
 }
 let requestedEvent=new URLSearchParams(location.search).get('detail');
 function render() {
@@ -141,15 +139,29 @@ function render() {
   eventRecovery.render();
   $('new-event').disabled=!editable();
   const filter=document.getElementById('event-kind-filter');if(filter){const value=filter.value;filter.innerHTML='<option value="">全区分</option>'+categoryOptions(value,events.map(e=>e.kind));filter.value=value;}
-  const scheduled = events.filter(e=>!e.archivedAt&&upcoming(e));
-  nextEventId=[...scheduled].sort((a,b)=>(a.date+(a.time||'23:59')).localeCompare(b.date+(b.time||'23:59')))[0]?.id;
-  const featured=document.getElementById('next-performance'),next=events.find(e=>e.id===nextEventId);
-  if(featured){featured.hidden=!next||(cloud.state.configured&&(!cloudLoaded||!cloud.state.role));featured.innerHTML=featured.hidden?'':card(next,true)}
+  const {event:next,text,updateAt}=performanceCountdown(events);
+  nextEventId=next?.id;
+  const featured=$('next-performance');
+  if(featured){featured.hidden=!next||(cloud.state.configured&&(!cloudLoaded||!cloud.state.role));featured.innerHTML=featured.hidden?'':card(next,true,text)}
+  scheduleCountdownUpdate(updateAt);
   const warning=cloudLoaded&&cloudLoadError?'<p class="sync-warning" role="status">更新できませんでした。前回取得した公演予定を表示しています。</p>':'';
   $('schedule').innerHTML = cloud.state.configured&&!cloudLoaded ? '<p class="empty">'+(cloud.state.role?esc(cloudLoadError||'公演予定を読み込んでいます。'):'公演予定を見るには会員ログインしてください。端末内のデータは保持しています。')+'</p>' : sortedEvents(events.filter(e=>!e.archivedAt&&e.id!==nextEventId)).map(e=>card(e)).join('') || (nextEventId?'<p class="empty">このほかの公演予定はありません。</p>':'<p class="empty">公演がありません。「公演を登録」から追加できます。</p>');
 
   if(warning)$('schedule').insertAdjacentHTML('afterbegin',warning);
 }
+function scheduleCountdownUpdate(updateAt) {
+  clearTimeout(countdownTimer);
+  countdownTimer=setTimeout(refreshCountdown,Math.max(0,updateAt-Date.now()));
+}
+function refreshCountdown() {
+  const {event,text,updateAt}=performanceCountdown(events);
+  if(event?.id!==nextEventId){render();return}
+  const message=$('next-performance')?.querySelector('.performance-countdown');
+  if(message&&message.textContent!==text)message.textContent=text;
+  scheduleCountdownUpdate(updateAt);
+}
+window.addEventListener('pageshow',refreshCountdown);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshCountdown()});
 function showEvent() {
   if (!eventDialog.open) eventDialog.showModal();
   eventDialog.scrollTop = 0;
