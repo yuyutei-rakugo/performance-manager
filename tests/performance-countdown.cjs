@@ -23,3 +23,7 @@ const overnight = {...event,time:'23:00',endTime:'01:00'};
 assert.equal(at('2026-12-20T15:59:59Z',[overnight,next]).event.id,'show');
 assert.equal(at('2026-12-20T16:00:00Z',[overnight,next]).event.id,'next');
 console.log('Performance countdown passed');
+
+for (const cancellation of [{cancelled:true},{canceled:true},{status:'中止'}]) {
+  assert.equal(at('2026-12-19T15:00:00Z',[{...event,...cancellation},next]).event.id,'next');
+}

@@ -1,4 +1,4 @@
-import {performanceCountdown} from './performance-countdown.js?v=20261126-countdown1';
+import {performanceCountdown} from './performance-countdown.js?v=20261126-cancel1';
 import {openFlyerVenues} from './flyer-venues.js?v=20261126-push-reliable1';
 import {startEditor,finishEditor,leaveEditor,guardEditor,editorState,saveRecovery,recoveryScope,recoveredEditState} from './editor-dialog.js?v=20261125-regions1';
 import {performerPicker,updatePerformerPickers,readPerformer,showPerformerRoster} from './performer-picker.js?v=20261125-regions1';

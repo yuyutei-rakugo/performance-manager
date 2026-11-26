@@ -23,7 +23,7 @@ export function performanceCountdown(events, now = Date.now()) {
   let next;
   let overnight;
   for (const event of events) {
-    if (event.archivedAt) continue;
+    if (event.archivedAt || event.cancelled || event.canceled || event.status === '中止') continue;
     if (event.date >= date && (!next || scheduleKey(event) < scheduleKey(next))) next = event;
     if (event.date === yesterday && event.time && event.endTime &&
         event.endTime < event.time && now < endOn(event, date) &&
