@@ -23,7 +23,12 @@ self.addEventListener('push',event=>{
 self.addEventListener('notificationclick',event=>{
  const url=new URL('./',self.registration.scope);
  const receipt=event.notification.data?.receipt;
- if(/^[a-zA-Z0-9-]{36}$/.test(receipt||''))url.hash='push-open='+receipt;
+ if(/^[a-zA-Z0-9-]{36}$/.test(receipt||'')){
+  // Make this a document navigation even when the app is open at its home URL.
+  // The receipt remains in the fragment and is not sent with the page request.
+  url.searchParams.set('notification','test');
+  url.hash='push-open='+receipt;
+ }
  event.notification.close();
  event.waitUntil((async()=>{
   const windows=await self.clients.matchAll({type:'window',includeUncontrolled:true});

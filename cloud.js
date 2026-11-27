@@ -152,7 +152,7 @@ export function mountAccount(){
  settings.onclick=()=>{
   menu.showModal();
   if(cloud.state.provider==='apps-script'&&cloud.state.role){
-   (loadPush??=import('./push-settings.js?v=20261127-push-onboarding1').then(mod=>mod.mountPushSettings(menu,cloud)).catch(()=>{loadPush=null})).then(open=>open?.());
+   (loadPush??=import('./push-settings.js?v=20261127-push-open2').then(mod=>mod.mountPushSettings(menu,cloud)).catch(()=>{loadPush=null})).then(open=>open?.());
   }
  };
  menu.querySelector('[data-install]').onclick=()=>menu.close();
@@ -217,7 +217,10 @@ export function mountAccount(){
     if(!sub)throw Error('通知を登録した端末で開いてください。');
     await cloud.push('pushOpened',{endpoint:sub.endpoint,receipt:hash.slice(11)});
     status.textContent='テスト通知を開いたことを確認しました。設定完了です。';
-    history.replaceState(null,'',location.pathname+location.search);
+    const cleanUrl=new URL(location.href);
+    cleanUrl.searchParams.delete('notification');
+    cleanUrl.hash='';
+    history.replaceState(null,'',cleanUrl.href);
    }
   }catch(error){status.textContent='受信確認を保存できませんでした。'+error.message}
   finally{routeBusy=false}

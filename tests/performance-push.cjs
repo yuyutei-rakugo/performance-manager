@@ -116,12 +116,17 @@ vm.runInContext(read('sw.js'),worker);
  assert.equal(notification.tag,'notebook-push-test');
  listeners.notificationclick({notification,waitUntil});
  await done;
- assert.equal(opened,'https://notebook.example/performance-manager/#push-open='+claim.payload.receipt);
+ assert.equal(opened,'https://notebook.example/performance-manager/?notification=test#push-open='+claim.payload.receipt);
  opened=undefined;
  notification.data={url:'https://notebook.example/performance-manager/?detail=test'};
  openPages=[{url:'https://notebook.example/performance-manager/?source=homescreen',navigate:async url=>{
   navigated=url;return {focus:async()=>{focused=true}};
  }}];
+ notification.data={receipt:claim.payload.receipt};
+ listeners.notificationclick({notification,waitUntil});
+ await done;
+ assert.equal(navigated,'https://notebook.example/performance-manager/?notification=test#push-open='+claim.payload.receipt);
+ notification.data={url:'https://notebook.example/performance-manager/?detail=test'};
  listeners.notificationclick({notification,waitUntil});
  await done;
  assert.equal(navigated,'https://notebook.example/performance-manager/');
