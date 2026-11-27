@@ -1,5 +1,6 @@
+import {escapeHtml as esc} from './ui-text.js?v=20261127-text1';
 import {performanceCountdown} from './performance-countdown.js?v=20261126-cancel1';
-import {openFlyerVenues} from './flyer-venues.js?v=20261127-read-refresh1';
+import {openFlyerVenues} from './flyer-venues.js?v=20261127-text1';
 import {startEditor,finishEditor,leaveEditor,guardEditor,editorState,saveRecovery,recoveryScope,recoveredEditState} from './editor-dialog.js?v=20261125-regions1';
 import {performerPicker,updatePerformerPickers,readPerformer,showPerformerRoster} from './performer-picker.js?v=20261125-regions1';
 import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261125-regions1';
@@ -13,7 +14,6 @@ const key = 'yuitei.events.v1';
 const tasks = ['会場を予約する', '開催日時を確定する', '出演者に連絡する', '演目を確認する', '出演順を決める', '持ち時間を確認する', 'チラシを作る', '公演を告知する', '予約を確認する', '番組表を作る', '高座と座布団を準備する', '音響を確認する', '受付担当を決める', '当日の進行を共有する', '搬入・撤収の手順を確認する'];
 const $ = id => document.getElementById(id);
 const eventDialog = $('event-dialog');
-const esc = value => String(value).replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 const clone = value => JSON.parse(JSON.stringify(value));
 const localDate = date => [date.getFullYear(), date.getMonth() + 1, date.getDate()].map((part, i) => String(part).padStart(i ? 2 : 4, '0')).join('-');
 const today = () => localDate(new Date());
@@ -211,33 +211,22 @@ function updateFormRoster(form){
   }
   updatePerformerPickers(form,performerNames);
 }
-function loadPerformerRoster(form,force=false){
-  if(!cloud.state.configured||cloud.state.provider!=='apps-script'){
-    performerNames=memberNames;
-    updatePerformerPickers(form,performerNames);
-    const retry=()=>loadPerformerRoster(form,true);
-    showPerformerRoster(form,'loading',performerNames,retry);
-    loadLegacyRoster({force}).then(names=>{
-      if($('event-form')!==form||!eventDialog.open)return;
-      memberNames=performerNames=names;
-      updateFormRoster(form);
-      showPerformerRoster(form,'ready',performerNames,retry);
-    }).catch(()=>{
-      if($('event-form')===form&&eventDialog.open)showPerformerRoster(form,'error',performerNames,retry);
-    });
-    return;
-  }
+async function loadPerformerRoster(form,force=false){
+  const shared=cloud.state.configured&&cloud.state.provider==='apps-script';
+  const active=()=>$('event-form')===form&&eventDialog.open;
   const retry=()=>loadPerformerRoster(form,true);
+  if(!shared)performerNames=memberNames;
   showPerformerRoster(form,'loading',performerNames,retry);
-  cloud.roster({force}).then(rows=>{
-    if($('event-form')!==form||!eventDialog.open)return;
-    performerNames=rows.map(row=>row.name);
+  try{
+    const names=shared?(await cloud.roster({force})).map(row=>row.name):await loadLegacyRoster({force});
+    if(!active())return;
+    if(!shared)memberNames=names;
+    performerNames=names;
     updateFormRoster(form);
-    showPerformerRoster(form,'ready',performerNames,retry);
-  }).catch(()=>{
-    if($('event-form')!==form||!eventDialog.open)return;
-    showPerformerRoster(form,'error',performerNames,retry);
-  });
+    showPerformerRoster(form,'ready',names,retry);
+  }catch{
+    if(active())showPerformerRoster(form,'error',performerNames,retry);
+  }
 }
 function programMinutes(row){
   const minutes=row.querySelector('[name=minutes]').valueAsNumber,seconds=row.querySelector('[name=seconds]').valueAsNumber||0;
@@ -503,6 +492,6 @@ reservationsButton.textContent='予約書類を追加';reservationsButton.hidden
 document.querySelector('.workspace')?.append(reservationsButton);
 cloud.onState(state=>{reservationsButton.hidden=state.provider!=='apps-script'||!state.role});
 reservationsButton.onclick=async()=>{
- const {openReservationDocuments}=await import('./reservation-documents.js?v=20261127-read-refresh1');
+ const {openReservationDocuments}=await import('./reservation-documents.js?v=20261127-text1');
  if(cloud.state.role)openReservationDocuments();
 };

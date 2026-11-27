@@ -1,12 +1,35 @@
+import {escapeHtml as esc,errorMessage} from './ui-text.js?v=20261127-text1';
 import {previewFlyerMigration} from './flyer-migration.js?v=20261125-regions1';
 import {cloud,startCloud,mountAccount} from './cloud.js?v=20261127-read-refresh1';
 import {toRecord,readRecords,mergeRecords} from './record-transfer.js?v=20261127-roster3';
 let backupExpected='',backupOwner='',backupBusy=false;
 const $=id=>document.getElementById(id),status=$('admin-status');let docs={},past=[],members=[],accountGeneration=0,archiveBusy=false;
 const today=()=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Tokyo'}).format(new Date());
-const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const read=async name=>(await cloud.readShared(name))||{items:[],revision:0};
-async function refresh(){const generation=accountGeneration,local=!cloud.state.configured;const practice=local?JSON.parse(localStorage.getItem('yuitei.rehearsals.v1')||'{"items":[],"attendance":{}}'):null;const [events,rehearsals,history]=local?[{items:JSON.parse(localStorage.getItem('yuitei.events.v1')||'[]')},practice,{items:readRecords()}]:await Promise.all(['events','rehearsals','history'].map(read));if(generation!==accountGeneration)return;docs={events,rehearsals,history};past=[...events.items.filter(r=>!r.archivedAt&&r.date<today()).map(source=>({type:'event',source})),...rehearsals.items.filter(r=>!r.archivedAt&&r.date<today()).map(source=>({type:'rehearsal',source}))].sort((a,b)=>a.source.date.localeCompare(b.source.date));$('past-items').innerHTML=past.length?past.map((p,i)=>`<label><input type="checkbox" data-past="${i}"> ${esc(p.source.date)} ${esc(p.source.title)} ／ ${esc(p.source.venue)}</label>`).join(''):'<p>日付が過ぎた未転記の予定はありません。</p>';$('archive-selected').disabled=true;}
+function readLocalArchiveDocuments(){
+ return [
+  {items:JSON.parse(localStorage.getItem('yuitei.events.v1')||'[]')},
+  JSON.parse(localStorage.getItem('yuitei.rehearsals.v1')||'{"items":[],"attendance":{}}'),
+  {items:readRecords()},
+ ];
+}
+async function refresh(){
+ const generation=accountGeneration;
+ const [events,rehearsals,history]=cloud.state.configured
+  ? await Promise.all(['events','rehearsals','history'].map(read))
+  : readLocalArchiveDocuments();
+ if(generation!==accountGeneration)return;
+ docs={events,rehearsals,history};
+ const date=today();
+ past=[['event',events],['rehearsal',rehearsals]].flatMap(([type,doc])=>
+  doc.items.filter(row=>!row.archivedAt&&row.date<date).map(source=>({type,source})))
+  .sort((a,b)=>a.source.date.localeCompare(b.source.date));
+ $('past-items').innerHTML=past.length?past.map((p,i)=>
+  `<label><input type="checkbox" data-past="${i}"> ${esc(p.source.date)} ${esc(p.source.title)} ／ ${esc(p.source.venue)}</label>`).join('')
+  :'<p>日付が過ぎた未転記の予定はありません。</p>';
+ $('archive-selected').disabled=true;
+}
+
 $('past-items').onchange=()=>$('archive-selected').disabled=archiveBusy||!document.querySelector('[data-past]:checked');
 $('refresh-past').onclick=()=>refresh().catch(e=>status.textContent=e.message);
 async function refreshAfterSave(update,result){
@@ -87,7 +110,7 @@ $('member-form').onsubmit=async e=>{
  }catch(error){if(generation===accountGeneration)$('member-result').textContent='保存できませんでした。'+error.message+' 入力はそのままです。'}
  finally{memberBusy=false;b.disabled=false;for(const child of f.children)child.inert=false}
 };
-$('migrate-local').onclick=async()=>{const b=$('migrate-local');b.disabled=true;try{if(!confirm('この端末の予定・記録・出欠を共通保存へ追加しますか？'))return;const response=await fetch('./history-data.json?v=20261125-regions1');if(!response.ok)throw Error('原記録を読み込めません。');const history=await response.json(),events=JSON.parse(localStorage.getItem('yuitei.events.v1')||'[]'),rehearsals=JSON.parse(localStorage.getItem('yuitei.rehearsals.v1')||'{"items":[],"attendance":{}}');await cloud.importLocal({documents:{events,rehearsals:rehearsals.items,history:[...new Map([...history.records,...readRecords()].map(record=>[record.id,record])).values()]},attendance:rehearsals.attendance});$('migrate-result').textContent='共通保存へ追加しました。別のスマホでも確認してください。';await refreshAfterSave(refresh,$('migrate-result'))}catch(e){$('migrate-result').textContent=e.message}finally{b.disabled=false}};
+$('migrate-local').onclick=async()=>{const b=$('migrate-local');b.disabled=true;try{if(!confirm('この端末の予定・記録・出欠を共通保存へ追加しますか？'))return;const response=await fetch('./history-data.json?v=20261125-regions1');if(!response.ok)throw Error('原記録を読み込めません。');const history=await response.json(),events=JSON.parse(localStorage.getItem('yuitei.events.v1')||'[]'),rehearsals=JSON.parse(localStorage.getItem('yuitei.rehearsals.v1')||'{"items":[],"attendance":{}}');await cloud.importLocal({documents:{events,rehearsals:rehearsals.items,history:[...new Map([...history.records,...readRecords()].map(record=>[record.id,record])).values()]},attendance:rehearsals.attendance});$('migrate-result').textContent='共通保存へ追加しました。別のスマホでも確認してください。';await refreshAfterSave(refresh,$('migrate-result'))}catch(e){$('migrate-result').textContent=errorMessage(e,'取り込めませんでした。')}finally{b.disabled=false}};
 $('pin-form').onsubmit=async e=>{e.preventDefault();const f=e.target,b=f.querySelector('button');if(b.disabled)return;b.disabled=true;f.elements.pin.disabled=true;f.querySelector('p').textContent='保存中…';try{await cloud.changePin(f.elements.pin.value);f.reset();f.querySelector('p').textContent='保存しました。新しい番号でログインしてください。'}catch(error){f.querySelector('p').textContent='保存できませんでした。'+error.message}finally{b.disabled=false;f.elements.pin.disabled=false}};
 $('data-open').onclick=()=>$('data-dialog').showModal();$('data-close').onclick=()=>$('data-dialog').close();
 cloud.onState(s=>{const flyerPanel=$('flyer-settings');flyerPanel.hidden=!(s.configured&&s.provider==='apps-script'&&s.role==='admin');$('flyer-plan').replaceChildren();backupOwner=s.user?.uid||'';backupExpected='';$('backup-panel').hidden=!(s.configured&&s.provider==='apps-script'&&s.role==='admin');$('backup-choice').replaceChildren(new Option('一覧を確認してください',''));$('backup-restore').disabled=true;$('backup-status').textContent='';accountGeneration++;memberDirty=false;$('member-form').hidden=true;$('member-feedback').textContent='';docs={};past=[];members=[];$('past-items').replaceChildren();$('member-list').replaceChildren();$('member-form').reset();$('pin-form').reset();if($('data-dialog').open)$('data-dialog').close();const ready=s.configured&&s.provider==='apps-script';$('admin-tools').hidden=s.ready===false||s.configured&&(!ready||s.role!=='admin');$('member-tools').hidden=!ready||s.role!=='admin';$('pin-form').querySelector('button').disabled=!ready||!s.user;if(s.ready===false)return;if(!s.configured){status.textContent='現在は端末内保存です。下で選んだ予定を、この端末の記録へ移せます。共通保存と会員・管理者の認証はまだ設定されていません。';refresh().catch(e=>status.textContent=e.message)}else if(!ready)status.textContent='この接続では管理者機能を利用できません。';else if(!s.user)status.textContent='登録名と暗証番号でログインしてください。';else if(s.role!=='admin')status.textContent='会員としてログインしています。管理者の操作は利用できません。';else{status.textContent=s.stageName+'：管理者としてログイン中';Promise.all([refresh(),refreshMembers()]).catch(e=>status.textContent=e.message)}});mountAccount();startCloud();

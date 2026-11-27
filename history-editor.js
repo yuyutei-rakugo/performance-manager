@@ -1,3 +1,4 @@
+import {escapeHtml as esc} from './ui-text.js?v=20261127-text1';
 import {startEditor,finishEditor,leaveEditor,guardEditor,editorState,saveRecovery,recoveryScope,recoveredEditState} from './editor-dialog.js?v=20261125-regions1';
 import {categoryOptions,mountCategoryAdder} from './categories.js?v=20261125-regions1';
 import {readRecords,writeRecords} from './record-transfer.js?v=20261127-roster3';
@@ -9,7 +10,6 @@ export function historyEditor(getData,refresh,refreshRows=()=>{}){
  const original=structuredClone(getData().records);
  let revision=0,loaded=false,stop,identity='',busy=false,editMode=false;
  let localReady=true;try{readRecords()}catch{localReady=false}const publicIds=new Set(getData().publicIds||[]);const allowed=()=>cloud.state.ready!==false&&!cloud.state.connectionIssue&&(cloud.state.configured?loaded&&['editor','admin'].includes(cloud.state.role):localReady);
- const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const feedback=message=>section.querySelector('#history-edit-status').textContent=message;
  const canEdit=id=>allowed()&&(cloud.state.configured||!publicIds.has(id));
  const toggle=section.querySelector('#history-edit-mode'),add=section.querySelector('#history-add');

@@ -1,3 +1,4 @@
+import {escapeHtml as esc} from './ui-text.js?v=20261127-text1';
 import {previewFlyerMigration} from './flyer-migration.js?v=20261125-regions1';
 import {flyerLocation,flyerLocationInfo,confirmedGoogleShare,googleSharePreview,exactAddressPosition,normalizeLocationAddress,flyerLinkConflicts} from './flyer-locations.js?v=20261126-pin1';
 import {startEditor,finishEditor,leaveEditor,guardEditor,editorState} from './editor-dialog.js?v=20261125-regions1';
@@ -8,7 +9,6 @@ const searchName=value=>String(value||'').normalize('NFKC').toLowerCase().replac
 const matchesSearch=(names,query)=>{const words=String(query||'').trim().split(/[\s　]+/).map(searchName).filter(Boolean),text=names.map(searchName).join(' ');return words.every(word=>text.includes(word))};
 const compare=new Intl.Collator('ja',{numeric:true,sensitivity:'base'}).compare;
 const orderName=row=>row.source?.name===row.name&&row.source.reading?row.source.reading:row.name;
-const esc=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 const venueKey=row=>JSON.stringify([row.region,row.name].map(value=>value.normalize('NFKC').toLowerCase().replace(/\s+/g,'')));
 const mapUrl=row=>/^https:\/\//.test(flyerLocationInfo(row)?.mapUrl)
  ?flyerLocationInfo(row).mapUrl:'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(flyerLocation(row)?.join(',')||flyerLocationInfo(row)?.address||row.region+' '+row.name);

@@ -9,7 +9,7 @@ async function boot(configured=false,page="rehearsals.html",deferAttendance=fals
  w.localStorage.setItem('yuitei.rehearsals.v1',JSON.stringify({items:[practice,{...practice,id:'archived',date:'2098-01-01',archivedAt:'yes'}],attendance:{[practice.id]:{'日光':'欠席'}}}));
  let listener,fail=false,writes=[],watchers={},answer,answerError;
  w.cloud={state:configured?{configured:true,provider:'apps-script',role:'viewer',stageName:'勇水'}:{configured:false},onState(fn){listener=fn;fn(this.state)},async roster(){return [{name:'勇水'},{name:'日光'}]},watch(name,fn){watchers[name]=fn;return ()=>delete watchers[name]},watchAttendance(id,fn,onError){answer=fn;answerError=onError;if(!deferAttendance)fn([]);return ()=>{}},async respondAttendance(id,status){if(fail)throw Error('通信失敗');writes.push({id,status})}};
- w.eval(clean('record-transfer.js')+'\n'+clean('rehearsal-model.js')+'\n'+clean('member-home.js')+'\nmountMemberHome();');await tick();
+ w.eval(require('node:fs').readFileSync('ui-text.js','utf8').replace(/export /g,'')+'\nwindow.esc=escapeHtml;');w.eval(clean('record-transfer.js')+'\n'+clean('rehearsal-model.js')+'\n'+clean('member-home.js')+'\nmountMemberHome();');await tick();
  return {w,q:s=>w.document.querySelector(s),fail(v){fail=v},writes,watchers,answer:rows=>answer(rows),answerError:()=>answerError('通信失敗'),emit(s){w.cloud.state=s;listener(s)}};
 }
 (async()=>{

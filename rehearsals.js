@@ -1,6 +1,7 @@
+import {errorMessage} from './ui-text.js?v=20261127-text1';
 import {startEditor,finishEditor,leaveEditor,guardEditor,editorState,hasEditorDraft,saveRecovery,recoveryScope,recoveredEditState} from './editor-dialog.js?v=20261125-regions1';
 import {performerPicker,updatePerformerPickers,readPerformer,showPerformerRoster} from './performer-picker.js?v=20261125-regions1';
-import {mountMemberHome} from './member-home.js?v=20261127-roster3';
+import {mountMemberHome} from './member-home.js?v=20261127-text1';
 import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261125-regions1';
 import {readCategories,saveCategories,validCategories} from './categories.js?v=20261125-regions1';
 import {mountScheduleImport} from './schedule-import.js?v=20261125-regions1';
@@ -36,7 +37,7 @@ async function save(next,expected=revision,nextAttendance=attendance,report=noti
    localItems=structuredClone(items);localAttendance=structuredClone(attendance);
    window.dispatchEvent(new Event('schedule-data-changed'));
   }
- }catch(error){report(error.message||'保存できませんでした。');return false}
+ }catch(error){report(errorMessage(error,'保存できませんでした。'));return false}
  finally{busy=false}
  try{render()}catch{notify('保存しました。一覧を更新できませんでした。再読み込みして確認してください。')}
  return true;
@@ -496,6 +497,6 @@ reservationsButton.textContent='予約書類を追加';reservationsButton.hidden
 document.querySelector('.workspace')?.append(reservationsButton);
 cloud.onState(state=>{reservationsButton.hidden=state.provider!=='apps-script'||!state.role});
 reservationsButton.onclick=async()=>{
- const {openReservationDocuments}=await import('./reservation-documents.js?v=20261127-read-refresh1');
+ const {openReservationDocuments}=await import('./reservation-documents.js?v=20261127-text1');
  if(cloud.state.role)openReservationDocuments();
 };
