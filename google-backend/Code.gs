@@ -10,7 +10,18 @@ function initializeOwner(){
 function doGet(){return output_({reservationDocuments:true,ok:true,service:'yuyutei-members',version:1,attendanceProxy:true,rehearsalArchiveToday:true,automaticBackup:true,backupRecoveryRevision:2,checklistExclusion:true,flyerVenues:true,flyerLocationFields:true,flyerSharedFacilities:true,flyerDeclineHistory:true,flyerGoogleShare:true,performancePush:true})}
 function doPost(event){
  const lock=LockService.getScriptLock();let locked=false;
- try{if(!event||!event.postData||event.postData.contents.length>1500000)throw Error('リクエストを確認してください。');const req=JSON.parse(event.postData.contents);if(!req||typeof req!=='object')throw Error('リクエストを確認してください。');if(req.action==='flyerResolveGoogleLink'){authorize_(readDb_(),req.token);return output_({ok:true,...flyerResolveGoogleLink_(req.url)})}lock.waitLock(20000);locked=true;const db=readDb_();if(req.action==='login')return output_({ok:true,...login_(db,req)});const member=authorize_(db,req.token);let data;
+ try{if(!event||!event.postData||event.postData.contents.length>1500000)throw Error('リクエストを確認してください。');const req=JSON.parse(event.postData.contents);if(!req||typeof req!=='object')throw Error('リクエストを確認してください。');if(req.action==='flyerResolveGoogleLink'){authorize_(readDb_(),req.token);return output_({ok:true,...flyerResolveGoogleLink_(req.url)})}
+ if(req.action==='usageRecord'||req.action==='usageReport'){
+  const db=readDb_();
+  if(req.action==='usageReport'){
+   admin_(authorize_(db,req.token));
+   return output_({ok:true,...usageReport_(db)});
+  }
+  // Only the per-member read/modify/write belongs inside the shared lock.
+  lock.waitLock(2000);locked=true;
+  return output_({ok:true,...trackUsage_(authorize_(db,req.token))});
+ }
+ lock.waitLock(20000);locked=true;const db=readDb_();if(req.action==='login')return output_({ok:true,...login_(db,req)});const member=authorize_(db,req.token);let data;
  switch(req.action){
  case 'reservationList':case 'reservationPhoto':case 'reservationAdd':case 'reservationReview':case 'reservationContact':data=reservationRequest_(db,member,req);break;
  case 'flyerMigrationPreview':case 'flyerMigrationApply':admin_(member);data=flyerMigration_(db,req);break;

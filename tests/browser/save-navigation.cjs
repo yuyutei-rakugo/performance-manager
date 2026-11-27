@@ -32,6 +32,8 @@ async function main(){
     async function session(role){
       const context=await browser.newContext({...devices['Pixel 7'],serviceWorkers:'block'});
       const page=await context.newPage();
+      // Keep dated fixtures independent of the runner's date and time zone.
+      await page.clock.setFixedTime(new Date('2026-11-20T03:00:00Z'));
       page.setDefaultTimeout(9000);
       await page.addInitScript(()=>{if(!localStorage.getItem('yuitei.session'))localStorage.setItem('yuitei.session','fixture')});
       await page.route('**/cloud-config.json',route=>route.fulfill({json:{enabled:true,provider:'apps-script',endpoint}}));
@@ -40,6 +42,7 @@ async function main(){
         const answer=body=>route.fulfill({headers:{'access-control-allow-origin':'*'},json:body});
         const ok=payload=>answer({ok:true,...payload});
         switch(request.action){
+          case 'usageRecord':return ok({});
           case 'session':return ok({member:{id:role,name:'試験会員',role,active:true}});
           case 'read':
             if(request.name==='history'&&delayedHistory)await delayedHistory;
@@ -519,7 +522,7 @@ async function main(){
     docs.events.revision++;
     await checklistViewer.reload();
     await checklistViewer.locator('[data-event]').click();
-    await checklistViewer.clock.setFixedTime(new Date(Date.now()+120000));
+    await checklistViewer.clock.setFixedTime(new Date('2026-11-20T03:02:00Z'));
     await checklistViewer.evaluate(()=>window.dispatchEvent(new Event('focus')));
     await checklistViewer.locator('#event-dialog').getByText('対象作業なし',{exact:true}).waitFor();
     docs.events.items[0].checklist=committedTasks;
