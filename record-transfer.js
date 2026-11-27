@@ -1,4 +1,23 @@
 import {cloud} from './cloud.js?v=20261127-read-refresh1';
+let legacyRoster;
+export function loadLegacyRoster({force=false}={}){
+ if(force)legacyRoster=null;
+ if(!legacyRoster){
+  const request=fetch('./history-data.json').then(response=>{
+   if(response.ok===false)throw Error('会員名を読み込めません。');
+   return response.json();
+  }).then(data=>{
+   if(!Array.isArray(data.names)||!data.names.every(name=>typeof name==='string'))
+    throw Error('会員名の形式を確認してください。');
+   return data.names.filter(name=>name!=='藤本');
+  }).catch(error=>{
+   if(legacyRoster===request)legacyRoster=null;
+   throw error;
+  });
+  legacyRoster=request;
+ }
+ return legacyRoster.then(names=>[...names]);
+}
 export const historyKey='yuitei.history.v1';
 export const validRecord=r=>r&&typeof r.id==='string'&&typeof r.date==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(r.date)&&typeof r.kind==='string'&&typeof r.occasion==='string'&&typeof r.note==='string'&&r.pieces&&typeof r.pieces==='object'&&!Array.isArray(r.pieces)&&Object.values(r.pieces).every(v=>typeof v==='string');
 export function readRecords(){const raw=JSON.parse(localStorage.getItem(historyKey)||'{"version":1,"items":[]}');if(raw.version!==1||!Array.isArray(raw.items)||!raw.items.every(validRecord))throw Error('保存済みの記録を読み込めません。上書きを停止しています。');return raw.items;}

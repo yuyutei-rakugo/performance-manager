@@ -1,6 +1,6 @@
 import {cloud} from './cloud.js?v=20261127-read-refresh1';
 import {validRehearsal,validAttendance,japanDate,untilJapanMidnight,featuredRehearsal,rehearsalBadge,rehearsalDateTime} from './rehearsal-model.js?v=20261125-regions1';
-import {scheduleChangeBadge,rehearsalTitle} from './record-transfer.js?v=20261127-read-refresh1';
+import {scheduleChangeBadge,rehearsalTitle,loadLegacyRoster} from './record-transfer.js?v=20261127-roster2';
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const label=s=>s==='未回答'||!s?'未登録':s;
 export function mountMemberHome(){
@@ -8,7 +8,7 @@ export function mountMemberHome(){
  const panel=document.createElement('section');panel.className='member-home';panel.setAttribute('aria-label','次回の予定と自分の出欠');
  const tabs=document.querySelector('main .tabs');if(!tabs)return;tabs.after(panel);
  let practices=[],answers={},names=[],stopSchedule,stopAnswer,watching='',answerState='loading',response={},error='',generation=0,loadedPractices=false,scheduleError=false;
- function local(){try{const e=JSON.parse(localStorage.getItem('yuitei.events.v1')||'[]'),p=JSON.parse(localStorage.getItem('yuitei.rehearsals.v1')||'{"items":[],"attendance":{}}');if(!Array.isArray(e)||!Array.isArray(p.items)||!p.items.every(validRehearsal)||!p.attendance||!Object.values(p.attendance).every(validAttendance))throw Error();practices=p.items;answers=p.attendance;error=''}catch{error='端末の予定を読み込めません。データ管理から保存済みの内容を確認してください。'}render()}
+ function local(){try{const p=JSON.parse(localStorage.getItem('yuitei.rehearsals.v1')||'{"items":[],"attendance":{}}');if(!Array.isArray(p.items)||!p.items.every(validRehearsal)||!p.attendance||!Object.values(p.attendance).every(validAttendance))throw Error();practices=p.items;answers=p.attendance;error=''}catch{error='端末の予定を読み込めません。データ管理から保存済みの内容を確認してください。'}render()}
  function person(){return cloud.state.configured?cloud.state.stageName:localStorage.getItem('yuitei.attendance.person')||''}
  function plan(r){
   return `${scheduleChangeBadge(r,esc)}<h3>${rehearsalBadge(r,rehearsalTitle(r),esc)}</h3><p>${rehearsalDateTime(r,esc)}<br>会場：${esc(r.venue)}</p>`;
@@ -88,9 +88,9 @@ export function mountMemberHome(){
   if(!s.configured){
    local();
    try{
-    const response=await fetch('./history-data.json');const data=await response.json();
+    const roster=await loadLegacyRoster();
     if(version!==generation)return;
-    names=data.names.filter(n=>n!=='藤本');render();
+    names=roster;render();
    }catch{if(version===generation){error='会員名を読み込めません。再読み込みしてください。';render()}}
    return;
   }
