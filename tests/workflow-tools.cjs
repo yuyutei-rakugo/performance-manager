@@ -9,7 +9,7 @@ const tick=()=>new Promise(r=>setImmediate(r));
  w.HTMLDialogElement.prototype.showModal=function(){this.open=true};w.HTMLDialogElement.prototype.close=function(){this.open=false};
  const source={id:'tool-fixture',title:'定期落語会',kind:'定期落語会',date:'2099-01-01',time:'14:00',venue:'和室',memo:'管理用',performers:[],checklist:[{label:'会場予約',done:true,assignees:['勇水'],dueDate:'2098-12-01'},{label:'広報申込み',done:false,excluded:true,assignees:['勇水'],dueDate:''},{label:'番組表',done:false,assignees:['勇水'],dueDate:''}]};
  w.localStorage.setItem('yuitei.events.v1',JSON.stringify([source]));w.fetch=async()=>({ok:true,json:async()=>({names:['勇水','ぐう'],records:[]})});
- w.eval(['editor-dialog.js','categories.js','schedule-import.js','record-transfer.js','performer-picker.js','performance-countdown.js','app.js'].map(clean).join('\n'));await tick();
+ w.eval(require('node:fs').readFileSync('ui-text.js','utf8').replace(/export /g,'')+'\nwindow.esc=escapeHtml;');w.eval(['editor-dialog.js','categories.js','schedule-import.js','record-transfer.js','performer-picker.js','performance-countdown.js','app.js'].map(clean).join('\n'));await tick();
  const original=structuredClone(source);
  w.document.querySelector('[data-event]').click();w.document.querySelector('[data-edit]').click();
  let form=w.document.querySelector('#event-form');assert.match(form.querySelector('[data-editor-status]').textContent,/編集中/);

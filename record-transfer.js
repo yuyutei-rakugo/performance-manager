@@ -1,4 +1,24 @@
-import {cloud} from './cloud.js?v=20261127-push-open2';
+import {cloud} from './cloud.js?v=20261127-integrated2';
+let legacyRoster;
+export function loadLegacyRoster({force=false}={}){
+ if(force)legacyRoster=null;
+ if(!legacyRoster){
+  const request=fetch('./history-data.json?v=20261127-integrated2').then(response=>{
+   if(response.ok===false)throw Error('会員名を読み込めません。');
+   return response.json();
+  }).then(data=>{
+   const names=data.localRoster??data.names;
+   if(!Array.isArray(names)||!names.every(name=>typeof name==='string'))
+    throw Error('会員名の形式を確認してください。');
+   return names;
+  }).catch(error=>{
+   if(legacyRoster===request)legacyRoster=null;
+   throw error;
+  });
+  legacyRoster=request;
+ }
+ return legacyRoster.then(names=>[...names]);
+}
 export const historyKey='yuitei.history.v1';
 export const validRecord=r=>r&&typeof r.id==='string'&&typeof r.date==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(r.date)&&typeof r.kind==='string'&&typeof r.occasion==='string'&&typeof r.note==='string'&&r.pieces&&typeof r.pieces==='object'&&!Array.isArray(r.pieces)&&Object.values(r.pieces).every(v=>typeof v==='string');
 export function readRecords(){const raw=JSON.parse(localStorage.getItem(historyKey)||'{"version":1,"items":[]}');if(raw.version!==1||!Array.isArray(raw.items)||!raw.items.every(validRecord))throw Error('保存済みの記録を読み込めません。上書きを停止しています。');return raw.items;}
@@ -47,7 +67,7 @@ export function duplicateSchedule(type,source){
  return copy;
 }
 export function scheduleInvite(type,source){
- const url=new URL(type==='event'?'./':'rehearsals.html',location.href);
+ const url=new URL(type==='event'?'./':'rehearsals.html?v=20261127-integrated2',location.href);
  url.search='';url.hash='';url.searchParams.set('detail',source.id);
  const day=/^\d{4}-\d{2}-\d{2}$/.test(source.date)?new Intl.DateTimeFormat('ja-JP',{timeZone:'Asia/Tokyo',year:'numeric',month:'long',day:'numeric',weekday:'short'}).format(new Date(source.date+'T12:00:00+09:00')):source.date;
  return ['【結友亭 '+(type==='event'?'公演':'稽古')+'のご案内】',type==='event'?source.title:rehearsalTitle(source),'日時：'+day+' '+(source.time||'時間未定'),'場所：'+source.venue,type==='rehearsal'?'出欠は「帳面」からお願いします。':'詳しくは「帳面」でご確認ください。',url.href].filter(Boolean).join('\n');

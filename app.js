@@ -1,27 +1,27 @@
-import {performanceCountdown} from './performance-countdown.js?v=20261126-cancel1';
-import {openFlyerVenues} from './flyer-venues.js?v=20261127-push-open2';
-import {startEditor,finishEditor,leaveEditor,guardEditor,editorState,saveRecovery,recoveryScope,recoveredEditState} from './editor-dialog.js?v=20261125-regions1';
-import {performerPicker,updatePerformerPickers,readPerformer,showPerformerRoster} from './performer-picker.js?v=20261125-regions1';
-import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261125-regions1';
-import {readCategories,saveCategories,validCategories,categoryOptions,mountCategories,mountCategoryAdder} from './categories.js?v=20261125-regions1';
-import {mountScheduleImport} from './schedule-import.js?v=20261125-regions1';
-import {scheduleChange,scheduleChangeBadge,preparationTemplates,draftTask,duplicateSchedule,copyScheduleInvite,validPerformer,timeline,formatDuration,toRecord,transferRecord,readRecords,mergeRecords,mergedRecords} from './record-transfer.js?v=20261127-push-open2';
-import {cloud,startCloud,mountAccount} from './cloud.js?v=20261127-push-open2';
+import {escapeHtml as esc} from './ui-text.js?v=20261127-integrated2';
+import {performanceCountdown} from './performance-countdown.js?v=20261127-integrated2';
+import {openFlyerVenues} from './flyer-venues.js?v=20261127-integrated2';
+import {startEditor,finishEditor,leaveEditor,guardEditor,editorState,saveRecovery,recoveryScope,recoveredEditState} from './editor-dialog.js?v=20261127-integrated2';
+import {performerPicker,updatePerformerPickers,readPerformer,showPerformerRoster} from './performer-picker.js?v=20261127-integrated2';
+import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261127-integrated2';
+import {readCategories,saveCategories,validCategories,categoryOptions,mountCategories,mountCategoryAdder} from './categories.js?v=20261127-integrated2';
+import {mountScheduleImport} from './schedule-import.js?v=20261127-integrated2';
+import {loadLegacyRoster,scheduleChange,scheduleChangeBadge,preparationTemplates,draftTask,duplicateSchedule,copyScheduleInvite,validPerformer,timeline,formatDuration,toRecord,transferRecord,readRecords,mergeRecords,mergedRecords} from './record-transfer.js?v=20261127-integrated2';
+import {cloud,startCloud,mountAccount} from './cloud.js?v=20261127-integrated2';
 'use strict';
 
 const key = 'yuitei.events.v1';
 const tasks = ['会場を予約する', '開催日時を確定する', '出演者に連絡する', '演目を確認する', '出演順を決める', '持ち時間を確認する', 'チラシを作る', '公演を告知する', '予約を確認する', '番組表を作る', '高座と座布団を準備する', '音響を確認する', '受付担当を決める', '当日の進行を共有する', '搬入・撤収の手順を確認する'];
 const $ = id => document.getElementById(id);
 const eventDialog = $('event-dialog');
-const esc = value => String(value).replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 const clone = value => JSON.parse(JSON.stringify(value));
 const localDate = date => [date.getFullYear(), date.getMonth() + 1, date.getDate()].map((part, i) => String(part).padStart(i ? 2 : 4, '0')).join('-');
 const today = () => localDate(new Date());
 const dateLabel = value => new Intl.DateTimeFormat('ja-JP', {year:'numeric',month:'long',day:'numeric',weekday:'short'}).format(new Date(value + 'T00:00:00'));
 const newTasks = () => tasks.map(draftTask);
 let cloudLoadError='';
-let memberNames=['勇水','小薔薇','懐古','華詩','世喜音','やすゑ','一悟','日光'],cloudRevision=0,cloudLoaded=false,stopCloud,cloudIdentity='',saving=false;
-fetch('./history-data.json').then(r=>r.json()).then(d=>{memberNames=d.names.filter(n=>n!=='藤本')}).catch(()=>{});
+let memberNames=[],cloudRevision=0,cloudLoaded=false,stopCloud,cloudIdentity='',saving=false;
+
 const editable=()=>!cloud.state.configured||(['admin','editor'].includes(cloud.state.role)&&cloudLoaded);
 function assigneePicker(item,i){const choices=cloud.state.configured&&cloud.state.provider==='apps-script'?performerNames:memberNames;return `<fieldset class="assignee-picker"><legend>担当者（任意・複数選択可）</legend>${[...new Set([...choices,...(item.assignees||[])])].map(n=>`<label><input type="checkbox" data-owner="${i}" value="${esc(n)}" ${(item.assignees||[]).includes(n)?'checked':''}>${esc(n)}</label>`).join('')}</fieldset>`}
 function progress(event){
@@ -183,7 +183,7 @@ function renderDetails(id,message='') {
     window.addEventListener('afterprint',()=>document.body.classList.remove('print-program'),{once:true});
     window.print();
   };
-  $('transfer-event').onclick=async()=>{if(cloud.state.role!=='admin'||event.date>=today()||!confirm('終了した公演を稽古・公演記録へ移しますか？同じ公演は重複せず更新されます。'))return;try{await transferRecord(toRecord('event',event,memberNames));if(await save(events.map(e=>e.id===id?{...e,archivedAt:new Date().toISOString()}:e))){eventDialog.close();notify('稽古・公演記録へ移しました。')}else notify('記録への保存は完了しましたが、転記済み表示を保存できませんでした。再実行しても重複しません。')}catch(e){notify(e.message)}};
+  $('transfer-event').onclick=async()=>{if(cloud.state.role!=='admin'||event.date>=today()||!confirm('終了した公演を稽古・公演記録へ移しますか？同じ公演は重複せず更新されます。'))return;try{await transferRecord(toRecord('event',event,await loadLegacyRoster().catch(()=>memberNames)));if(await save(events.map(e=>e.id===id?{...e,archivedAt:new Date().toISOString()}:e))){eventDialog.close();notify('稽古・公演記録へ移しました。')}else notify('記録への保存は完了しましたが、転記済み表示を保存できませんでした。再実行しても重複しません。')}catch(e){notify(e.message)}};
   if($('unarchive-event'))$('unarchive-event').onclick=async()=>{if(await save(events.map(e=>e.id===id?{...e,archivedAt:null}:e))){eventDialog.close();notify('公演一覧に戻しました。転記した記録は残しています。')}};
   eventDialog.querySelector('[data-edit]')?.addEventListener('click',()=>renderForm(events.find(item=>item.id===id)));
   eventDialog.querySelector('[data-flyers]')?.addEventListener('click',()=>openFlyerVenues(event));
@@ -204,28 +204,29 @@ async function deleteEvent(id) {
 }
 
 let performerNames=[];
-function loadPerformerRoster(form,force=false){
-  if(!cloud.state.configured||cloud.state.provider!=='apps-script'){
-    performerNames=memberNames;
-    updatePerformerPickers(form,performerNames);
-    showPerformerRoster(form,'ready',performerNames,()=>loadPerformerRoster(form,true));
-    return;
+function updateFormRoster(form){
+  for(const fieldset of form.querySelectorAll('.assignee-picker')){
+    const assignees=[...fieldset.querySelectorAll('[data-owner]:checked')].map(input=>input.value);
+    fieldset.outerHTML=assigneePicker({assignees},0);
   }
+  updatePerformerPickers(form,performerNames);
+}
+async function loadPerformerRoster(form,force=false){
+  const shared=cloud.state.configured&&cloud.state.provider==='apps-script';
+  const active=()=>$('event-form')===form&&eventDialog.open;
   const retry=()=>loadPerformerRoster(form,true);
+  if(!shared)performerNames=memberNames;
   showPerformerRoster(form,'loading',performerNames,retry);
-  cloud.roster({force}).then(rows=>{
-    if($('event-form')!==form||!eventDialog.open)return;
-    performerNames=rows.map(row=>row.name);
-    for(const fieldset of form.querySelectorAll('.assignee-picker')){
-      const assignees=[...fieldset.querySelectorAll('[data-owner]:checked')].map(input=>input.value);
-      fieldset.outerHTML=assigneePicker({assignees},0);
-    }
-    updatePerformerPickers(form,performerNames);
-    showPerformerRoster(form,'ready',performerNames,retry);
-  }).catch(()=>{
-    if($('event-form')!==form||!eventDialog.open)return;
-    showPerformerRoster(form,'error',performerNames,retry);
-  });
+  try{
+    const names=shared?(await cloud.roster({force})).map(row=>row.name):await loadLegacyRoster({force});
+    if(!active())return;
+    if(!shared)memberNames=names;
+    performerNames=names;
+    updateFormRoster(form);
+    showPerformerRoster(form,'ready',names,retry);
+  }catch{
+    if(active())showPerformerRoster(form,'error',performerNames,retry);
+  }
 }
 function programMinutes(row){
   const minutes=row.querySelector('[name=minutes]').valueAsNumber,seconds=row.querySelector('[name=seconds]').valueAsNumber||0;
@@ -414,7 +415,7 @@ $('schedule').onclick = async click => {
 };
 document.getElementById('next-performance')?.addEventListener('click',event=>{const button=event.target.closest('[data-event]');if(button)renderDetails(button.dataset.event)});
 $('list-tab').onclick = () => render();
-$('calendar-tab').onclick = () => {location.href = 'rehearsals.html?v=20261125-regions1';};
+$('calendar-tab').onclick = () => {location.href = 'rehearsals.html?v=20261127-integrated2';};
 $('new-event').onclick = () => renderForm();
 $('data-open').onclick = () => $('data-dialog').showModal();
 guardEditor(eventDialog);
@@ -491,6 +492,6 @@ reservationsButton.textContent='予約書類を追加';reservationsButton.hidden
 document.querySelector('.workspace')?.append(reservationsButton);
 cloud.onState(state=>{reservationsButton.hidden=state.provider!=='apps-script'||!state.role});
 reservationsButton.onclick=async()=>{
- const {openReservationDocuments}=await import('./reservation-documents.js?v=20261127-push-open2');
+ const {openReservationDocuments}=await import('./reservation-documents.js?v=20261127-integrated2');
  if(cloud.state.role)openReservationDocuments();
 };

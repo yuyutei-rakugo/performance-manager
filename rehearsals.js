@@ -1,12 +1,13 @@
-import {startEditor,finishEditor,leaveEditor,guardEditor,editorState,hasEditorDraft,saveRecovery,recoveryScope,recoveredEditState} from './editor-dialog.js?v=20261125-regions1';
-import {performerPicker,updatePerformerPickers,readPerformer,showPerformerRoster} from './performer-picker.js?v=20261125-regions1';
-import {mountMemberHome} from './member-home.js?v=20261127-push-open2';
-import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261125-regions1';
-import {readCategories,saveCategories,validCategories} from './categories.js?v=20261125-regions1';
-import {mountScheduleImport} from './schedule-import.js?v=20261125-regions1';
-import {scheduleChange,scheduleChangeBadge,duplicateSchedule,copyScheduleInvite,toRecord,formatDuration,rehearsalTitle,readRecords,mergeRecords,mergedRecords} from './record-transfer.js?v=20261127-push-open2';
-import {cloud,startCloud,mountAccount} from './cloud.js?v=20261127-push-open2';
-import {statuses,rehearsalNames,validRehearsal,validAttendance,attendanceSummary,japanDate,rehearsalBadge,rehearsalDateTime} from './rehearsal-model.js?v=20261125-regions1';
+import {errorMessage} from './ui-text.js?v=20261127-integrated2';
+import {startEditor,finishEditor,leaveEditor,guardEditor,editorState,hasEditorDraft,saveRecovery,recoveryScope,recoveredEditState} from './editor-dialog.js?v=20261127-integrated2';
+import {performerPicker,updatePerformerPickers,readPerformer,showPerformerRoster} from './performer-picker.js?v=20261127-integrated2';
+import {mountMemberHome} from './member-home.js?v=20261127-integrated2';
+import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261127-integrated2';
+import {readCategories,saveCategories,validCategories} from './categories.js?v=20261127-integrated2';
+import {mountScheduleImport} from './schedule-import.js?v=20261127-integrated2';
+import {loadLegacyRoster,scheduleChange,scheduleChangeBadge,duplicateSchedule,copyScheduleInvite,toRecord,formatDuration,rehearsalTitle,readRecords,mergeRecords,mergedRecords} from './record-transfer.js?v=20261127-integrated2';
+import {cloud,startCloud,mountAccount} from './cloud.js?v=20261127-integrated2';
+import {statuses,rehearsalNames,validRehearsal,validAttendance,attendanceSummary,japanDate,rehearsalBadge,rehearsalDateTime} from './rehearsal-model.js?v=20261127-integrated2';
 const $=id=>document.getElementById(id),esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const key='yuitei.rehearsals.v1';let items=[],attendance={},names=[],revision=0,loaded=false,storageOK=true,stop,stopAttendance,opened=null,detailRevision=0,busy=false,archiving=false;
 let noticeTimer;
@@ -36,7 +37,7 @@ async function save(next,expected=revision,nextAttendance=attendance,report=noti
    localItems=structuredClone(items);localAttendance=structuredClone(attendance);
    window.dispatchEvent(new Event('schedule-data-changed'));
   }
- }catch(error){report(error.message||'保存できませんでした。');return false}
+ }catch(error){report(errorMessage(error,'保存できませんでした。'));return false}
  finally{busy=false}
  try{render()}catch{notify('保存しました。一覧を更新できませんでした。再読み込みして確認してください。')}
  return true;
@@ -166,7 +167,7 @@ function loadRoster(force=false){
  rosterState='loading';drawRoster();
  const request=cloud.state.configured&&cloud.state.provider==='apps-script'
   ? cloud.roster({force}).then(rows=>rows.map(row=>row.name))
-  : fetch('./history-data.json').then(r=>r.json()).then(data=>data.names.filter(name=>name!=='藤本'));
+  : loadLegacyRoster({force});
  request.then(next=>{
   if(generation!==accountGeneration)return;
   names=next;rosterState='ready';drawRoster();
@@ -496,6 +497,6 @@ reservationsButton.textContent='予約書類を追加';reservationsButton.hidden
 document.querySelector('.workspace')?.append(reservationsButton);
 cloud.onState(state=>{reservationsButton.hidden=state.provider!=='apps-script'||!state.role});
 reservationsButton.onclick=async()=>{
- const {openReservationDocuments}=await import('./reservation-documents.js?v=20261127-push-open2');
+ const {openReservationDocuments}=await import('./reservation-documents.js?v=20261127-integrated2');
  if(cloud.state.role)openReservationDocuments();
 };

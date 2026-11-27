@@ -1,7 +1,7 @@
-import {cloud} from './cloud.js?v=20261127-push-open2';
+import {escapeHtml} from './ui-text.js?v=20261127-integrated2';
+import {cloud} from './cloud.js?v=20261127-integrated2';
 
 const captions={date:'利用日',venue:'施設名',room:'部屋',start:'予約開始',end:'予約終了',issued:'発行日'};
-const escapeHtml=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 const request=(action,data={})=>cloud.reservation(action,data);
 function unique(values){
  const distinct=[...new Set(values)];

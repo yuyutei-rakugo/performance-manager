@@ -4,12 +4,12 @@ const clean=file=>fs.readFileSync(file,'utf8').replace(/^import .*;\n/gm,'').rep
 const practice={id:'next-practice',title:'通常稽古',date:'2099-01-02',time:'14:00',venue:'和室',notes:''};
 async function boot(configured=false,page="rehearsals.html",deferAttendance=false){
  const w=new JSDOM('<main><nav class="tabs"></nav></main>',{url:'https://example.test/'+page,runScripts:'outside-only'}).window;w.structuredClone=structuredClone;
- w.fetch=async()=>({json:async()=>({names:['勇水','日光','藤本']})});w.localStorage.setItem('yuitei.attendance.person','勇水');
+ w.fetch=async()=>({json:async()=>({names:['勇水','日光','藤本'],localRoster:['勇水','日光']})});w.localStorage.setItem('yuitei.attendance.person','勇水');
  w.localStorage.setItem('yuitei.events.v1',JSON.stringify([{id:'earlier-event',date:'2099-01-01',time:'12:00',title:'新春寄席',venue:'大広間'},{id:'past',date:'2000-01-01',title:'終了公演'}]));
  w.localStorage.setItem('yuitei.rehearsals.v1',JSON.stringify({items:[practice,{...practice,id:'archived',date:'2098-01-01',archivedAt:'yes'}],attendance:{[practice.id]:{'日光':'欠席'}}}));
  let listener,fail=false,writes=[],watchers={},answer,answerError;
  w.cloud={state:configured?{configured:true,provider:'apps-script',role:'viewer',stageName:'勇水'}:{configured:false},onState(fn){listener=fn;fn(this.state)},async roster(){return [{name:'勇水'},{name:'日光'}]},watch(name,fn){watchers[name]=fn;return ()=>delete watchers[name]},watchAttendance(id,fn,onError){answer=fn;answerError=onError;if(!deferAttendance)fn([]);return ()=>{}},async respondAttendance(id,status){if(fail)throw Error('通信失敗');writes.push({id,status})}};
- w.eval(clean('record-transfer.js')+'\n'+clean('rehearsal-model.js')+'\n'+clean('member-home.js')+'\nmountMemberHome();');await tick();
+ w.eval(require('node:fs').readFileSync('ui-text.js','utf8').replace(/export /g,'')+'\nwindow.esc=escapeHtml;');w.eval(clean('record-transfer.js')+'\n'+clean('rehearsal-model.js')+'\n'+clean('member-home.js')+'\nmountMemberHome();');await tick();
  return {w,q:s=>w.document.querySelector(s),fail(v){fail=v},writes,watchers,answer:rows=>answer(rows),answerError:()=>answerError('通信失敗'),emit(s){w.cloud.state=s;listener(s)}};
 }
 (async()=>{
@@ -25,8 +25,10 @@ async function boot(configured=false,page="rehearsals.html",deferAttendance=fals
  assert.match(slow.q('.quick-attendance strong').textContent,/取得できませんでした/);
  assert(!slow.q('[data-quick-status=出席]').disabled);
  const button=slow.q('[data-quick-status=出席]');
+ const plan=slow.q('[data-next-plan] h3');
  slow.answer([]);
  assert.equal(slow.q('[data-quick-status=出席]'),button);
+ assert.equal(slow.q('[data-next-plan] h3'),plan,'attendance refresh preserves the schedule DOM');
  assert.equal(slow.q('.quick-attendance strong').textContent,'未登録');
  assert(!slow.q('[data-quick-status=出席]').disabled);
  slow.w.close();
