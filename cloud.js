@@ -122,8 +122,8 @@ export function mountAccount(){
   <a class="secondary" id="settings-admin" href="./admin.html?v=20261125-regions1" hidden>管理者ページ</a>
   <button type="button" class="secondary" id="cloud-logout" hidden>ログアウト</button>
  </div>
- <section data-push-settings hidden><button type="button" class="secondary" data-push-toggle>公演のお知らせを受け取る</button> <button type="button" class="secondary" data-push-test hidden>テスト通知を送る</button><p role="status"></p></section>
- <details id="push-report" hidden><summary>通知の配信状況</summary><button type="button" class="secondary">配信状況を確認する</button><p role="status"></p></details>
+ <section data-push-settings hidden><h3>公演の通知を受け取る</h3><p>下のボタンを押し、確認画面で「許可」を選んでください。登録後にテスト通知を送ります。通知を押して開いた日時と高座名は、設定確認のため管理者に表示されます。</p><button type="button" class="secondary" data-push-toggle>通知を受け取る</button> <button type="button" class="secondary" data-push-test hidden>テスト通知を送る</button><p role="status"></p></section>
+ <details id="push-report" hidden><summary>通知の配信状況</summary><button type="button" class="secondary">配信状況を確認する</button><p role="status"></p><div data-push-devices></div></details>
  <details class="quick-help"><summary>帳面の使い方</summary>
  <h3>予定を見る・出欠を答える</h3><p>「公演一覧」「稽古出欠」「稽古・公演記録」で切り替えます。稽古は「出欠・詳細」から自分の回答を選び、登録できた表示を確認してください。</p>
  <h3>編集と保存</h3><p>編集担当・管理者は「編集する」を押し、「変更を保存する」で確定します。「キャンセル」は変更を保存しません。保存できなかった場合は入力を残して再試行できます。</p>
@@ -152,7 +152,7 @@ export function mountAccount(){
  settings.onclick=()=>{
   menu.showModal();
   if(cloud.state.provider==='apps-script'&&cloud.state.role){
-   (loadPush??=import('./push-settings.js?v=20261126-push-pilot2').then(mod=>mod.mountPushSettings(menu,cloud)).catch(()=>{loadPush=null})).then(open=>open?.());
+   (loadPush??=import('./push-settings.js?v=20261127-push-onboarding1').then(mod=>mod.mountPushSettings(menu,cloud)).catch(()=>{loadPush=null})).then(open=>open?.());
   }
  };
  menu.querySelector('[data-install]').onclick=()=>menu.close();
@@ -173,6 +173,13 @@ export function mountAccount(){
     test?'テスト '+time(test.at)+'。'+(test.accepted?'通知サービスが受付。':'通知サービスの受付を確認できませんでした。'):'',
     '端末に届いたかは、端末の通知欄で確認してください。',
    ].filter(Boolean).join(' ');
+   const devices=report.querySelector('[data-push-devices]');
+   devices.replaceChildren();
+   for(const device of result.devices||[]){
+    const row=document.createElement('p');
+    row.textContent=device.name+'：'+(device.registered?'登録済み':'未登録')+'／'+(device.testAt?(device.accepted?'テスト受付済み':'テスト受付未確認')+' '+time(device.testAt):'テスト未実施')+'／'+(device.openedAt?'通知を開いた日時 '+time(device.openedAt):'開封未確認');
+    devices.append(row);
+   }
   }catch{
    if(cloud.state.user?.uid===account)reportStatus.textContent='確認できませんでした。再度お試しください。';
   }finally{reportButton.disabled=false}
@@ -183,7 +190,7 @@ export function mountAccount(){
   if(dataButton)dataButton.hidden=!s.ready||s.configured&&!administrator;
   admin.hidden=!s.ready||!administrator;
   report.hidden=!s.ready||!administrator||s.provider!=='apps-script';
-  if(report.hidden){report.open=false;reportStatus.textContent=''}
+  if(report.hidden){report.open=false;reportStatus.textContent='';report.querySelector('[data-push-devices]').replaceChildren()}
   login.hidden=!s.configured||!s.ready||!!s.user;
   login.textContent=s.provider==='apps-script'?'会員ログイン':'Googleで会員ログイン';
   logout.hidden=!s.user;
@@ -192,6 +199,31 @@ export function mountAccount(){
   if(pinTools.hidden){pinTools.open=false;pinForm.reset();pinMessage.textContent=''}
   status.textContent=s.message;
  });
+ let routeBusy=false, loginRequested=false;
+ async function openNotificationRoute(){
+  if(routeBusy||!cloud.state.ready)return;
+  const hash=location.hash;
+  if(hash!=='#notifications'&&!/^#push-open=[a-zA-Z0-9-]{36}$/.test(hash))return;
+  if(!cloud.state.user){
+   if(!loginRequested){loginRequested=true;showPinLogin()}
+   return;
+  }
+  routeBusy=true;
+  try{
+   if(!menu.open)settings.click();
+   if(hash.startsWith('#push-open=')){
+    const registration=await navigator.serviceWorker?.getRegistration();
+    const sub=await registration?.pushManager?.getSubscription();
+    if(!sub)throw Error('通知を登録した端末で開いてください。');
+    await cloud.push('pushOpened',{endpoint:sub.endpoint,receipt:hash.slice(11)});
+    status.textContent='テスト通知を開いたことを確認しました。設定完了です。';
+    history.replaceState(null,'',location.pathname+location.search);
+   }
+  }catch(error){status.textContent='受信確認を保存できませんでした。'+error.message}
+  finally{routeBusy=false}
+ }
+ cloud.onState(()=>queueMicrotask(openNotificationRoute));
+ window.addEventListener('hashchange',openNotificationRoute);
  pinForm.onsubmit=async e=>{
   e.preventDefault();
   const button=pinForm.querySelector('button');

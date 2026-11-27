@@ -1,5 +1,5 @@
 import {previewFlyerMigration} from './flyer-migration.js?v=20261125-regions1';
-import {cloud,startCloud,mountAccount} from './cloud.js?v=20261126-push-reliable1';
+import {cloud,startCloud,mountAccount} from './cloud.js?v=20261127-push-onboarding1';
 import {toRecord,readRecords,mergeRecords} from './record-transfer.js?v=20261126-push-reliable1';
 let backupExpected='',backupOwner='',backupBusy=false;
 const $=id=>document.getElementById(id),status=$('admin-status');let docs={},past=[],members=[],accountGeneration=0,archiveBusy=false;

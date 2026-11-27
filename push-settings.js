@@ -32,7 +32,13 @@ export function mountPushSettings(menu, cloud) {
           subscription = await registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:key});
         }
         await request('pushEnable',options(subscription));
-        status.textContent = 'この端末で通知を受け取ります。';
+        status.textContent = '通知を有効にしました。テスト通知を送信中…';
+        try {
+          await request('pushTest',options(subscription));
+          status.textContent = 'テスト通知を送りました。届いた通知を押して、受信確認を完了してください。';
+        } catch (error) {
+          status.textContent = '通知の登録は完了しました。テスト送信は確認できませんでした。'+error.message;
+        }
       } else if (action === 'disable' && subscription) {
         await request('pushDisable', options(subscription));
         await subscription.unsubscribe();
@@ -44,7 +50,7 @@ export function mountPushSettings(menu, cloud) {
       }
       const enabled = !!subscription && (await request('pushStatus',options(subscription))).enabled;
       toggle.dataset.enabled = String(enabled);
-      toggle.textContent = enabled ? 'この端末の通知を停止する' : '公演のお知らせを受け取る';
+      toggle.textContent = enabled ? 'この端末の通知を停止する' : '通知を受け取る';
       test.hidden = !enabled;
       if (action === 'status') status.textContent = enabled ? 'この端末では通知が有効です。' : 'この端末では通知が無効です。';
     } catch (error) {
@@ -70,5 +76,6 @@ export function mountPushSettings(menu, cloud) {
       return;
     }
     await manage('status');
+    section.scrollIntoView?.({block:'center'});
   };
 }

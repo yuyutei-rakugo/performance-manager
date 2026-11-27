@@ -1,4 +1,4 @@
-import {cloud} from './cloud.js?v=20261126-push-reliable1';
+import {cloud} from './cloud.js?v=20261127-push-onboarding1';
 import {validRehearsal,validAttendance,japanDate,untilJapanMidnight,featuredRehearsal,rehearsalBadge,rehearsalDateTime} from './rehearsal-model.js?v=20261125-regions1';
 import {scheduleChangeBadge,rehearsalTitle} from './record-transfer.js?v=20261126-push-reliable1';
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));

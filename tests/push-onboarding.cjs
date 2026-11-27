@@ -1,0 +1,40 @@
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const vm=require('node:vm');
+const {JSDOM}=require('jsdom');
+const dom=new JSDOM('<dialog open><section data-push-settings><button data-push-toggle></button><button data-push-test></button><p role="status"></p></section></dialog>');
+const menu=dom.window.document.querySelector('dialog');
+const calls=[];
+let subscribed=false;
+const subscription={endpoint:'https://web.push.apple.com/token',toJSON:()=>({keys:{}})};
+const notification={permission:'default',requestPermission:async()=>{calls.push('permission');return 'granted'}};
+const context=vm.createContext({navigator:{userAgent:'Android',serviceWorker:{getRegistration:async()=>({active:true,pushManager:{getSubscription:async()=>subscribed?subscription:null,subscribe:async()=>{subscribed=true;return subscription}}})}},window:{PushManager:{},Notification:notification},Notification:notification,document:dom.window.document,Uint8Array,atob,matchMedia:()=>({matches:false})});
+vm.runInContext(fs.readFileSync('push-settings.js','utf8').replace('export function','function'),context);
+const cloud={state:{role:'viewer',provider:'apps-script'},push:async action=>{calls.push(action);if(action==='pushConfig')return {allowed:true,publicKey:'AAAA'};if(action==='pushStatus')return {enabled:subscribed};return {}}};
+(async()=>{
+ const open=context.mountPushSettings(menu,cloud);await open();
+ menu.querySelector('[data-push-toggle]').click();
+ await new Promise(resolve=>setImmediate(resolve));
+ assert(calls.indexOf('permission')<calls.indexOf('pushEnable'));
+ assert(calls.indexOf('pushEnable')<calls.indexOf('pushTest'));
+ assert.match(menu.querySelector('[role=status]').textContent,/通知を押して/);
+ assert.equal(menu.querySelector('[data-push-test]').hidden,false);
+ console.log('PASS permission, registration, automatic test order and member confirmation instructions');
+})().catch(e=>{console.error(e);process.exitCode=1});
+(async()=>{
+ const page=new JSDOM('<div class="header-actions"></div>',{url:'https://notebook.example/#notifications'});
+ const {window}=page;
+ window.HTMLDialogElement.prototype.showModal=function(){this.open=true};
+ window.HTMLDialogElement.prototype.close=function(){this.open=false};
+ const ctx=vm.createContext({window,document:window.document,location:window.location,history:window.history,localStorage:window.localStorage,navigator:{},queueMicrotask,CustomEvent:window.CustomEvent,URL,console});
+ const source=fs.readFileSync('cloud.js','utf8').replace(/^import .*\n/,'').replace(/export /g,'');
+ vm.runInContext(source,ctx);
+ vm.runInContext('mountAccount();Object.assign(state,{ready:true,configured:true,provider:"apps-script"});emit()',ctx);
+ await new Promise(r=>setImmediate(r));
+ assert.match(window.document.querySelector('dialog[open] h2').textContent,/会員ログイン/);
+ // Following authentication, the same notification route resumes without another login.
+ vm.runInContext('Object.assign(state,{user:{uid:"member"},role:"viewer",provider:"fixture"});emit()',ctx);
+ await new Promise(r=>setImmediate(r));
+ assert(window.document.querySelector('.settings-dialog').open);
+ console.log('PASS direct notification link prompts login and resumes settings after authentication');
+})().catch(e=>{console.error(e);process.exitCode=1});

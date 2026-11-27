@@ -6,7 +6,7 @@ import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261125-regions
 import {readCategories,saveCategories,validCategories,categoryOptions,mountCategories,mountCategoryAdder} from './categories.js?v=20261125-regions1';
 import {mountScheduleImport} from './schedule-import.js?v=20261125-regions1';
 import {scheduleChange,scheduleChangeBadge,preparationTemplates,draftTask,duplicateSchedule,copyScheduleInvite,validPerformer,timeline,formatDuration,toRecord,transferRecord,readRecords,mergeRecords,mergedRecords} from './record-transfer.js?v=20261126-push-reliable1';
-import {cloud,startCloud,mountAccount} from './cloud.js?v=20261126-push-reliable1';
+import {cloud,startCloud,mountAccount} from './cloud.js?v=20261127-push-onboarding1';
 'use strict';
 
 const key = 'yuitei.events.v1';
