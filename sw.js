@@ -14,6 +14,7 @@ self.addEventListener('push',event=>{
   if(!message?.id||typeof message.title!=='string'||typeof message.body!=='string')return;
   const url=new URL('./',self.registration.scope);
   await self.registration.showNotification(message.title,{
+   data:message.kind==='test'&&/^[a-zA-Z0-9-]{36}$/.test(message.receipt||'')?{receipt:message.receipt}:null,
    body:message.body,tag:message.id,renotify:false,
    icon:new URL('notebook-pixel-any-192-v3.png',url).href,
   });
@@ -21,6 +22,8 @@ self.addEventListener('push',event=>{
 });
 self.addEventListener('notificationclick',event=>{
  const url=new URL('./',self.registration.scope);
+ const receipt=event.notification.data?.receipt;
+ if(/^[a-zA-Z0-9-]{36}$/.test(receipt||''))url.hash='push-open='+receipt;
  event.notification.close();
  event.waitUntil((async()=>{
   const windows=await self.clients.matchAll({type:'window',includeUncontrolled:true});

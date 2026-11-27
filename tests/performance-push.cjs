@@ -74,6 +74,12 @@ const claim=run("pushRequest_(owner,'session',{action:'pushTest',endpoint},[even
 assert.equal(claim.payload.detail,event.id);
 context.claim=claim;
 assert.equal(run("pushSendClaimed_(claim.id,claim.payload,120,'session')"),201);
+assert.throws(()=>run("pushRequest_(member,'session',{action:'pushOpened',endpoint,receipt:claim.payload.receipt})"),/一致/);
+assert.throws(()=>run("pushRequest_(owner,'session',{action:'pushOpened',endpoint,receipt:'wrong'})"),/一致/);
+run("pushRequest_(owner,'session',{action:'pushOpened',endpoint,receipt:claim.payload.receipt})");
+assert(run('pushReport_(readDb_()).devices[0].openedAt'));
+assert.equal(run('pushReport_(readDb_()).devices[0].accepted'),true);
+assert(!JSON.stringify(run('pushReport_(readDb_())')).includes(endpoint));
 assert.throws(()=>run("pushRequest_(owner,'session',{action:'pushTest',endpoint},[event])"),/1分/);
 run('sendPerformanceNotifications()');
 assert.equal(delivered,1);
@@ -110,7 +116,7 @@ vm.runInContext(read('sw.js'),worker);
  assert.equal(notification.tag,'notebook-push-test');
  listeners.notificationclick({notification,waitUntil});
  await done;
- assert.equal(opened,'https://notebook.example/performance-manager/');
+ assert.equal(opened,'https://notebook.example/performance-manager/#push-open='+claim.payload.receipt);
  opened=undefined;
  notification.data={url:'https://notebook.example/performance-manager/?detail=test'};
  openPages=[{url:'https://notebook.example/performance-manager/?source=homescreen',navigate:async url=>{

@@ -57,6 +57,11 @@ function pushRequest_(member,session,req,events) {
   }
   return {enabled:owns&&allowed,differentMember:!!stored&&stored.memberId!==member.id};
  }
+ if(req.action==='pushOpened'){
+  if(!owns||!allowed||!stored.testReceipt||req.receipt!==stored.testReceipt)throw Error('通知の確認情報が一致しません。');
+  stored.testOpenedAt=stored.testOpenedAt||new Date().toISOString();
+  props.setProperty(id,JSON.stringify(stored));return {};
+ }
  if(req.action==='pushDisable'){
   if(owns)props.deleteProperty(id);
   return {};
@@ -76,6 +81,9 @@ function pushRequest_(member,session,req,events) {
   const now=Date.now();
   if(now-(stored.testAt||0)<60000)throw Error('1分待ってからお試しください。');
   stored.testAt=now;
+  stored.testReceipt=Utilities.getUuid();
+  delete stored.testOpenedAt;
+  delete stored.testAccepted;
   props.setProperty(id,JSON.stringify(stored));
   const today=Utilities.formatDate(new Date(now),'Asia/Tokyo','yyyy-MM-dd');
   const next=(events||[]).filter(event=>event.date>=today&&!pushCancelled_(event))
@@ -83,6 +91,7 @@ function pushRequest_(member,session,req,events) {
   const payload=next
    ? {id:'notebook-push-test',kind:'test',detail:next.id,title:'帳面のテスト通知',body:pushEventLabel_(next)}
    : {id:'notebook-push-test',kind:'test',title:'帳面のテスト通知',body:'通知を押すと帳面が開きます。'};
+  payload.receipt=stored.testReceipt;
   return {test:{id,payload}};
  }
  throw Error('この通知操作は利用できません。');
@@ -155,16 +164,26 @@ function pushSendClaimed_(id,payload,ttl,expected) {
  lock.waitLock(10000);
  try {
   const current=JSON.parse(props.getProperty(id)||'null');
+  if(pushSameRegistration_(current,row)&&current.testReceipt===payload.receipt){
+   current.testAccepted=code>=200&&code<300;
+   props.setProperty(id,JSON.stringify(current));
+  }
   if(pushSameRegistration_(current,row)&&(code===404||code===410))props.deleteProperty(id);
   props.setProperty('PUSH_LAST_TEST',JSON.stringify({at:new Date().toISOString(),code,
    accepted:code>=200&&code<300}));
  }finally{lock.releaseLock()}
  return code;
 }
-function pushReport_() {
+function pushReport_(db) {
  const props=PropertiesService.getScriptProperties();
  const rows=props.getKeys().filter(key=>key.startsWith('PUSH_SUB_'));
  return {mode:pushMode_(),registered:rows.length,limit:50,
+  devices:db?db.members.filter(m=>m.active).flatMap(member=>{
+   const devices=rows.map(id=>JSON.parse(props.getProperty(id)||'null'))
+    .filter(row=>row?.memberId===member.id&&row.epoch===member.epoch);
+   return devices.length?devices.map(row=>({name:member.name,registered:true,testAt:row.testAt||null,
+    accepted:row.testAccepted===true,openedAt:row.testOpenedAt||null})):[{name:member.name,registered:false}];
+  }):[],
   lastTest:JSON.parse(props.getProperty('PUSH_LAST_TEST')||'null'),
   lastRun:JSON.parse(props.getProperty('PUSH_LAST_RUN')||'null')};
 }
