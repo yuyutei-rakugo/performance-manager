@@ -1,10 +1,10 @@
 import {startEditor,finishEditor,leaveEditor,guardEditor,editorState,hasEditorDraft,saveRecovery,recoveryScope,recoveredEditState} from './editor-dialog.js?v=20261125-regions1';
 import {performerPicker,updatePerformerPickers,readPerformer,showPerformerRoster} from './performer-picker.js?v=20261125-regions1';
-import {mountMemberHome} from './member-home.js?v=20261126-push-reliable1';
+import {mountMemberHome} from './member-home.js?v=20261127-push-onboarding1';
 import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261125-regions1';
 import {readCategories,saveCategories,validCategories} from './categories.js?v=20261125-regions1';
 import {mountScheduleImport} from './schedule-import.js?v=20261125-regions1';
-import {scheduleChange,scheduleChangeBadge,duplicateSchedule,copyScheduleInvite,toRecord,formatDuration,rehearsalTitle,readRecords,mergeRecords,mergedRecords} from './record-transfer.js?v=20261126-push-reliable1';
+import {scheduleChange,scheduleChangeBadge,duplicateSchedule,copyScheduleInvite,toRecord,formatDuration,rehearsalTitle,readRecords,mergeRecords,mergedRecords} from './record-transfer.js?v=20261127-push-onboarding1';
 import {cloud,startCloud,mountAccount} from './cloud.js?v=20261127-push-onboarding1';
 import {statuses,rehearsalNames,validRehearsal,validAttendance,attendanceSummary,japanDate,rehearsalBadge,rehearsalDateTime} from './rehearsal-model.js?v=20261125-regions1';
 const $=id=>document.getElementById(id),esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -496,6 +496,6 @@ reservationsButton.textContent='予約書類を追加';reservationsButton.hidden
 document.querySelector('.workspace')?.append(reservationsButton);
 cloud.onState(state=>{reservationsButton.hidden=state.provider!=='apps-script'||!state.role});
 reservationsButton.onclick=async()=>{
- const {openReservationDocuments}=await import('./reservation-documents.js?v=20261126-push-reliable1');
+ const {openReservationDocuments}=await import('./reservation-documents.js?v=20261127-push-onboarding1');
  if(cloud.state.role)openReservationDocuments();
 };

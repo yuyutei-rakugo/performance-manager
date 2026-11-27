@@ -1,11 +1,11 @@
 import {performanceCountdown} from './performance-countdown.js?v=20261126-cancel1';
-import {openFlyerVenues} from './flyer-venues.js?v=20261126-push-reliable1';
+import {openFlyerVenues} from './flyer-venues.js?v=20261127-push-onboarding1';
 import {startEditor,finishEditor,leaveEditor,guardEditor,editorState,saveRecovery,recoveryScope,recoveredEditState} from './editor-dialog.js?v=20261125-regions1';
 import {performerPicker,updatePerformerPickers,readPerformer,showPerformerRoster} from './performer-picker.js?v=20261125-regions1';
 import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261125-regions1';
 import {readCategories,saveCategories,validCategories,categoryOptions,mountCategories,mountCategoryAdder} from './categories.js?v=20261125-regions1';
 import {mountScheduleImport} from './schedule-import.js?v=20261125-regions1';
-import {scheduleChange,scheduleChangeBadge,preparationTemplates,draftTask,duplicateSchedule,copyScheduleInvite,validPerformer,timeline,formatDuration,toRecord,transferRecord,readRecords,mergeRecords,mergedRecords} from './record-transfer.js?v=20261126-push-reliable1';
+import {scheduleChange,scheduleChangeBadge,preparationTemplates,draftTask,duplicateSchedule,copyScheduleInvite,validPerformer,timeline,formatDuration,toRecord,transferRecord,readRecords,mergeRecords,mergedRecords} from './record-transfer.js?v=20261127-push-onboarding1';
 import {cloud,startCloud,mountAccount} from './cloud.js?v=20261127-push-onboarding1';
 'use strict';
 
@@ -491,6 +491,6 @@ reservationsButton.textContent='予約書類を追加';reservationsButton.hidden
 document.querySelector('.workspace')?.append(reservationsButton);
 cloud.onState(state=>{reservationsButton.hidden=state.provider!=='apps-script'||!state.role});
 reservationsButton.onclick=async()=>{
- const {openReservationDocuments}=await import('./reservation-documents.js?v=20261126-push-reliable1');
+ const {openReservationDocuments}=await import('./reservation-documents.js?v=20261127-push-onboarding1');
  if(cloud.state.role)openReservationDocuments();
 };
