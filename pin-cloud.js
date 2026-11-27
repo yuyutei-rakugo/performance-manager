@@ -187,12 +187,21 @@ export function createPinClient(endpoint,state,emit){
   const now=Date.now();
   for(const entry of streams.values())if(entry.subscribers.size)refreshIfStale(entry,now);
  }
+ let usageRequest,trackForeground=false;
+ function recordVisibleUsage(){
+  if(!trackForeground||!token||!state.user||document.hidden||usageRequest?.version===epoch)return;
+  const request={version:epoch};
+  usageRequest=request;
+  void call('usageRecord',{},true).catch(()=>{}).finally(()=>{
+   if(usageRequest===request)usageRequest=null;
+  });
+ }
  window.addEventListener('focus',refreshVisible);
- document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshVisible()});
+ document.addEventListener('visibilitychange',()=>{if(!document.hidden){refreshVisible();recordVisibleUsage()}});
  window.addEventListener('pageshow',event=>{
   if(!event.persisted||!token)return;
   if((readStorage(localStorage)||readStorage(sessionStorage))!==token)signOut();
-  else refreshVisible();
+  else {refreshVisible();recordVisibleUsage()}
  });
  async function deviceSubscription(){
   try{
@@ -225,17 +234,18 @@ export function createPinClient(endpoint,state,emit){
   return request;
  }
  return {
-  async start(){
+  async start({recordUsage=false}={}){
+   trackForeground=recordUsage;
    state.provider='apps-script';
    if(!token){identity(null);return}
    const member=cachedMember();
-   if(member){readViews();identity(member);return}
+   if(member){readViews();identity(member);if(recordUsage)recordVisibleUsage();return}
    try{
     const {member}=await call('session',{remember});
-    rememberMember(member);readViews();identity(member);
+    rememberMember(member);readViews();identity(member);if(recordUsage)recordVisibleUsage();
    }catch(error){if(!error.sessionInvalid)throw error}
   },
-  async login(name,pin,keep=true){const result=await call('login',{name,pin,remember:keep});clear();token=result.token;remember=keep;persist();rememberMember(result.member);identity(result.member);void reconcileDeviceSubscription(epoch)},
+  async login(name,pin,keep=true){const result=await call('login',{name,pin,remember:keep});clear();token=result.token;remember=keep;persist();rememberMember(result.member);identity(result.member);if(trackForeground)recordVisibleUsage();void reconcileDeviceSubscription(epoch)},
   push(action,data){return call(action,data,true)},
   async logout(){
    const unsubscribe=deviceSubscription().then(sub=>sub?.unsubscribe());

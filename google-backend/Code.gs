@@ -19,6 +19,8 @@ function doPost(event){
  case 'roster':data={members:db.members.filter(m=>m.active).map(m=>({name:m.name}))};break;
  case 'archivePast':admin_(member);data=archivePast_(db,req,member);if(data.count)writeDb_(db);break;
  case 'importLocal':admin_(member);data=importLocal_(db,req,member);if(db.flyers?.facilities)seedFlyerFacilities_(db.flyers,db.shared.events.items);writeDb_(db);break;
+ case 'usageRecord':data=trackUsage_(member);break;
+ case 'usageReport':admin_(member);data=usageReport_(db);break;
  case 'pushReport':admin_(member);data=pushReport_(db);break;
  case 'pushOpened':case 'pushConfig':case 'pushStatus':case 'pushEnable':case 'pushDisable':case 'pushTest':{
   const session=digest_(req.token);
