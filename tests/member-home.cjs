@@ -25,8 +25,10 @@ async function boot(configured=false,page="rehearsals.html",deferAttendance=fals
  assert.match(slow.q('.quick-attendance strong').textContent,/取得できませんでした/);
  assert(!slow.q('[data-quick-status=出席]').disabled);
  const button=slow.q('[data-quick-status=出席]');
+ const plan=slow.q('[data-next-plan] h3');
  slow.answer([]);
  assert.equal(slow.q('[data-quick-status=出席]'),button);
+ assert.equal(slow.q('[data-next-plan] h3'),plan,'attendance refresh preserves the schedule DOM');
  assert.equal(slow.q('.quick-attendance strong').textContent,'未登録');
  assert(!slow.q('[data-quick-status=出席]').disabled);
  slow.w.close();

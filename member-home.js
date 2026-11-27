@@ -4,24 +4,20 @@ import {scheduleChangeBadge,rehearsalTitle} from './record-transfer.js?v=2026112
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const label=s=>s==='未回答'||!s?'未登録':s;
 export function mountMemberHome(){
- const practicePage=location.pathname.endsWith('/rehearsals.html');
- if(!practicePage)return;
- const resource='rehearsals';
+ if(!location.pathname.endsWith('/rehearsals.html'))return;
  const panel=document.createElement('section');panel.className='member-home';panel.setAttribute('aria-label','次回の予定と自分の出欠');
  const tabs=document.querySelector('main .tabs');if(!tabs)return;tabs.after(panel);
- let events=[],practices=[],answers={},names=[],stops=[],stopAnswer,watching='',answerState='loading',response={},error='',generation=0,loadedEvents=false,loadedPractices=false,scheduleError=false;
- function local(){try{const e=JSON.parse(localStorage.getItem('yuitei.events.v1')||'[]'),p=JSON.parse(localStorage.getItem('yuitei.rehearsals.v1')||'{"items":[],"attendance":{}}');if(!Array.isArray(e)||!Array.isArray(p.items)||!p.items.every(validRehearsal)||!p.attendance||!Object.values(p.attendance).every(validAttendance))throw Error();events=e;practices=p.items;answers=p.attendance;error=''}catch{error='端末の予定を読み込めません。データ管理から保存済みの内容を確認してください。'}render()}
+ let practices=[],answers={},names=[],stopSchedule,stopAnswer,watching='',answerState='loading',response={},error='',generation=0,loadedPractices=false,scheduleError=false;
+ function local(){try{const e=JSON.parse(localStorage.getItem('yuitei.events.v1')||'[]'),p=JSON.parse(localStorage.getItem('yuitei.rehearsals.v1')||'{"items":[],"attendance":{}}');if(!Array.isArray(e)||!Array.isArray(p.items)||!p.items.every(validRehearsal)||!p.attendance||!Object.values(p.attendance).every(validAttendance))throw Error();practices=p.items;answers=p.attendance;error=''}catch{error='端末の予定を読み込めません。データ管理から保存済みの内容を確認してください。'}render()}
  function person(){return cloud.state.configured?cloud.state.stageName:localStorage.getItem('yuitei.attendance.person')||''}
- function next(rows){return rows.filter(r=>!r.archivedAt&&r.date&&new Date(r.date+'T'+(r.time||'23:59')).getTime()>=Date.now()).sort((a,b)=>(a.date+(a.time||'23:59')).localeCompare(b.date+(b.time||'23:59')))[0]}
- function plan(r,type){
-  if(type==='practice')return `${scheduleChangeBadge(r,esc)}<h3>${rehearsalBadge(r,rehearsalTitle(r),esc)}</h3><p>${rehearsalDateTime(r,esc)}<br>会場：${esc(r.venue)}</p>`;
-  return `${scheduleChangeBadge(r,esc)}<h3>${esc(r.title)}</h3><p>${esc(r.date)} ${esc(r.time||'時間未定')}<br>会場：${esc(r.venue)}</p>`;
+ function plan(r){
+  return `${scheduleChangeBadge(r,esc)}<h3>${rehearsalBadge(r,rehearsalTitle(r),esc)}</h3><p>${rehearsalDateTime(r,esc)}<br>会場：${esc(r.venue)}</p>`;
  }
- let renderedKey='',featuredId;
+ let renderedKey='',renderedPlan,featuredId;
  function render(){
   const shared=cloud.state.configured,authorized=!shared||!!cloud.state.role;
   const today=japanDate();
-  const p=practicePage&&authorized?featuredRehearsal(practices,today):null,e=practicePage?null:next(events),first=p||e,self=person();
+  const p=authorized?featuredRehearsal(practices,today):null,self=person();
   watchAnswer(shared&&authorized?p?.id:'');
   if(response.id!==p?.id||response.person!==self)response={id:p?.id,person:self};
   const activeResponse=response;
@@ -32,18 +28,20 @@ export function mountMemberHome(){
   const key=JSON.stringify([p?.id,self,shared,shared?null:names]);
   // Keep the actual buttons connected while polling updates the displayed answer.
   if(key!==renderedKey){
-   renderedKey=key;
-   panel.innerHTML=`<h2>${practicePage?'次回の稽古':'次回の公演'}</h2><div data-next-plan></div>${p?`<div class="quick-attendance">${!shared?`<label>自分の名前<select id="quick-person"><option value="">選んでください</option>${names.map(n=>`<option value="${esc(n)}" ${n===self?'selected':''}>${esc(n)}</option>`).join('')}</select></label><p class="muted">名前をこのブラウザに覚えます。共有端末では自分の名前に切り替えてください。現在は端末内保存で、本人認証・端末間の同期は未接続です。</p>`:''}<p>自分の回答${self?'（'+esc(self)+'）':''}：<strong></strong></p><p class="sync-warning" hidden>出欠を更新できませんでした。</p><div class="rsvp-buttons">${['出席','欠席','未定'].map(s=>`<button type="button" class="secondary" data-quick-status="${s}">${s}</button>`).join('')}</div><a data-open-rehearsal="${esc(p.id)}" href="rehearsals.html?v=20261125-regions1&detail=${encodeURIComponent(p.id)}">詳細を見る</a></div>`:''}<p class="save-feedback" role="status"></p>`;
+   renderedKey=key;renderedPlan=undefined;
+   panel.innerHTML=`<h2>次回の稽古</h2><div data-next-plan></div>${p?`<div class="quick-attendance">${!shared?`<label>自分の名前<select id="quick-person"><option value="">選んでください</option>${names.map(n=>`<option value="${esc(n)}" ${n===self?'selected':''}>${esc(n)}</option>`).join('')}</select></label><p class="muted">名前をこのブラウザに覚えます。共有端末では自分の名前に切り替えてください。現在は端末内保存で、本人認証・端末間の同期は未接続です。</p>`:''}<p>自分の回答${self?'（'+esc(self)+'）':''}：<strong></strong></p><p class="sync-warning" hidden>出欠を更新できませんでした。</p><div class="rsvp-buttons">${['出席','欠席','未定'].map(s=>`<button type="button" class="secondary" data-quick-status="${s}">${s}</button>`).join('')}</div><a data-open-rehearsal="${esc(p.id)}" href="rehearsals.html?v=20261125-regions1&detail=${encodeURIComponent(p.id)}">詳細を見る</a></div>`:''}<p class="save-feedback" role="status"></p>`;
   }
-  if(practicePage&&featuredId!==p?.id){
+  if(featuredId!==p?.id){
    featuredId=p?.id;
    window.dispatchEvent(new CustomEvent('featured-rehearsal-change',{detail:{id:featuredId}}));
   }
-  panel.querySelector('h2').textContent=practicePage?(p?.date===today?'今日の稽古':'次回の稽古'):'次回の公演';
-  panel.querySelector('[data-next-plan]').innerHTML=!authorized?
-   `<p>会員ログインすると、${practicePage?'稽古の予定と自分の出欠':'公演の予定'}を確認できます。</p>`:
-   first?plan(first,first===p?'practice':'event'):
-   shared&&!(practicePage?loadedPractices:loadedEvents)?'<p>予定を読み込み中…</p>':'<p>これからの予定はありません。</p>';
+  panel.querySelector('h2').textContent=p?.date===today?'今日の稽古':'次回の稽古';
+  const markup=!authorized?'<p>会員ログインすると、稽古の予定と自分の出欠を確認できます。</p>':
+   p?plan(p):shared&&!loadedPractices?'<p>予定を読み込み中…</p>':'<p>これからの予定はありません。</p>';
+  if(markup!==renderedPlan){
+   panel.querySelector('[data-next-plan]').innerHTML=markup;
+   renderedPlan=markup;
+  }
   const quick=panel.querySelector('.quick-attendance');
   if(quick){
    quick.querySelector('strong').textContent=current;
@@ -55,7 +53,7 @@ export function mountMemberHome(){
   }
   panel.querySelector('.save-feedback').textContent=save?.message||(activeResponse.message||error);
   const detail=panel.querySelector('[data-open-rehearsal]');
-  if(detail)detail.onclick=event=>{if(practicePage){event.preventDefault();window.dispatchEvent(new CustomEvent('rehearsal-detail',{detail:{id:p.id}}))}};
+  if(detail)detail.onclick=event=>{event.preventDefault();window.dispatchEvent(new CustomEvent('rehearsal-detail',{detail:{id:p.id}}))};
   const picker=panel.querySelector('#quick-person');
   if(picker)picker.onchange=event=>{try{localStorage.setItem('yuitei.attendance.person',event.target.value);window.dispatchEvent(new Event('member-person-changed'));render()}catch{error='名前を記憶できませんでした。ブラウザの保存設定を確認してください。';render()}};
   for(const b of panel.querySelectorAll('[data-quick-status]'))b.onclick=async()=>{
@@ -84,12 +82,11 @@ export function mountMemberHome(){
  cloud.onState(async s=>{
   if(s.ready===false)return;
   const version=++generation;
-  stops.forEach(stop=>stop());stops=[];stopAnswer?.();stopAnswer=null;
-  watching='';answerState='loading';events=[];practices=[];answers={};names=[];
-  loadedEvents=false;loadedPractices=false;response={};error='';scheduleError=false;
+  stopSchedule?.();stopSchedule=null;stopAnswer?.();stopAnswer=null;
+  watching='';answerState='loading';practices=[];answers={};names=[];
+  loadedPractices=false;response={};error='';scheduleError=false;
   if(!s.configured){
    local();
-   if(!practicePage)return;
    try{
     const response=await fetch('./history-data.json');const data=await response.json();
     if(version!==generation)return;
@@ -100,14 +97,13 @@ export function mountMemberHome(){
   if(s.stageName)names=[s.stageName];
   render();
   if(!s.role)return;
-  stops.push(cloud.watch(resource,doc=>{
+  stopSchedule=cloud.watch('rehearsals',doc=>{
    if(version!==generation)return;
    if(doc&&!Array.isArray(doc.items)){error='予定の形式を確認してください。';render();return}
    if(scheduleError)error='';scheduleError=false;
-   if(resource==='events'){events=doc?.items||[];loadedEvents=true}
-   else{practices=doc?.items||[];loadedPractices=true}
+   practices=doc?.items||[];loadedPractices=true;
    render();
-  },message=>{scheduleError=true;error=loadedEvents||loadedPractices?'更新できませんでした。前回取得した予定を表示しています。':message;render()}));
+  },message=>{scheduleError=true;error=loadedPractices?'更新できませんでした。前回取得した予定を表示しています。':message;render()});
  });
  {
   let midnightTimer;
