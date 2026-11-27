@@ -42,6 +42,7 @@ async function main(){
     const req=JSON.parse(r.request().postData()),{action}=req;
     const json=body=>r.fulfill({headers:{'access-control-allow-origin':'*'},json:body});
     switch(action){
+    case 'usageRecord':return json({ok:true});
     case 'session':return json({ok:true,member:{id:name,name,role:admin?'admin':name===names[0]?'editor':'viewer',...(admin?{attendanceProxy:true}:{})}});
     case 'read':
      if(readbackPending){readbackPending=false;return json({ok:false,error:'模擬読み戻し失敗'})}

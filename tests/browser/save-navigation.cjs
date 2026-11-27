@@ -40,6 +40,7 @@ async function main(){
         const answer=body=>route.fulfill({headers:{'access-control-allow-origin':'*'},json:body});
         const ok=payload=>answer({ok:true,...payload});
         switch(request.action){
+          case 'usageRecord':return ok({});
           case 'session':return ok({member:{id:role,name:'試験会員',role,active:true}});
           case 'read':
             if(request.name==='history'&&delayedHistory)await delayedHistory;
