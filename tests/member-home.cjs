@@ -4,7 +4,7 @@ const clean=file=>fs.readFileSync(file,'utf8').replace(/^import .*;\n/gm,'').rep
 const practice={id:'next-practice',title:'通常稽古',date:'2099-01-02',time:'14:00',venue:'和室',notes:''};
 async function boot(configured=false,page="rehearsals.html",deferAttendance=false){
  const w=new JSDOM('<main><nav class="tabs"></nav></main>',{url:'https://example.test/'+page,runScripts:'outside-only'}).window;w.structuredClone=structuredClone;
- w.fetch=async()=>({json:async()=>({names:['勇水','日光','藤本']})});w.localStorage.setItem('yuitei.attendance.person','勇水');
+ w.fetch=async()=>({json:async()=>({names:['勇水','日光','藤本'],localRoster:['勇水','日光']})});w.localStorage.setItem('yuitei.attendance.person','勇水');
  w.localStorage.setItem('yuitei.events.v1',JSON.stringify([{id:'earlier-event',date:'2099-01-01',time:'12:00',title:'新春寄席',venue:'大広間'},{id:'past',date:'2000-01-01',title:'終了公演'}]));
  w.localStorage.setItem('yuitei.rehearsals.v1',JSON.stringify({items:[practice,{...practice,id:'archived',date:'2098-01-01',archivedAt:'yes'}],attendance:{[practice.id]:{'日光':'欠席'}}}));
  let listener,fail=false,writes=[],watchers={},answer,answerError;

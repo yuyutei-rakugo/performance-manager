@@ -5,7 +5,7 @@ import {performerPicker,updatePerformerPickers,readPerformer,showPerformerRoster
 import {applyConfirmedSchedule} from './schedule-bootstrap.js?v=20261125-regions1';
 import {readCategories,saveCategories,validCategories,categoryOptions,mountCategories,mountCategoryAdder} from './categories.js?v=20261125-regions1';
 import {mountScheduleImport} from './schedule-import.js?v=20261125-regions1';
-import {loadLegacyRoster,scheduleChange,scheduleChangeBadge,preparationTemplates,draftTask,duplicateSchedule,copyScheduleInvite,validPerformer,timeline,formatDuration,toRecord,transferRecord,readRecords,mergeRecords,mergedRecords} from './record-transfer.js?v=20261127-roster2';
+import {loadLegacyRoster,scheduleChange,scheduleChangeBadge,preparationTemplates,draftTask,duplicateSchedule,copyScheduleInvite,validPerformer,timeline,formatDuration,toRecord,transferRecord,readRecords,mergeRecords,mergedRecords} from './record-transfer.js?v=20261127-roster3';
 import {cloud,startCloud,mountAccount} from './cloud.js?v=20261127-read-refresh1';
 'use strict';
 
@@ -20,7 +20,7 @@ const today = () => localDate(new Date());
 const dateLabel = value => new Intl.DateTimeFormat('ja-JP', {year:'numeric',month:'long',day:'numeric',weekday:'short'}).format(new Date(value + 'T00:00:00'));
 const newTasks = () => tasks.map(draftTask);
 let cloudLoadError='';
-let memberNames=['勇水','小薔薇','懐古','華詩','世喜音','やすゑ','一悟','日光'],cloudRevision=0,cloudLoaded=false,stopCloud,cloudIdentity='',saving=false;
+let memberNames=[],cloudRevision=0,cloudLoaded=false,stopCloud,cloudIdentity='',saving=false;
 
 const editable=()=>!cloud.state.configured||(['admin','editor'].includes(cloud.state.role)&&cloudLoaded);
 function assigneePicker(item,i){const choices=cloud.state.configured&&cloud.state.provider==='apps-script'?performerNames:memberNames;return `<fieldset class="assignee-picker"><legend>担当者（任意・複数選択可）</legend>${[...new Set([...choices,...(item.assignees||[])])].map(n=>`<label><input type="checkbox" data-owner="${i}" value="${esc(n)}" ${(item.assignees||[]).includes(n)?'checked':''}>${esc(n)}</label>`).join('')}</fieldset>`}

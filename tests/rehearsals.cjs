@@ -5,7 +5,7 @@ const html=fs.readFileSync(path.join(root,'rehearsals.html'),'utf8'),source=fs.r
 const tick=()=>new Promise(r=>setImmediate(r));
 async function boot(stored,cloudState={configured:false},pageUrl='http://localhost/rehearsals.html'){
  const dom=new JSDOM(html,{url:pageUrl,runScripts:'outside-only'}),w=dom.window;let stateListener,watch,watchAttendance,watchAttendanceError;let confirm=true,blobData,saveError=false,respond=[];
- w.structuredClone=structuredClone;w.setTimeout=()=>0;w.fetch=async()=>({json:async()=>({names:['勇水','日光','一悟','藤本']})});w.confirm=()=>confirm;
+ w.structuredClone=structuredClone;w.setTimeout=()=>0;w.fetch=async()=>({json:async()=>({names:['勇水','日光','一悟','藤本'],localRoster:['勇水','日光','一悟']})});w.confirm=()=>confirm;
  w.HTMLDialogElement.prototype.showModal=function(){this.open=true};w.HTMLDialogElement.prototype.close=function(){const open=this.open;this.open=false;if(open)this.onclose?.()};
  w.HTMLAnchorElement.prototype.click=function(){};w.URL.createObjectURL=b=>{blobData=b;return 'blob:test'};w.URL.revokeObjectURL=()=>{};
  const cloud={state:cloudState,onState(fn){stateListener=fn;fn(this.state)},watch(name,fn){watch=fn;return()=>{}},watchAttendance(id,fn,onError){watchAttendance=fn;watchAttendanceError=onError;return()=>{}},async save(){if(saveError)throw Error('conflict')},async respondAttendance(id,status){respond.push({id,status});if(saveError)throw Error('通信失敗')}};

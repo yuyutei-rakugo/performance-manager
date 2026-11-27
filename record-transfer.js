@@ -3,13 +3,14 @@ let legacyRoster;
 export function loadLegacyRoster({force=false}={}){
  if(force)legacyRoster=null;
  if(!legacyRoster){
-  const request=fetch('./history-data.json').then(response=>{
+  const request=fetch('./history-data.json?v=20261127-roster3').then(response=>{
    if(response.ok===false)throw Error('会員名を読み込めません。');
    return response.json();
   }).then(data=>{
-   if(!Array.isArray(data.names)||!data.names.every(name=>typeof name==='string'))
+   const names=data.localRoster??data.names;
+   if(!Array.isArray(names)||!names.every(name=>typeof name==='string'))
     throw Error('会員名の形式を確認してください。');
-   return data.names.filter(name=>name!=='藤本');
+   return names;
   }).catch(error=>{
    if(legacyRoster===request)legacyRoster=null;
    throw error;

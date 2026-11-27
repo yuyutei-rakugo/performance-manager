@@ -1,6 +1,6 @@
 import {cloud} from './cloud.js?v=20261127-read-refresh1';
 import {validRehearsal,validAttendance,japanDate,untilJapanMidnight,featuredRehearsal,rehearsalBadge,rehearsalDateTime} from './rehearsal-model.js?v=20261125-regions1';
-import {scheduleChangeBadge,rehearsalTitle,loadLegacyRoster} from './record-transfer.js?v=20261127-roster2';
+import {scheduleChangeBadge,rehearsalTitle,loadLegacyRoster} from './record-transfer.js?v=20261127-roster3';
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const label=s=>s==='未回答'||!s?'未登録':s;
 export function mountMemberHome(){
