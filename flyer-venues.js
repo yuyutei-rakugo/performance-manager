@@ -1,7 +1,7 @@
 import {previewFlyerMigration} from './flyer-migration.js?v=20261125-regions1';
 import {flyerLocation,flyerLocationInfo,confirmedGoogleShare,googleSharePreview,exactAddressPosition,normalizeLocationAddress,flyerLinkConflicts} from './flyer-locations.js?v=20261126-pin1';
 import {startEditor,finishEditor,leaveEditor,guardEditor,editorState} from './editor-dialog.js?v=20261125-regions1';
-import {cloud} from './cloud.js?v=20261127-push-open2';
+import {cloud} from './cloud.js?v=20261127-read-refresh1';
 
 const statuses=['未依頼','依頼済み','掲示済み','今回は見送り'];
 const searchName=value=>String(value||'').normalize('NFKC').toLowerCase().replace(/[ァ-ヶ]/g,ch=>String.fromCharCode(ch.charCodeAt(0)-0x60)).replace(/[\s・･〜～ー‐－-]/g,'');

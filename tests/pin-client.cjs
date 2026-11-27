@@ -53,6 +53,10 @@ function respond(action,data){const i=requests.findIndex(r=>r.body.action===acti
  stopAttendance();stopDuplicate();
  const failure=client.respondAttendance('p1','欠席');const r=requests.find(r=>r.body.action==='attendanceSave');requests.splice(requests.indexOf(r),1);r.resolve({ok:false,error:'通信失敗'});await assert.rejects(failure,/通信失敗/);assert.equal(rows.at(-1)[0].status,'出席','failed write must not publish selected answer');
  const docSave=client.save('rehearsals',{items:[{id:'updated'}]},1);respond('save',{revision:2});assert.equal(await docSave,2);assert.equal(c.at(-1).revision,2);assert.equal(c.at(-1).items[0].id,'updated');
+ const afterSave=calls.length;
+ timers[1]();
+ assert.equal(calls.length,afterSave,'recently confirmed saves avoid the next redundant schedule poll');
+ now+=61000;
  const delayed=client.save('rehearsals',{items:[{id:'superseded'}]},2);
  timers[1]();respond('read',{doc:{items:[{id:'newer'}],revision:4}});await tick();
  respond('save',{revision:3});assert.equal(await delayed,3);
@@ -63,7 +67,7 @@ function respond(action,data){const i=requests.findIndex(r=>r.body.action===acti
  respond('read',{doc:{items:[{id:'conflict-current'}],revision:5}});await tick();
  assert.equal(c.at(-1).items[0].id,'conflict-current');
  const retry=client.start();respond('session',{ok:false,error:'一時接続エラー'});await assert.rejects(retry,/一時接続エラー/);assert.equal(persistent.get('yuitei.session'),'test-session','temporary failures preserve session');
- let oldDelivered=0;timers[1]();client.watch('rehearsals',()=>oldDelivered++);await tick();const logout=client.logout();assert.equal(state.user,null,'logout clears UI without waiting for network');respond('logout',{});await logout;const count=oldDelivered;respond('read',{doc:{items:[{id:'old-user'}],revision:3}});await tick();assert.equal(oldDelivered,count,'pending response cannot escape logout');assert.equal(storage.has('yuitei.session'),false);
+ let oldDelivered=0;now+=61000;timers[1]();client.watch('rehearsals',()=>oldDelivered++);await tick();const logout=client.logout();assert.equal(state.user,null,'logout clears UI without waiting for network');respond('logout',{});await logout;const count=oldDelivered;respond('read',{doc:{items:[{id:'old-user'}],revision:3}});await tick();assert.equal(oldDelivered,count,'pending response cannot escape logout');assert.equal(storage.has('yuitei.session'),false);
  assert.equal(persistent.has('yuitei.session'),false);
  const login=client.login('勇水','2468');respond('login',{token:'kept',member:{id:'owner',name:'勇水',role:'admin'}});await login;assert.equal(persistent.get('yuitei.session'),'kept');assert(!JSON.stringify([...persistent,...storage]).includes('2468'));
  const restart=n=>vm.runInContext('this.'+n+'=createPinClient("https://example.test",this.state,()=>{});this.'+n,sandbox);

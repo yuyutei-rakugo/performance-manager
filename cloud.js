@@ -91,7 +91,7 @@ export async function startCloud(){
   state.configured=true;state.provider=config.provider||'firebase';state.message='ログイン状態を確認しています。';emit();
   if(config.provider==='apps-script'){if(!/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec$/.test(config.endpoint||'')){
    state.connectionIssue='configuration';state.ready=true;state.message='共通保存の接続先設定を確認してください。';emit();return
-  }const {createPinClient}=await import('./pin-cloud.js?v=20261126-push-reliable1');pinClient=createPinClient(config.endpoint,state,emit);await pinClient.start();return}
+  }const {createPinClient}=await import('./pin-cloud.js?v=20261127-read-refresh1');pinClient=createPinClient(config.endpoint,state,emit);await pinClient.start();return}
   const base='https://www.gstatic.com/firebasejs/12.6.0/';
   const [app,authApi,store]=await Promise.all([import(base+'firebase-app.js'),import(base+'firebase-auth.js'),import(base+'firebase-firestore.js')]);
   api={...authApi,...store};const firebase=app.initializeApp(config.firebase);auth=api.getAuth(firebase);db=api.getFirestore(firebase);
@@ -152,7 +152,7 @@ export function mountAccount(){
  settings.onclick=()=>{
   menu.showModal();
   if(cloud.state.provider==='apps-script'&&cloud.state.role){
-   (loadPush??=import('./push-settings.js?v=20261127-push-open2').then(mod=>mod.mountPushSettings(menu,cloud)).catch(()=>{loadPush=null})).then(open=>open?.());
+   (loadPush??=import('./push-settings.js?v=20261127-read-refresh1').then(mod=>mod.mountPushSettings(menu,cloud)).catch(()=>{loadPush=null})).then(open=>open?.());
   }
  };
  menu.querySelector('[data-install]').onclick=()=>menu.close();
