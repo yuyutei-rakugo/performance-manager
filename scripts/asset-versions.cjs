@@ -64,10 +64,7 @@ function readProject() {
 function main([command, version, ...files]) {
   const {filenames, sources} = readProject();
   if (command === 'check' && !version) {
-    const problems = check(sources, filenames);
-    if (!problems.length) return;
-    console.error(problems.join('\n'));
-    process.exitCode = 1;
+    reportProblems(sources, filenames);
     return;
   }
   if (command !== 'update' || !version || !/^[\w-]+$/.test(version) ||
@@ -85,6 +82,15 @@ function main([command, version, ...files]) {
     const updated = update(source, filenames, targets, version);
     if (updated !== source) fs.writeFileSync(path.join(root, name), updated);
   }
+  const updated = readProject();
+  reportProblems(updated.sources, updated.filenames);
+}
+
+function reportProblems(sources, filenames) {
+  const problems = check(sources, filenames);
+  if (!problems.length) return;
+  console.error(problems.join('\n'));
+  process.exitCode = 1;
 }
 
 module.exports = {check, update, readProject};

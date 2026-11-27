@@ -7,7 +7,7 @@ export function createPinClient(endpoint,state,emit){
 
  const readStorage=store=>{try{return store.getItem(sessionKey)||''}catch{return ''}};
  const removeStorage=store=>{try{store.removeItem(sessionKey)}catch{}};
- let token=readStorage(localStorage)||readStorage(sessionStorage),remember=!!readStorage(localStorage),epoch=0,rosterRequest=null;
+ let token=readStorage(localStorage)||readStorage(sessionStorage),remember=!!readStorage(localStorage),epoch=0,rosterVersion=0,rosterRequest=null;
  function forget(){removeStorage(localStorage);removeStorage(sessionStorage);try{sessionStorage.removeItem(sessionKey+'.temporary')}catch{}}
  function persist(){forget();try{(remember?localStorage:sessionStorage).setItem(sessionKey,token);if(!remember)sessionStorage.setItem(sessionKey+'.temporary','yes')}catch{try{sessionStorage.setItem(sessionKey,token)}catch{}}}
  // Upgrade a still-valid tab session without retaining the PIN.
@@ -208,6 +208,22 @@ export function createPinClient(endpoint,state,emit){
    if(status.differentMember&&version===epoch)await sub.unsubscribe();
   }catch{} // A missing notification API must not block sign-in.
  }
+ async function roster({force=false}={}){
+  const key=streamKey('roster',{});
+  const cached=views.get(key);
+  if(!force&&cached&&Date.now()-cached.time<freshFor)return structuredClone(cached.value);
+  if(rosterRequest)return rosterRequest;
+  if(force){views.delete(key);flushViews()}
+  const version=epoch, generation=rosterVersion;
+  const request=call('roster',{},true).then(result=>{
+   if(version!==epoch)throw Error('ログイン状態が変わりました。');
+   if(generation!==rosterVersion)return roster();
+   saveView(key,result.members);
+   return structuredClone(result.members);
+  }).finally(()=>{if(rosterRequest===request)rosterRequest=null});
+  rosterRequest=request;
+  return request;
+ }
  return {
   async start(){
    state.provider='apps-script';
@@ -248,22 +264,10 @@ export function createPinClient(endpoint,state,emit){
   },
   async respondAttendance(id,status){await writeAttendance(id,'attendanceSave',{status})},
   proxyAttendance(id,name,status){return writeAttendance(id,'attendanceProxy',{name,status})},
-  async roster({force=false}={}){
-   const key=streamKey('roster',{});
-   const cached=views.get(key);
-   if(!force&&cached&&Date.now()-cached.time<freshFor)return structuredClone(cached.value);
-   if(rosterRequest)return rosterRequest;
-   if(force){views.delete(key);flushViews()}
-   const version=epoch;
-   rosterRequest=call('roster').then(result=>{
-    if(version===epoch)saveView(key,result.members)
-    return structuredClone(result.members);
-   }).finally(()=>{if(version===epoch)rosterRequest=null});
-   return rosterRequest;
-  },
+  roster,
   async archivePast(data){const version=epoch,result=await call('archivePast',data);if(version===epoch){if(result.rehearsals)confirmed('read',{name:'rehearsals'},result.rehearsals);refresh('read')}return result},
   async importLocal(data){const result=await call('importLocal',data);refresh();return result},
-  async members(){return (await call('members')).members},async memberSave(member){const result=await call('memberSave',{member});views.delete(streamKey('roster',{}));flushViews();return result.member},
+  async members(){return (await call('members')).members},async memberSave(member){const result=await call('memberSave',{member});rosterVersion++;rosterRequest=null;views.delete(streamKey('roster',{}));flushViews();return result.member},
   async changePin(pin){await call('changePin',{pin});signOut()}
  };
 }

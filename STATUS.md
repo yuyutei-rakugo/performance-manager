@@ -66,5 +66,5 @@ GitHub 側は対象コミットを revert し、Apps Script 側は同じデプ�
 バージョン指定のない Service Worker の登録URLは一括更新の対象外です。
 
 `node scripts/asset-versions.cjs check` で同一ファイルへの参照の不一致や
-混在するバージョン未指定を検出できます。同じ検査は自動テストでも実行します。
+混在するバージョン未指定を検出できます。一括更新の直後も同じ検査を実行し、不一致があれば異常終了します。自動テストでも検査します。
 対象はルートにある HTML・JavaScript・CSS・manifest 内のリテラル参照です。

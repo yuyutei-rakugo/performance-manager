@@ -25,6 +25,17 @@ function respond(action,data){const i=requests.findIndex(r=>r.body.action===acti
  respond('roster',{members:[{name:'勇水'},{name:'新規会員'}]});
  assert.equal((await forcedA).length,2);assert.equal((await forcedB).length,2);
  assert.equal((await client.roster()).length,2);
+ const outdated=client.roster({force:true});
+ const editing=client.memberSave({id:'member',name:'更新済み会員'});
+ respond('memberSave',{member:{id:'member',name:'更新済み会員'}});await editing;
+ const current=client.roster();
+ const newest=requests.findLast(r=>r.body.action==='roster');
+ requests.splice(requests.indexOf(newest),1);
+ newest.resolve({ok:true,members:[{name:'更新済み会員'}]});
+ assert.equal((await current)[0].name,'更新済み会員');
+ respond('roster',{members:[{name:'編集前の会員'}]});
+ assert.equal((await outdated)[0].name,'更新済み会員');
+ assert.equal((await client.roster())[0].name,'更新済み会員');
  let rows=[],attendanceErrors=[];
  const stopAttendance=client.watchAttendance('p1',value=>rows.push(value),error=>attendanceErrors.push(error));
  const stopDuplicate=client.watchAttendance('p1',()=>{});
