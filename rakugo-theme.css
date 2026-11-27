@@ -197,7 +197,6 @@ output[data-end-time]{font-size:1.1rem;font-weight:800;color:var(--red)}
 .flyer-confirmation h3{font-size:1.3rem;margin-block:12px}
 .flyer-confirmation>button{margin:8px 8px 8px 0}
 .flyer-editor [data-editor-status]{margin-block:6px}
-.flyer-editor [data-save-feedback][hidden]{display:none}
 .flyer-editor [hidden]{display:none!important}
 .flyer-save-footer{z-index:10;background:var(--paper,#fff)}
 
