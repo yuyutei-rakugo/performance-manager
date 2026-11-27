@@ -53,7 +53,7 @@ export function createPinClient(endpoint,state,emit){
     if(version!==epoch&&action!=='logout')throw Error('ログイン状態が変わりました。');
     if(!result.ok){
      const error=Error(result.error||'操作できませんでした。');
-     error.sessionInvalid=action!=='login'&&/会員ログインが必要|ログインの期限/.test(error.message);
+     error.sessionInvalid=action!=='login'&&action!=='usageRecord'&&/会員ログインが必要|ログインの期限/.test(error.message);
      if(version===epoch&&token&&error.sessionInvalid)signOut();
      throw error;
     }

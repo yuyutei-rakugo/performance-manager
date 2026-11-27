@@ -124,7 +124,10 @@ function respond(action,data){const i=requests.findIndex(r=>r.body.action===acti
  const usageCount=calls.filter(c=>c.action==='usageRecord').length;
  listeners.visibilitychange();
  assert.equal(calls.filter(c=>c.action==='usageRecord').length,usageCount,'pending calls coalesce');
- respond('usageRecord',{});await tick();
+ const normalSave=back.save('events',{items:[]},1);
+ respond('save',{revision:2});assert.equal(await normalSave,2);
+ respond('usageRecord',{ok:false,error:'ログインの期限が切れました。'});await tick();
+ assert.equal(state.user.uid,'back-member','an optional analytics failure must not sign out the member');
  sandbox.document.hidden=true;listeners.visibilitychange();
  assert.equal(calls.filter(c=>c.action==='usageRecord').length,usageCount);
  sandbox.document.hidden=false;listeners.visibilitychange();

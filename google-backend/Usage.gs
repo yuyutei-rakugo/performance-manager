@@ -45,13 +45,15 @@ function usageReport_(db, now=Date.now()) {
 // Run once daily using an Apps Script time-driven trigger.
 function pruneNotebookUsage() {
  const lock=LockService.getScriptLock();
- lock.waitLock(20000);
- try{
-  const props=PropertiesService.getScriptProperties(),now=Date.now();
-  for(const key of props.getKeys().filter(key=>key.startsWith(usagePrefix_))){
-   const raw=props.getProperty(key),row=usageRow_(raw,now),updated=JSON.stringify(row);
+ const props=PropertiesService.getScriptProperties(),now=Date.now();
+ for(const key of props.getKeys().filter(key=>key.startsWith(usagePrefix_))){
+  lock.waitLock(2000);
+  try{
+   const raw=props.getProperty(key);
+   if(!raw)continue;
+   const row=usageRow_(raw,now),updated=JSON.stringify(row);
    if(!row.last&&!Object.keys(row.days).length)props.deleteProperty(key);
    else if(raw!==updated)props.setProperty(key,updated);
-  }
- }finally{lock.releaseLock()}
+  }finally{lock.releaseLock()}
+ }
 }
