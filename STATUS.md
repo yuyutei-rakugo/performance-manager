@@ -55,3 +55,16 @@ GitHub 側は対象コミットを revert し、Apps Script 側は同じデプ�
 ## 旧構成
 
 現行の公開経路は GitHub Pages と Apps Script です。Firebase の設定、ルール、prepare-hosting.py は旧構成です。prepare-hosting.py の固定ファイル一覧に現行の通知・地図のモジュールが含まれないため、現行の公開には使いません。既存の依存先や旧環境からの参照を確認できないファイルは保持します。記録表の列名は history-data.json の names、端末内モードの名簿は localRoster、共通保存の名簿は Apps Script の有効会員一覧を使います。
+
+## 公開ファイルのバージョン
+
+ローカルの参照先を一括更新するには
+`node scripts/asset-versions.cjs update YYYYMMDD-label --all` を実行します。
+既にバージョン付きの全ファイルを対象にするため、依存するファイルを含めて
+新しいURLへ更新できます。対象が限定されるときは `--all` の位置に
+ファイル名を並べます。既存の詳細表示用パラメーターとフラグメントは保持します。
+バージョン指定のない Service Worker の登録URLは一括更新の対象外です。
+
+`node scripts/asset-versions.cjs check` で同一ファイルへの参照の不一致や
+混在するバージョン未指定を検出できます。同じ検査は自動テストでも実行します。
+対象はルートにある HTML・JavaScript・CSS・manifest 内のリテラル参照です。
