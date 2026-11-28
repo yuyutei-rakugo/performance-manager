@@ -19,6 +19,12 @@ const cloud={state:{role:'viewer',provider:'apps-script'},push:async action=>{ca
  assert(calls.indexOf('pushEnable')<calls.indexOf('pushTest'));
  assert.match(menu.querySelector('[role=status]').textContent,/通知を押して/);
  assert.equal(menu.querySelector('[data-push-test]').hidden,false);
+ context.navigator.userAgent='Mozilla/5.0 Android Line/15.1.0';
+ const before=calls.length;
+ await open();
+ assert.equal(calls.length,before);
+ assert.equal(menu.querySelector('[data-push-toggle]').hidden,true);
+ assert.match(menu.querySelector('[role=status]').textContent,/ブラウザで開く/);
  console.log('PASS permission, registration, automatic test order and member confirmation instructions');
 })().catch(e=>{console.error(e);process.exitCode=1});
 (async()=>{

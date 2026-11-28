@@ -6,6 +6,7 @@ export function mountPushSettings(menu, cloud) {
   let state, busy = false;
   const request = (action, fields) => cloud.push(action, fields);
   const supported = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+  const lineBrowser = () => /\bLine\//i.test(navigator.userAgent);
   const appleMobile = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
     navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
   const options = subscription => ({endpoint:subscription.endpoint, keys:subscription.toJSON().keys});
@@ -65,16 +66,31 @@ export function mountPushSettings(menu, cloud) {
   return async () => {
     section.hidden = true;
     if (!cloud.state.role || cloud.state.provider !== 'apps-script') return;
-    const config = await request('pushConfig').catch(() => null);
-    if (!config?.allowed || !menu.open) return;
-    state = config;
-    section.hidden = false;
-    if (appleMobile && !matchMedia('(display-mode: standalone)').matches && !navigator.standalone) {
-      toggle.disabled = true;
-      test.hidden = true;
-      status.textContent = 'iPhone・iPadはホーム画面に追加し、そのアイコンから帳面を開いてください。';
+    if (!menu.open) return;
+    const guidance = lineBrowser()
+      ? 'LINEのメニューから「ブラウザで開く」を選んでください。' +
+        (appleMobile ? ' Safariでホーム画面に追加し、そのアイコンから帳面を開いてください。' : ' 開いた画面で「通知を受け取る」を押してください。')
+      : appleMobile && !matchMedia('(display-mode: standalone)').matches && !navigator.standalone
+        ? 'Safariでホーム画面に追加し、そのアイコンから帳面を開いてください。'
+        : !supported() ? 'このブラウザでは通知を設定できません。Chromeなどで帳面を開いてください。' : '';
+    if (guidance) {
+      section.hidden = false;
+      toggle.hidden = test.hidden = true;
+      status.textContent = guidance;
+      section.scrollIntoView?.({block:'center'});
       return;
     }
+    const config = await request('pushConfig').catch(() => null);
+    if (!menu.open) return;
+    if (!config) {
+      section.hidden = false;
+      toggle.hidden = test.hidden = true;
+      status.textContent = '通知設定を読み込めませんでした。通信を確認し、設定を開き直してください。';
+      return;
+    }
+    if (!config.allowed) return;
+    state = config;
+    section.hidden = toggle.hidden = false;
     await manage('status');
     section.scrollIntoView?.({block:'center'});
   };
