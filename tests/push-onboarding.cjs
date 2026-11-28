@@ -44,3 +44,42 @@ const cloud={state:{role:'viewer',provider:'apps-script'},push:async action=>{ca
  assert(window.document.querySelector('.settings-dialog').open);
  console.log('PASS direct notification link prompts login and resumes settings after authentication');
 })().catch(e=>{console.error(e);process.exitCode=1});
+
+(async()=>{
+ const {window}=new JSDOM('<div class="header-actions"></div>',{url:'https://example.test/'});
+ window.HTMLDialogElement.prototype.showModal=function(){this.open=true};
+ const ctx=vm.createContext({window,document:window.document,location:window.location,navigator:{},
+   queueMicrotask,CustomEvent:window.CustomEvent});
+ vm.runInContext(fs.readFileSync('cloud.js','utf8').replace(/^import .*\n/,'').replace(/export /g,''),ctx);
+ const calls=[];
+ ctx.load=action=>new Promise(resolve=>calls.push({action,resolve}));
+ vm.runInContext('cloud.push=load;mountAccount();Object.assign(state,{ready:true,provider:"apps-script",role:"admin",user:{uid:"admin"}});emit()',ctx);
+ const d=window.document;
+ d.querySelector('#settings-open').click();
+ const report=d.querySelector('#push-report'),usage=d.querySelector('#usage-report');
+ const tick=()=>new Promise(r=>setTimeout(r,15));
+ const toggle=async(panel,open)=>{panel.open=open;await tick()};
+ assert.equal(calls.length,0);
+ assert.equal(report.querySelector('button'),null);
+ assert.equal(usage.querySelector('button'),null);
+ await toggle(report,true);
+ assert.equal(report.querySelector('[role=status]').textContent,'読み込み中…');
+ assert.deepEqual(calls.map(c=>c.action),['pushReport']);
+ await toggle(report,false);
+ await toggle(report,true);
+ calls[1].resolve({mode:'members',registered:2,limit:50});
+ await tick();
+ calls[0].resolve({mode:'members',registered:1,limit:50});
+ await tick();
+ assert.match(report.textContent,/登録端末 2／50台/);
+ await toggle(usage,true);
+ assert.equal(calls[2].action,'usageReport');
+ calls[2].resolve({used7:1,used30:1,total:2,rows:[]});
+ await tick();
+ assert.match(usage.textContent,/50％/);
+ vm.runInContext('state.role="viewer";emit()',ctx);
+ assert(report.hidden&&usage.hidden);
+ assert.equal(usage.querySelector('[role=status]').textContent,'');
+ window.close();
+ console.log('PASS administrator reports load on opening, refresh, and ignore stale responses');
+})().catch(e=>{console.error(e);process.exitCode=1});

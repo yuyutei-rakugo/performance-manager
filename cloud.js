@@ -1,4 +1,4 @@
-import {loadCloudConfig} from './schedule-bootstrap.js?v=20261128-line2';
+import {loadCloudConfig} from './schedule-bootstrap.js?v=20261128-reports1';
 // Configuration is enabled only after the Firebase project and access rules are ready.
 const listeners = new Set();
 const state = {ready:false, configured:false, connectionIssue:null, user:null, role:null,stageName:null, message:'共通保存は設定準備中です。現在はこの端末に保存します。'};
@@ -91,7 +91,7 @@ export async function startCloud(){
   state.configured=true;state.provider=config.provider||'firebase';state.message='ログイン状態を確認しています。';emit();
   if(config.provider==='apps-script'){if(!/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec$/.test(config.endpoint||'')){
    state.connectionIssue='configuration';state.ready=true;state.message='共通保存の接続先設定を確認してください。';emit();return
-  }const {createPinClient}=await import('./pin-cloud.js?v=20261128-line2');pinClient=createPinClient(config.endpoint,state,emit);await pinClient.start({recordUsage:true});return}
+  }const {createPinClient}=await import('./pin-cloud.js?v=20261128-reports1');pinClient=createPinClient(config.endpoint,state,emit);await pinClient.start({recordUsage:true});return}
   const base='https://www.gstatic.com/firebasejs/12.6.0/';
   const [app,authApi,store]=await Promise.all([import(base+'firebase-app.js'),import(base+'firebase-auth.js'),import(base+'firebase-firestore.js')]);
   api={...authApi,...store};const firebase=app.initializeApp(config.firebase);auth=api.getAuth(firebase);db=api.getFirestore(firebase);
@@ -119,12 +119,12 @@ export function mountAccount(){
  <div class="settings-actions">
   <button type="button" class="secondary" data-install>ホーム画面に追加</button>
   <button type="button" class="secondary" data-share>LINEで共有</button>
-  <a class="secondary" id="settings-admin" href="./admin.html?v=20261128-line2" hidden>管理者ページ</a>
+  <a class="secondary" id="settings-admin" href="./admin.html?v=20261128-reports1" hidden>管理者ページ</a>
   <button type="button" class="secondary" id="cloud-logout" hidden>ログアウト</button>
  </div>
  <section data-push-settings hidden><h3>公演の通知を受け取る</h3><p>下のボタンを押し、確認画面で「許可」を選んでください。登録後にテスト通知を送ります。通知を押して開いた日時と高座名は、設定確認のため管理者に表示されます。</p><button type="button" class="secondary" data-push-toggle>通知を受け取る</button> <button type="button" class="secondary" data-push-test hidden>テスト通知を送る</button><p role="status"></p></section>
- <details id="push-report" hidden><summary>通知の配信状況</summary><button type="button" class="secondary">配信状況を確認する</button><p role="status"></p><div data-push-devices></div></details>
- <details id="usage-report" hidden><summary>利用状況</summary><button type="button" class="secondary">利用状況を確認する</button><p role="status"></p><div data-usage-rows></div></details>
+ <details id="push-report" hidden><summary>通知の配信状況</summary><p role="status"></p><div data-push-devices></div></details>
+ <details id="usage-report" hidden><summary>利用状況</summary><p role="status"></p><div data-usage-rows></div></details>
  <details class="quick-help"><summary>帳面の使い方</summary>
  <h3>予定を見る・出欠を答える</h3><p>「公演一覧」「稽古出欠」「稽古・公演記録」で切り替えます。稽古は「出欠・詳細」から自分の回答を選び、登録できた表示を確認してください。</p>
  <h3>編集と保存</h3><p>編集担当・管理者は「編集する」を押し、「変更を保存する」で確定します。「キャンセル」は変更を保存しません。保存できなかった場合は入力を残して再試行できます。</p>
@@ -154,18 +154,41 @@ export function mountAccount(){
  settings.onclick=()=>{
   menu.showModal();
   if(cloud.state.provider==='apps-script'&&cloud.state.role){
-   (loadPush??=import('./push-settings.js?v=20261128-line2').then(mod=>mod.mountPushSettings(menu,cloud)).catch(()=>{loadPush=null})).then(open=>open?.());
+   (loadPush??=import('./push-settings.js?v=20261128-reports1').then(mod=>mod.mountPushSettings(menu,cloud)).catch(()=>{loadPush=null})).then(open=>open?.());
   }
  };
  menu.querySelector('[data-install]').onclick=()=>menu.close();
- const report=menu.querySelector('#push-report'), reportButton=report.querySelector('button'), reportStatus=report.querySelector('[role=status]');
- reportButton.onclick=async()=>{
-  const account=cloud.state.user?.uid;
-  reportButton.disabled=true;
-  reportStatus.textContent='確認中…';
-  try{
-   const result=await cloud.push('pushReport');
-   if(cloud.state.user?.uid!==account||cloud.state.role!=='admin')return;
+ function mountReport(id,action,rowsSelector,failure,render){
+  const panel=menu.querySelector(id);
+  const status=panel.querySelector('[role=status]');
+  const rows=panel.querySelector(rowsSelector);
+  let account, request=0;
+  function reset(){
+   request++;
+   panel.open=false;
+   status.textContent='';
+   rows.replaceChildren();
+  }
+  menu.addEventListener('close',reset);
+  panel.addEventListener('toggle',async()=>{
+   const current=++request;
+   if(!panel.open||panel.hidden||!menu.open||!account)return;
+   status.textContent='読み込み中…';
+   rows.replaceChildren();
+   try{
+    const result=await cloud.push(action);
+    if(current===request&&panel.open&&!panel.hidden&&menu.open)render(result,status,rows);
+   }catch{
+    if(current===request&&panel.open&&!panel.hidden&&menu.open)status.textContent=failure;
+   }
+  });
+  return next=>{
+   if(next!==account){reset();account=next}
+   panel.hidden=!account;
+  };
+ }
+ const showReport=mountReport('#push-report','pushReport','[data-push-devices]',
+  '確認できませんでした。閉じてから開き直してください。',(result,reportStatus,devices)=>{
    const mode={off:'停止',pilot:'管理者テスト',members:'会員向け'}[result.mode];
    const time=value=>new Date(value).toLocaleString('ja-JP',{timeZone:'Asia/Tokyo'});
    const run=result.lastRun, test=result.lastTest;
@@ -175,30 +198,14 @@ export function mountAccount(){
     test?'テスト '+time(test.at)+'。'+(test.accepted?'通知サービスが受付。':'通知サービスの受付を確認できませんでした。'):'',
     '端末に届いたかは、端末の通知欄で確認してください。',
    ].filter(Boolean).join(' ');
-   const devices=report.querySelector('[data-push-devices]');
-   devices.replaceChildren();
    for(const device of result.devices||[]){
     const row=document.createElement('p');
     row.textContent=device.name+'：'+(device.registered?'登録済み':'未登録')+'／'+(device.testAt?(device.accepted?'テスト受付済み':'テスト受付未確認')+' '+time(device.testAt):'テスト未実施')+'／'+(device.openedAt?'通知を開いた日時 '+time(device.openedAt):'開封未確認');
     devices.append(row);
    }
-  }catch{
-   if(cloud.state.user?.uid===account)reportStatus.textContent='確認できませんでした。再度お試しください。';
-  }finally{reportButton.disabled=false}
- };
- const usage=menu.querySelector('#usage-report');
- const usageButton=usage.querySelector('button');
- const usageStatus=usage.querySelector('[role=status]');
- const usageRows=usage.querySelector('[data-usage-rows]');
- let usageAccount;
- usageButton.onclick=async()=>{
-  const account=usageAccount;
-  usageButton.disabled=true;
-  usageStatus.textContent='確認中…';
-  usageRows.replaceChildren();
-  try{
-   const result=await cloud.push('usageReport');
-   if(usageAccount!==account)return;
+ });
+ const showUsage=mountReport('#usage-report','usageReport','[data-usage-rows]',
+  '利用状況を取得できませんでした。閉じてから開き直してください。',(result,usageStatus,usageRows)=>{
    const rate=count=>result.total?Math.round(count/result.total*100)+'％':'—';
    usageStatus.textContent='過去7日 '+result.used7+'／'+result.total+'人（'+rate(result.used7)+'）・過去30日 '+result.used30+'／'+result.total+'人（'+rate(result.used30)+'）';
    for(const row of result.rows){
@@ -207,23 +214,15 @@ export function mountAccount(){
     item.textContent=row.name+'　7日間 '+row.count7+'回／30日間 '+row.count30+'回（'+row.days30+'日利用）　最終利用 '+last;
     usageRows.append(item);
    }
-  }catch{
-   if(usageAccount===account)usageStatus.textContent='利用状況を取得できませんでした。時間をおいてお試しください。';
-  }finally{usageButton.disabled=false}
- };
+ });
  cloud.onState(s=>{
   const administrator=s.role==='admin';
   settings.textContent=title.textContent=administrator?'管理者設定':'設定';
   if(dataButton)dataButton.hidden=!s.ready||s.configured&&!administrator;
   admin.hidden=!s.ready||!administrator;
-  report.hidden=!s.ready||!administrator||s.provider!=='apps-script';
-  const nextUsageAccount=report.hidden?null:s.user?.uid;
-  if(nextUsageAccount!==usageAccount){
-   usageAccount=nextUsageAccount;
-   usage.open=false;usageStatus.textContent='';usageRows.replaceChildren();
-  }
-  usage.hidden=!usageAccount;
-  if(report.hidden){report.open=false;reportStatus.textContent='';report.querySelector('[data-push-devices]').replaceChildren()}
+  const reportAccount=s.ready&&administrator&&s.provider==='apps-script'?s.user?.uid:null;
+  showReport(reportAccount);
+  showUsage(reportAccount);
   login.hidden=!s.configured||!s.ready||!!s.user;
   login.textContent=s.provider==='apps-script'?'会員ログイン':'Googleで会員ログイン';
   logout.hidden=!s.user;
