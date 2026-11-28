@@ -1,8 +1,8 @@
-import {escapeHtml as esc} from './ui-text.js?v=20261127-line1';
-import {startEditor,finishEditor,leaveEditor,guardEditor,editorState,saveRecovery,recoveryScope,recoveredEditState} from './editor-dialog.js?v=20261127-line1';
-import {categoryOptions,mountCategoryAdder} from './categories.js?v=20261127-line1';
-import {readRecords,writeRecords} from './record-transfer.js?v=20261127-line1';
-import {cloud} from './cloud.js?v=20261127-line1';
+import {escapeHtml as esc} from './ui-text.js?v=20261128-line2';
+import {startEditor,finishEditor,leaveEditor,guardEditor,editorState,saveRecovery,recoveryScope,recoveredEditState} from './editor-dialog.js?v=20261128-line2';
+import {categoryOptions,mountCategoryAdder} from './categories.js?v=20261128-line2';
+import {readRecords,writeRecords} from './record-transfer.js?v=20261128-line2';
+import {cloud} from './cloud.js?v=20261128-line2';
 export function historyEditor(getData,refresh,refreshRows=()=>{}){
  const section=document.createElement('section');section.className='record-edit-panel';section.innerHTML='<div class="record-edit-actions"><button id="history-edit-mode" class="secondary" type="button" aria-controls="body" hidden>記録を編集する</button><button id="history-add" class="primary" type="button" disabled hidden>＋ 稽古・公演記録を追加</button></div><p id="history-edit-result" class="save-feedback" role="status"></p><p id="history-edit-status" role="status">共通保存の接続を確認しています…</p>';
  (document.getElementById('history-tools')||document.querySelector('main')).append(section);

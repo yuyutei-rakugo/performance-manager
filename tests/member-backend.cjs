@@ -254,3 +254,18 @@ expectError(call('flyerResolveGoogleLink',{token,url:'https://maps.app.goo.gl@ex
 assert.equal(redirects,2);
 sandbox.UrlFetchApp.fetch=originalMapsFetch;
 console.log('PASS authenticated Google share link parsing, safe short redirects and viewport rejection');
+vm.runInContext(fs.readFileSync(path.join(root,'google-backend/Usage.gs'),'utf8'),sandbox);
+expectError(call('usageRecord'),/ログイン/);
+assert(call('memberSave',{token,member:{name:'集計試験会員',role:'viewer',active:true,pin:'4321'}}).ok);
+const usageViewer=call('login',{name:'集計試験会員',pin:'4321'});
+assert(usageViewer.ok);
+expectError(call('usageReport',{token:usageViewer.token}),/管理者/);
+const beforeUsage=files[properties.DB_FILE_ID];
+assert(call('usageRecord',{token}).ok);
+const otherDevice=call('login',{name:'勇水',pin:'2468'});
+assert(otherDevice.ok);
+assert(call('usageRecord',{token:otherDevice.token}).ok);
+assert.equal(call('usageReport',{token}).rows.find(row=>row.last).count7,1);
+assert.equal(call('usageReport',{token:token}).used7,1);
+assert.equal(files[properties.DB_FILE_ID],beforeUsage);
+console.log('PASS authenticated usage and isolated storage');

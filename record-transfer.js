@@ -1,9 +1,9 @@
-import {cloud} from './cloud.js?v=20261127-line1';
+import {cloud} from './cloud.js?v=20261128-line2';
 let legacyRoster;
 export function loadLegacyRoster({force=false}={}){
  if(force)legacyRoster=null;
  if(!legacyRoster){
-  const request=fetch('./history-data.json?v=20261127-line1').then(response=>{
+  const request=fetch('./history-data.json?v=20261128-line2').then(response=>{
    if(response.ok===false)throw Error('会員名を読み込めません。');
    return response.json();
   }).then(data=>{
@@ -67,7 +67,7 @@ export function duplicateSchedule(type,source){
  return copy;
 }
 export function scheduleInvite(type,source){
- const url=new URL(type==='event'?'./':'rehearsals.html?v=20261127-line1',location.href);
+ const url=new URL(type==='event'?'./':'rehearsals.html?v=20261128-line2',location.href);
  url.search='';url.hash='';url.searchParams.set('detail',source.id);
  const day=/^\d{4}-\d{2}-\d{2}$/.test(source.date)?new Intl.DateTimeFormat('ja-JP',{timeZone:'Asia/Tokyo',year:'numeric',month:'long',day:'numeric',weekday:'short'}).format(new Date(source.date+'T12:00:00+09:00')):source.date;
  return ['【結友亭 '+(type==='event'?'公演':'稽古')+'のご案内】',type==='event'?source.title:rehearsalTitle(source),'日時：'+day+' '+(source.time||'時間未定'),'場所：'+source.venue,type==='rehearsal'?'出欠は「帳面」からお願いします。':'詳しくは「帳面」でご確認ください。',url.href].filter(Boolean).join('\n');

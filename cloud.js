@@ -1,4 +1,4 @@
-import {loadCloudConfig} from './schedule-bootstrap.js?v=20261127-line1';
+import {loadCloudConfig} from './schedule-bootstrap.js?v=20261128-line2';
 // Configuration is enabled only after the Firebase project and access rules are ready.
 const listeners = new Set();
 const state = {ready:false, configured:false, connectionIssue:null, user:null, role:null,stageName:null, message:'共通保存は設定準備中です。現在はこの端末に保存します。'};
@@ -91,7 +91,7 @@ export async function startCloud(){
   state.configured=true;state.provider=config.provider||'firebase';state.message='ログイン状態を確認しています。';emit();
   if(config.provider==='apps-script'){if(!/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec$/.test(config.endpoint||'')){
    state.connectionIssue='configuration';state.ready=true;state.message='共通保存の接続先設定を確認してください。';emit();return
-  }const {createPinClient}=await import('./pin-cloud.js?v=20261127-line1');pinClient=createPinClient(config.endpoint,state,emit);await pinClient.start();return}
+  }const {createPinClient}=await import('./pin-cloud.js?v=20261128-line2');pinClient=createPinClient(config.endpoint,state,emit);await pinClient.start({recordUsage:true});return}
   const base='https://www.gstatic.com/firebasejs/12.6.0/';
   const [app,authApi,store]=await Promise.all([import(base+'firebase-app.js'),import(base+'firebase-auth.js'),import(base+'firebase-firestore.js')]);
   api={...authApi,...store};const firebase=app.initializeApp(config.firebase);auth=api.getAuth(firebase);db=api.getFirestore(firebase);
@@ -119,18 +119,20 @@ export function mountAccount(){
  <div class="settings-actions">
   <button type="button" class="secondary" data-install>ホーム画面に追加</button>
   <button type="button" class="secondary" data-share>LINEで共有</button>
-  <a class="secondary" id="settings-admin" href="./admin.html?v=20261127-line1" hidden>管理者ページ</a>
+  <a class="secondary" id="settings-admin" href="./admin.html?v=20261128-line2" hidden>管理者ページ</a>
   <button type="button" class="secondary" id="cloud-logout" hidden>ログアウト</button>
  </div>
  <section data-push-settings hidden><h3>公演の通知を受け取る</h3><p>下のボタンを押し、確認画面で「許可」を選んでください。登録後にテスト通知を送ります。通知を押して開いた日時と高座名は、設定確認のため管理者に表示されます。</p><button type="button" class="secondary" data-push-toggle>通知を受け取る</button> <button type="button" class="secondary" data-push-test hidden>テスト通知を送る</button><p role="status"></p></section>
  <details id="push-report" hidden><summary>通知の配信状況</summary><button type="button" class="secondary">配信状況を確認する</button><p role="status"></p><div data-push-devices></div></details>
+ <details id="usage-report" hidden><summary>利用状況</summary><button type="button" class="secondary">利用状況を確認する</button><p role="status"></p><div data-usage-rows></div></details>
  <details class="quick-help"><summary>帳面の使い方</summary>
  <h3>予定を見る・出欠を答える</h3><p>「公演一覧」「稽古出欠」「稽古・公演記録」で切り替えます。稽古は「出欠・詳細」から自分の回答を選び、登録できた表示を確認してください。</p>
  <h3>編集と保存</h3><p>編集担当・管理者は「編集する」を押し、「変更を保存する」で確定します。「キャンセル」は変更を保存しません。保存できなかった場合は入力を残して再試行できます。</p>
  <h3>変更のお知らせ</h3><p>「変更あり」は、今後保存された名称・日時・会場の変更を7日間表示します。LINE通知は自動送信しません。</p>
  <h3>準備項目のひな形</h3><p>公演の編集で「準備項目のひな形」を開きます。ひな形にする操作の後、公演を保存すると共有されます。使う時は作業名だけをコピーします。元の公演を削除すると、その公演だけに保存したひな形は候補から外れます。</p>
  <h3>ホーム画面に追加</h3><p>AndroidはChromeのメニューから「ホーム画面に追加」→「インストール」。iPhoneはSafariの共有メニューから「ホーム画面に追加」を選びます。</p>
- <h3>反映されない時</h3><p>通信を確認し、編集内容を保存してから帳面を開き直してください。出欠は「出欠一覧を更新」でも確認できます。困った時は勇水さんへ。暗証番号をLINEのグループには送らないでください。</p></details>
+ <h3>反映されない時</h3><p>通信を確認し、編集内容を保存してから帳面を開き直してください。出欠は「出欠一覧を更新」でも確認できます。困った時は勇水さんへ。暗証番号をLINEのグループには送らないでください。</p>
+ <h3>利用状況について</h3><p>帳面の運用改善のため、利用回数と最終利用日時を集計しています。個々の操作履歴は記録しません。</p></details>
  <details id="settings-pin" hidden><summary>暗証番号を変更</summary><form><label>新しい暗証番号（数字4桁）<input name="pin" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="new-password" required></label><button type="submit" class="primary">変更を保存する</button><p role="status"></p></form></details></div>`;
  document.body.append(menu);
  const settings=document.createElement('button'),login=document.createElement('button');
@@ -152,7 +154,7 @@ export function mountAccount(){
  settings.onclick=()=>{
   menu.showModal();
   if(cloud.state.provider==='apps-script'&&cloud.state.role){
-   (loadPush??=import('./push-settings.js?v=20261127-line1').then(mod=>mod.mountPushSettings(menu,cloud)).catch(()=>{loadPush=null})).then(open=>open?.());
+   (loadPush??=import('./push-settings.js?v=20261128-line2').then(mod=>mod.mountPushSettings(menu,cloud)).catch(()=>{loadPush=null})).then(open=>open?.());
   }
  };
  menu.querySelector('[data-install]').onclick=()=>menu.close();
@@ -184,12 +186,43 @@ export function mountAccount(){
    if(cloud.state.user?.uid===account)reportStatus.textContent='確認できませんでした。再度お試しください。';
   }finally{reportButton.disabled=false}
  };
+ const usage=menu.querySelector('#usage-report');
+ const usageButton=usage.querySelector('button');
+ const usageStatus=usage.querySelector('[role=status]');
+ const usageRows=usage.querySelector('[data-usage-rows]');
+ let usageAccount;
+ usageButton.onclick=async()=>{
+  const account=usageAccount;
+  usageButton.disabled=true;
+  usageStatus.textContent='確認中…';
+  usageRows.replaceChildren();
+  try{
+   const result=await cloud.push('usageReport');
+   if(usageAccount!==account)return;
+   const rate=count=>result.total?Math.round(count/result.total*100)+'％':'—';
+   usageStatus.textContent='過去7日 '+result.used7+'／'+result.total+'人（'+rate(result.used7)+'）・過去30日 '+result.used30+'／'+result.total+'人（'+rate(result.used30)+'）';
+   for(const row of result.rows){
+    const item=document.createElement('p');
+    const last=row.last?new Date(row.last).toLocaleString('ja-JP',{timeZone:'Asia/Tokyo'}):'記録なし';
+    item.textContent=row.name+'　7日間 '+row.count7+'回／30日間 '+row.count30+'回（'+row.days30+'日利用）　最終利用 '+last;
+    usageRows.append(item);
+   }
+  }catch{
+   if(usageAccount===account)usageStatus.textContent='利用状況を取得できませんでした。時間をおいてお試しください。';
+  }finally{usageButton.disabled=false}
+ };
  cloud.onState(s=>{
   const administrator=s.role==='admin';
   settings.textContent=title.textContent=administrator?'管理者設定':'設定';
   if(dataButton)dataButton.hidden=!s.ready||s.configured&&!administrator;
   admin.hidden=!s.ready||!administrator;
   report.hidden=!s.ready||!administrator||s.provider!=='apps-script';
+  const nextUsageAccount=report.hidden?null:s.user?.uid;
+  if(nextUsageAccount!==usageAccount){
+   usageAccount=nextUsageAccount;
+   usage.open=false;usageStatus.textContent='';usageRows.replaceChildren();
+  }
+  usage.hidden=!usageAccount;
   if(report.hidden){report.open=false;reportStatus.textContent='';report.querySelector('[data-push-devices]').replaceChildren()}
   login.hidden=!s.configured||!s.ready||!!s.user;
   login.textContent=s.provider==='apps-script'?'会員ログイン':'Googleで会員ログイン';
